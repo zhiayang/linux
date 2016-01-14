@@ -34,7 +34,7 @@ static void iio_buffer_cb_release(struct iio_buffer *buffer)
 {
 	struct iio_cb_buffer *cb_buff = buffer_to_cb_buffer(buffer);
 
-	bitmap_free(cb_buff->buffer.scan_mask);
+	iio_buffer_free_scanmask(buffer);
 	kfree(cb_buff);
 }
 
@@ -51,6 +51,7 @@ struct iio_cb_buffer *iio_channel_get_all_cb(struct device *dev,
 					     void *private)
 {
 	int ret;
+	struct iio_dev *indio_dev;
 	struct iio_cb_buffer *cb_buff;
 	struct iio_channel *chan;
 
@@ -71,28 +72,25 @@ struct iio_cb_buffer *iio_channel_get_all_cb(struct device *dev,
 		goto error_free_cb_buff;
 	}
 
-	cb_buff->indio_dev = cb_buff->channels[0].indio_dev;
-	cb_buff->buffer.scan_mask = bitmap_zalloc(cb_buff->indio_dev->masklength,
-						  GFP_KERNEL);
-	if (cb_buff->buffer.scan_mask == NULL) {
-		ret = -ENOMEM;
+	indio_dev = cb_buff->channels[0].indio_dev;
+
+	ret = iio_buffer_alloc_scanmask(&cb_buff->buffer, indio_dev);
+	if (ret)
 		goto error_release_channels;
-	}
 	chan = &cb_buff->channels[0];
 	while (chan->indio_dev) {
-		if (chan->indio_dev != cb_buff->indio_dev) {
+		if (chan->indio_dev != indio_dev) {
 			ret = -EINVAL;
 			goto error_free_scan_mask;
 		}
-		set_bit(chan->channel->scan_index,
-			cb_buff->buffer.scan_mask);
+		iio_buffer_channel_enable(&cb_buff->buffer, chan);
 		chan++;
 	}
 
 	return cb_buff;
 
 error_free_scan_mask:
-	bitmap_free(cb_buff->buffer.scan_mask);
+	iio_buffer_free_scanmask(&cb_buff->buffer);
 error_release_channels:
 	iio_channel_release_all(cb_buff->channels);
 error_free_cb_buff:
