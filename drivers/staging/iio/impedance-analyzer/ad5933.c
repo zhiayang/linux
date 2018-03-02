@@ -85,6 +85,7 @@
 struct ad5933_state {
 	struct i2c_client		*client;
 	struct regulator		*reg;
+	struct regulator		*vref;
 	struct clk			*mclk;
 	struct delayed_work		work;
 	struct mutex			lock; /* Protect sensor state */
@@ -708,6 +709,19 @@ static int ad5933_probe(struct i2c_client *client,
 	if (ret < 0)
 		goto error_disable_reg;
 
+	st->reg = devm_regulator_get(&client->dev, "vref");
+	if (!IS_ERR(st->vref)) {
+		ret = regulator_enable(st->vref);
+		if (ret)
+			goto error_disable_reg;
+		st->vref_mv = regulator_get_voltage(st->vref) / 1000;
+	}
+
+	if (voltage_uv)
+		st->vref_mv = voltage_uv / 1000;
+	else
+		st->vref_mv = pdata->vref_mv;
+
 	st->vref_mv = ret / 1000;
 
 	st->mclk = devm_clk_get(&client->dev, "mclk");
@@ -760,6 +774,8 @@ error_unreg_ring:
 	iio_kfifo_free(indio_dev->buffer);
 error_disable_mclk:
 	clk_disable_unprepare(st->mclk);
+error_disable_vref:
+	regulator_disable(st->vref);
 error_disable_reg:
 	regulator_disable(st->reg);
 
@@ -775,6 +791,7 @@ static int ad5933_remove(struct i2c_client *client)
 	iio_kfifo_free(indio_dev->buffer);
 	regulator_disable(st->reg);
 	clk_disable_unprepare(st->mclk);
+	regulator_disable(st->vref);
 
 	return 0;
 }
