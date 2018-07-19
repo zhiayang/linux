@@ -432,10 +432,9 @@ static int hmc7044_setup(struct iio_dev *indio_dev)
 
 	lcm_freq = vcxo_freq;
 	for (i = 0; i < ARRAY_SIZE(clkin_freq); i++) {
-		if (clkin_freq[i]) {
-			clkin_freq[i] = hmc->clkin_freq[i] / 1000;
+		clkin_freq[i] = hmc->clkin_freq[i] / 1000;
+		if (clkin_freq[i])
 			lcm_freq = gcd(clkin_freq[i], lcm_freq);
-		}
 	}
 
 	while (lcm_freq > HMC7044_RECOMM_LCM_MAX)
