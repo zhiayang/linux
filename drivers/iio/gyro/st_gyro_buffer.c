@@ -33,25 +33,19 @@ static int st_gyro_buffer_postenable(struct iio_dev *indio_dev)
 {
 	int err;
 
-	err = iio_triggered_buffer_postenable(indio_dev);
-	if (err < 0)
-		return err;
-
 	err = st_sensors_set_axis_enable(indio_dev,
 					 (u8)indio_dev->active_scan_mask[0]);
 	if (err < 0)
-		goto st_gyro_buffer_predisable;
+		return err;
 
 	err = st_sensors_set_enable(indio_dev, true);
 	if (err < 0)
-		goto st_gyro_buffer_enable_all_axis;
+		st_sensors_set_axis_enable(indio_dev, ST_SENSORS_ENABLE_ALL_AXIS);
 
-	return 0;
+	return err;
 
 st_gyro_buffer_enable_all_axis:
 	st_sensors_set_axis_enable(indio_dev, ST_SENSORS_ENABLE_ALL_AXIS);
-st_gyro_buffer_predisable:
-	iio_triggered_buffer_predisable(indio_dev);
 	return err;
 }
 
@@ -60,13 +54,8 @@ static int st_gyro_buffer_predisable(struct iio_dev *indio_dev)
 	int err, err2;
 
 	err = st_sensors_set_enable(indio_dev, false);
-	if (err < 0)
-		goto st_gyro_buffer_predisable;
 
-	err = st_sensors_set_axis_enable(indio_dev, ST_SENSORS_ENABLE_ALL_AXIS);
-
-st_gyro_buffer_predisable:
-	err2 = iio_triggered_buffer_predisable(indio_dev);
+	err2 = st_sensors_set_axis_enable(indio_dev, ST_SENSORS_ENABLE_ALL_AXIS);
 	if (!err)
 		err = err2;
 

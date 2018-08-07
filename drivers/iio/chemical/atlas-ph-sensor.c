@@ -305,10 +305,6 @@ static int atlas_buffer_postenable(struct iio_dev *indio_dev)
 	struct atlas_data *data = iio_priv(indio_dev);
 	int ret;
 
-	ret = iio_triggered_buffer_postenable(indio_dev);
-	if (ret)
-		return ret;
-
 	ret = pm_runtime_get_sync(&data->client->dev);
 	if (ret < 0) {
 		pm_runtime_put_noidle(&data->client->dev);
@@ -328,11 +324,7 @@ static int atlas_buffer_predisable(struct iio_dev *indio_dev)
 		return ret;
 
 	pm_runtime_mark_last_busy(&data->client->dev);
-	ret = pm_runtime_put_autosuspend(&data->client->dev);
-	if (ret)
-		return ret;
-
-	return iio_triggered_buffer_predisable(indio_dev);
+	return pm_runtime_put_autosuspend(&data->client->dev);
 }
 
 static const struct iio_trigger_ops atlas_interrupt_trigger_ops = {
