@@ -2,7 +2,7 @@
 /*
  * Cadence WDT driver - Used by Xilinx Zynq
  *
- * Copyright (C) 2010 - 2014 Xilinx, Inc.
+ * Copyright (C) 2010 - 2019 Xilinx, Inc.
  *
  */
 

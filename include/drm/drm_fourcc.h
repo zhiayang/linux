@@ -124,6 +124,8 @@ struct drm_format_info {
 	u8 block_h[3];
 
 	/** @hsub: Horizontal chroma subsampling factor */
+	u8 pixels_per_macropixel[3];
+	u8 bytes_per_macropixel[3];
 	u8 hsub;
 	/** @vsub: Vertical chroma subsampling factor */
 	u8 vsub;
@@ -318,6 +320,14 @@ unsigned int drm_format_info_block_height(const struct drm_format_info *info,
 					  int plane);
 uint64_t drm_format_info_min_pitch(const struct drm_format_info *info,
 				   int plane, unsigned int buffer_width);
+int drm_format_num_planes(uint32_t format);
+int drm_format_plane_cpp(uint32_t format, int plane);
+int drm_format_horz_chroma_subsampling(uint32_t format);
+int drm_format_vert_chroma_subsampling(uint32_t format);
+int drm_format_plane_width(int width, uint32_t format, int plane);
+int drm_format_plane_height(int height, uint32_t format, int plane);
+int drm_format_plane_width_bytes(const struct drm_format_info *info,
+				 int plane, int width);
 const char *drm_get_format_name(uint32_t format, struct drm_format_name_buf *buf);
 
 #endif /* __DRM_FOURCC_H__ */

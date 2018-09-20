@@ -138,3 +138,4 @@ struct clk_hw *zynqmp_clk_register_mux(const char *name, u32 clk_id,
 
 	return hw;
 }
+EXPORT_SYMBOL_GPL(zynqmp_clk_register_mux);

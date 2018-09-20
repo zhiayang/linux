@@ -104,6 +104,9 @@ void sdhci_get_property(struct platform_device *pdev)
 
 	device_property_read_u32(dev, "clock-frequency", &pltfm_host->clock);
 
+	if (device_property_present(dev, "broken-mmc-highspeed"))
+		host->quirks |= SDHCI_QUIRK_NO_HISPD_BIT;
+
 	if (device_property_present(dev, "keep-power-in-suspend"))
 		host->mmc->pm_caps |= MMC_PM_KEEP_POWER;
 
