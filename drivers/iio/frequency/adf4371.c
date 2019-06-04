@@ -570,6 +570,7 @@ static int adf4371_probe(struct spi_device *spi)
 	spi_set_drvdata(spi, indio_dev);
 	st->spi = spi;
 	st->regmap = regmap;
+	st->spi = spi;
 	mutex_init(&st->lock);
 
 	st->chip_info = &adf4371_chip_info[id->driver_data];
