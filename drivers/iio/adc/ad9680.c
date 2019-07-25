@@ -1471,7 +1471,89 @@ static int ad9680_post_setup(struct iio_dev *indio_dev)
 	return 0;
 }
 
+static int ad9680_jesd204_link_init(struct jesd204_dev *jdev,
+				    unsigned int link_num,
+				    struct jesd204_link *lnk)
+{
+	struct device *dev = jesd204_dev_to_device(jdev);
+	struct spi_device *spi = to_spi_device(dev);
+	struct axiadc_converter *conv = spi_get_drvdata(spi);
+
+	lnk->did = 0;
+	lnk->bid = 1;
+	lnk->num_lanes = 4;
+	lnk->num_converters = 2;
+	lnk->octets_per_frame = 1;
+	lnk->frames_per_multiframe = 32;
+	lnk->converter_resolution = 14;
+	lnk->bits_per_sample = 16;
+	lnk->scrambling = true;
+
+	if (conv->sysref_clk) {
+		lnk->subclass = 1;
+		lnk->sysref.mode = AD9680_SYSREF_CONTINUOUS;
+	} else {
+		lnk->subclass = 0;
+		lnk->sysref.mode = AD9680_SYSREF_DISABLED;
+	}
+
+	lnk->sysref.capture_falling_edge = true;
+	lnk->sysref.valid_falling_edge = false;
+
+	return JESD204_STATE_CHANGE_DONE;
+}
+
+static int ad9680_jesd204_link_disable(struct jesd204_dev *jdev,
+				       unsigned int link_num,
+				       struct jesd204_link *lnk)
+{
+	struct device *dev = jesd204_dev_to_device(jdev);
+	struct spi_device *spi = to_spi_device(dev);
+	struct axiadc_converter *conv = spi_get_drvdata(spi);
+
+	/* Disable link */
+	ad9680_spi_write(conv->spi, 0x571, 0x15);
+
+	clk_disable_unprepare(conv->lane_clk);
+
+	return JESD204_STATE_CHANGE_DONE;
+}
+
+static int ad9680_jesd204_link_enable(struct jesd204_dev *jdev,
+				      unsigned int link,
+				      struct jesd204_link *lnk)
+{
+	struct device *dev = jesd204_dev_to_device(jdev);
+	struct spi_device *spi = to_spi_device(dev);
+	struct axiadc_converter *conv = spi_get_drvdata(spi);
+	unsigned int pll_stat;
+	int ret;
+
+	// Enable link
+	ad9680_spi_write(conv->spi, 0x571, 0x14);
+
+	mdelay(20);
+	pll_stat = ad9680_spi_read(conv->spi, 0x56f);
+
+	dev_info(&conv->spi->dev, "PLL %s\n",
+		 (pll_stat & 0x80) ? "LOCKED" : "UNLOCKED");
+
+	ret = clk_prepare_enable(conv->lane_clk);
+	if (ret < 0) {
+		dev_err(&spi->dev, "Failed to enable JESD204 link: %d\n", ret);
+		return ret;
+	}
+
+	return JESD204_STATE_CHANGE_DONE;
+}
+
 static const struct jesd204_dev_data jesd204_ad9680_init = {
+	.link_ops = {
+		[JESD204_OP_LINK_INIT] = ad9680_jesd204_link_init,
+		[JESD204_OP_LINK_DISABLE] = ad9680_jesd204_link_disable,
+		[JESD204_OP_LINK_ENABLE] = ad9680_jesd204_link_enable,
+	},
+	.num_links = 1,
 };
 
 static int ad9680_probe(struct spi_device *spi)
