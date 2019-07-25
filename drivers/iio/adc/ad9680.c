@@ -1008,6 +1008,73 @@ static int ad9680_setup_link(struct spi_device *spi,
 	return ret;
 }
 
+static int ad9680_jesd204_link_setup(struct jesd204_dev *jdev,
+				     unsigned int link_num,
+				     struct jesd204_link *config)
+{
+	struct device *dev = jesd204_dev_to_device(jdev);
+	struct spi_device *spi = to_spi_device(dev);
+	unsigned int val;
+	unsigned int i;
+	int ret = 0;
+
+	val = ilog2(config->octets_per_frame);
+	val |= ilog2(config->num_converters) << 3;
+	val |= ilog2(config->num_lanes) << 6;
+
+	ret |= ad9680_spi_write(spi, 0x580, config->did);
+	ret |= ad9680_spi_write(spi, 0x581, config->bid);
+
+	ret = ad9680_spi_write(spi, 0x570, val); // Quick config
+
+	for (i = 0; i < config->num_lanes; i++) {
+		ret |= ad9680_spi_write(spi, 0x583 + i, config->lane_ids[i]);
+
+		/* FIXME: find a way to make this configurable ; it wasn't up
+		 * until now, even before this change; this looks like some
+		 * crossbar support that the framework could support
+		 */
+		val = config->lane_ids[i];
+		val |= val << 4;
+		ret |= ad9680_spi_write(spi, 0x5b2 + i + (i / 2), val);
+	}
+
+	val = config->num_lanes - 1;
+	val |= config->scrambling ? 0x80 : 0x00;
+	ret |= ad9680_spi_write(spi, 0x58b, val);
+
+	ret |= ad9680_spi_write(spi, 0x58d, config->frames_per_multiframe - 1);
+	ret |= ad9680_spi_write(spi, 0x58f, config->converter_resolution - 1);
+
+	val = config->bits_per_sample - 1;
+	val |= config->subclass ? 0x20 : 0x00;
+	ret |= ad9680_spi_write(spi, 0x590, val);
+
+	/* Disable SYSREF */
+	ret |= ad9680_spi_write(spi, 0x120, 0x00);
+
+	switch (config->sysref.mode) {
+	case JESD204_SYSREF_CONTINUOUS:
+		val = 0x02;
+		break;
+	case JESD204_SYSREF_ONESHOT:
+		val = 0x04;
+		break;
+	default:
+		val = 0x00;
+		break;
+	}
+
+	if (config->sysref.capture_falling_edge)
+		val |= 0x08;
+
+	if (config->sysref.valid_falling_edge)
+		val |= 0x10;
+	ret |= ad9680_spi_write(spi, 0x120, val);
+
+	return ret ? ret : JESD204_STATE_CHANGE_DONE;
+}
+
 static int ad9680_setup(struct spi_device *spi,
 			const struct jesd204_dev_data *jesd204_init,
 			bool ad9234)
@@ -1550,6 +1617,7 @@ static int ad9680_jesd204_link_enable(struct jesd204_dev *jdev,
 static const struct jesd204_dev_data jesd204_ad9680_init = {
 	.link_ops = {
 		[JESD204_OP_LINK_INIT] = ad9680_jesd204_link_init,
+		[JESD204_OP_LINK_SETUP] = ad9680_jesd204_link_setup,
 		[JESD204_OP_LINK_DISABLE] = ad9680_jesd204_link_disable,
 		[JESD204_OP_LINK_ENABLE] = ad9680_jesd204_link_enable,
 	},
