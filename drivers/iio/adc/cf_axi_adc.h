@@ -12,6 +12,7 @@
 #define ADI_AXI_ADC_H_
 
 #include <linux/fpga/adi-axi-common.h>
+#include <linux/jesd204/jesd204.h>
 
 /* ADC COMMON */
 
@@ -205,6 +206,7 @@ struct axiadc_chip_info {
 
 struct axiadc_converter {
 	struct spi_device 	*spi;
+	struct jesd204_dev	*jdev;
 	struct clk 		*clk;
 	struct clock_scale		adc_clkscale;
 	struct clk		*lane_clk;
