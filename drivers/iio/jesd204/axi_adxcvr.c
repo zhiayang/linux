@@ -585,6 +585,9 @@ static const char *adxcvr_gt_names[] = {
 	[XILINX_XCVR_TYPE_US_GTY4] = "GTY4",
 };
 
+static const struct jesd204_dev_data adxcvr_jesd204_data = {
+};
+
 static int adxcvr_probe(struct platform_device *pdev)
 {
 	struct device_node *np = pdev->dev.of_node;
@@ -720,6 +723,15 @@ static int adxcvr_probe(struct platform_device *pdev)
 		(unsigned long long)mem->start, st->regs,
 		st->num_lanes);
 
+	st->jdev = jesd204_dev_register(&pdev->dev, &adxcvr_jesd204_data);
+
+	if (IS_ERR(st->jdev)) {
+		dev_err(&pdev->dev,
+			"error registering with then JESD204 framework (%ld)\n",
+			PTR_ERR(st->jdev));
+		return PTR_ERR(st->jdev);
+	}
+
 	return 0;
 
 disable_unprepare:
@@ -739,6 +751,8 @@ disable_unprepare:
 static int adxcvr_remove(struct platform_device *pdev)
 {
 	struct adxcvr_state *st = platform_get_drvdata(pdev);
+
+	jesd204_dev_unregister(st->jdev);
 
 	device_remove_file(st->dev, &dev_attr_reg_access);
 	adxcvr_eyescan_unregister(st);
