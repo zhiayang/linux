@@ -1,0 +1,95 @@
+
+#include "zynqmp-zcu102-rev1.0.dts"
+
+/ {
+	amba_pl: amba_pl@0 {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		compatible = "simple-bus";
+		ranges ;
+
+		axi_dma_0: dma@80000000 {
+			#dma-cells = <1>;
+			clock-names = "s_axi_lite_aclk", "m_axi_sg_aclk", "m_axi_mm2s_aclk", "m_axi_s2mm_aclk";
+			clocks = <&clk 71>, <&clk 71>, <&misc_clk_0>, <&misc_clk_0>;
+			compatible = "xlnx,eth-dma";
+			interrupt-names = "mm2s_introut", "s2mm_introut";
+			interrupt-parent = <&gic>;
+			interrupts = <0 89 4 0 90 4>;
+			reg = <0x0 0x80000000 0x0 0x10000>;
+			xlnx,include-dre ;
+		};
+
+		misc_clk_0: misc_clk_0 {
+			#clock-cells = <0>;
+			clock-frequency = <156250000>;
+			compatible = "fixed-clock";
+		};
+
+		xxv_ethernet_0: ethernet@80010000 {
+			axistream-connected = <&axi_dma_0>;
+			axistream-control-connected = <&axi_dma_0>;
+			clock-frequency = <100000000>;
+			clock-names = "rx_core_clk_0", "dclk", "s_axi_aclk_0";
+			clocks = <&misc_clk_0>, <&clk 71>, <&clk 71>;
+			compatible = "xlnx,xxv-ethernet-2.5", "xlnx,xxv-ethernet-1.0";
+			device_type = "network";
+			local-mac-address = [00 0a 35 00 00 01];
+			phy-mode = "base-r";
+			reg = <0x0 0x80010000 0x0 0x10000>;
+			xlnx = <0x0>;
+			xlnx,add-gt-cntrl-sts-ports = <0x0>;
+			xlnx,anlt-clk-in-mhz = <0x64>;
+			xlnx,axis-tdata-width = <0x40>;
+			xlnx,axis-tkeep-width = <0x7>;
+			xlnx,base-r-kr = "BASE-R";
+			xlnx,clocking = "Asynchronous";
+			xlnx,core = "Ethernet MAC+PCS/PMA 64-bit";
+			xlnx,data-path-interface = "AXI Stream";
+			xlnx,enable-datapath-parity = <0x0>;
+			xlnx,enable-pipeline-reg = <0x0>;
+			xlnx,enable-preemption = <0x0>;
+			xlnx,enable-preemption-fifo = <0x0>;
+			xlnx,enable-rx-flow-control-logic = <0x0>;
+			xlnx,enable-time-stamping = <0x0>;
+			xlnx,enable-tx-flow-control-logic = <0x0>;
+			xlnx,enable-vlane-adjust-mode = <0x0>;
+			xlnx,family-chk = "zynquplus";
+			xlnx,fast-sim-mode = <0x0>;
+			xlnx,gt-diffctrl-width = <0x4>;
+			xlnx,gt-drp-clk = "100.00";
+			xlnx,gt-group-select = "Quad X0Y0";
+			xlnx,gt-location = <0x1>;
+			xlnx,gt-ref-clk-freq = "156.25";
+			xlnx,gt-type = "GTH";
+			xlnx,include-auto-neg-lt-logic = "None";
+			xlnx,include-axi4-interface = <0x1>;
+			xlnx,include-dre ;
+			xlnx,include-fec-logic = <0x0>;
+			xlnx,include-rsfec-logic = <0x0>;
+			xlnx,include-shared-logic = <0x1>;
+			xlnx,include-user-fifo = <0x1>;
+			xlnx,lane1-gt-loc = "X0Y4";
+			xlnx,lane2-gt-loc = "NA";
+			xlnx,lane3-gt-loc = "NA";
+			xlnx,lane4-gt-loc = "NA";
+			xlnx,line-rate = <0xa>;
+			xlnx,mii-ctrl-width = <0x4>;
+			xlnx,mii-data-width = <0x20>;
+			xlnx,num-of-cores = <0x1>;
+			xlnx,ptp-clocking-mode = <0x0>;
+			xlnx,ptp-operation-mode = <0x2>;
+			xlnx,runtime-switch = <0x0>;
+			xlnx,rxmem = <0x40000>;
+			xlnx,switch-1-10-25g = <0x0>;
+			xlnx,tx-latency-adjust = <0x0>;
+			xlnx,tx-total-bytes-width = <0x4>;
+			xlnx,xgmii-interface = <0x1>;
+			xxv_ethernet_0_mdio: mdio {
+				#address-cells = <1>;
+				#size-cells = <0>;
+			};
+		};
+	};
+};
+
