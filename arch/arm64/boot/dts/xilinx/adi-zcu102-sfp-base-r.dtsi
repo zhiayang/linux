@@ -1,6 +1,4 @@
 
-#include "zynqmp-zcu102-rev1.0.dts"
-
 / {
 	amba_pl: amba_pl@0 {
 		#address-cells = <2>;
