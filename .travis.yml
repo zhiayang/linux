@@ -1,0 +1,32 @@
+language: c
+
+branches:
+  except:
+  - xcomm_zynq
+  - adi-4.14.0 # current rebased versions of master; change this when updating kernel ver
+
+os: linux
+
+notifications:
+  email:
+    on_success: change
+    on_failure: always
+
+env:
+  matrix:
+  - BUILD_TYPE=sync_branches_with_master_travis DO_NOT_DOCKERIZE=1
+  - BUILD_TYPE=checkpatch DO_NOT_DOCKERIZE=1
+  - BUILD_TYPE=dtb_build_test ARCH=arm DTS_FILES=arch/arm/boot/dts/zynq-*.dts
+    CROSS_COMPILE=arm-linux-gnueabihf- DO_NOT_DOCKERIZE=1
+  - BUILD_TYPE=dtb_build_test ARCH=arm64 DTS_FILES=arch/arm64/boot/dts/xilinx/zynqmp-*.dts
+    CROSS_COMPILE=aarch64-linux-gnu- DO_NOT_DOCKERIZE=1
+  - DEFCONFIG=zynq_xcomm_adv7511_defconfig ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- IMAGE=uImage
+  - DEFCONFIG=zynq_pluto_defconfig ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- IMAGE=uImage
+  - DEFCONFIG=zynq_sidekiqz2_defconfig ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- IMAGE=uImage
+  - DEFCONFIG=adi_zynqmp_defconfig ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- IMAGE=Image
+  - DEFCONFIG=zynq_m2k_defconfig ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- IMAGE=uImage
+  - BUILD_TYPE=compile_test DEFCONFIG=zynq_xcomm_adv7511_defconfig ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf-
+  - BUILD_TYPE=compile_test DEFCONFIG=adi_zynqmp_defconfig ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu-
+
+script:
+  - ./ci/travis/run-build-docker.sh
