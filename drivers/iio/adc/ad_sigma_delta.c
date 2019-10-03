@@ -405,11 +405,11 @@ static int ad_sd_buffer_postenable(struct iio_dev *indio_dev)
 		ret = ad_sigma_delta_prepare_channel(sigma_delta, slot,
 			&indio_dev->channels[i]);
 		if (ret)
-			goto err_predisable;
+			return ret;
 		ret = ad_sigma_delta_set_channel(sigma_delta, slot,
 			indio_dev->channels[i].address);
 		if (ret)
-			goto err_predisable;
+			return ret;
 		slot++;
 	}
 

@@ -490,7 +490,6 @@ static int ad7768_buffer_postenable(struct iio_dev *indio_dev)
 {
 	struct ad7768_state *st = iio_priv(indio_dev);
 
-	iio_triggered_buffer_postenable(indio_dev);
 	/*
 	 * Write a 1 to the LSB of the INTERFACE_FORMAT register to enter
 	 * continuous read mode. Subsequent data reads do not require an
@@ -512,7 +511,7 @@ static int ad7768_buffer_predisable(struct iio_dev *indio_dev)
 	if (ret < 0)
 		return ret;
 
-	return iio_triggered_buffer_predisable(indio_dev);
+	return 0;
 }
 
 static const struct iio_buffer_setup_ops ad7768_buffer_ops = {
