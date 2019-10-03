@@ -12,6 +12,7 @@
 #include <linux/of_device.h>
 #include <linux/clk.h>
 #include <linux/clk-provider.h>
+#include <linux/io.h>
 
 #include "axi_adxcvr.h"
 #include "xilinx_transceiver.h"
