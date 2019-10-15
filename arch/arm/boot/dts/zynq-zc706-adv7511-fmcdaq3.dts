@@ -110,7 +110,7 @@
 	};
 
 	axi_ad9680_core: axi-ad9680-hpc@44a10000 {
-		compatible = "adi,axi-ad9680-1.0";
+		compatible = "adi,axi-adc-10.0.a";
 		reg = <0x44a10000 0x10000>;
 		dmas = <&rx_dma 0>;
 		dma-names = "rx";
