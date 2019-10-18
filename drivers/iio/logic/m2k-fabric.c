@@ -66,7 +66,7 @@ struct m2k_fabric {
 	bool reve;
 };
 
-static int m2k_fabric_switch_values_open[] = {
+static unsigned long m2k_fabric_switch_values_open[] = {
 	/* Output */
 	[M2K_FABRIC_GPIO_EN_AWG1] = 1,
 	[M2K_FABRIC_GPIO_EN_AWG2] = 1,
@@ -88,7 +88,7 @@ static int m2k_fabric_switch_values_open[] = {
 static void m2k_fabric_update_switch_settings(struct m2k_fabric *m2k_fabric,
 	bool update_input, bool update_output)
 {
-	int values[M2K_FABRIC_GPIO_MAX];
+	unsigned long values[M2K_FABRIC_GPIO_MAX];
 	unsigned int ngpios;
 	unsigned int gpio_base;
 
@@ -169,10 +169,12 @@ static void m2k_fabric_update_switch_settings(struct m2k_fabric *m2k_fabric,
 	gpiod_set_array_value_cansleep(ngpios -
 		(update_output ? M2K_FABRIC_GPIO_OUTPUT_MAX : 0),
 		&m2k_fabric->switch_gpios[M2K_FABRIC_GPIO_OUTPUT_MAX],
+		NULL, /* FIXME: add info here? */
 		&m2k_fabric_switch_values_open[M2K_FABRIC_GPIO_OUTPUT_MAX]);
 
 	gpiod_set_array_value_cansleep(ngpios,
 		&m2k_fabric->switch_gpios[gpio_base],
+		NULL, /* FIXME: add info here? */
 		&values[gpio_base]);
 }
 
