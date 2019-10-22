@@ -122,6 +122,7 @@ struct jesd204_dev {
  *			to transition
  * @init_links		initial settings passed from the driver
  * @active_links	active JESD204 link settings
+ * @staged_links	JESD204 link settings staged to be committed as active
  * @num_links		number of links
  */
 struct jesd204_dev_top {
@@ -138,6 +139,7 @@ struct jesd204_dev_top {
 
 	const struct jesd204_link	*init_links;
 	struct jesd204_link		*active_links;
+	struct jesd204_link		*staged_links;
 	unsigned int			num_links;
 };
 

@@ -313,6 +313,7 @@ int jesd204_dev_init_link_data(struct jesd204_dev *jdev)
 {
 	struct jesd204_dev_top *jdev_top = jesd204_dev_top_dev(jdev);
 	struct jesd204_link *jlink;
+	size_t mem_size;
 	int i, ret;
 
 	if (!jdev_top)
@@ -325,6 +326,9 @@ int jesd204_dev_init_link_data(struct jesd204_dev *jdev)
 		if (ret)
 			return ret;
 	}
+
+	mem_size = jdev_top->num_links * sizeof(*jdev_top->staged_links);
+	memcpy(jdev_top->staged_links, jdev_top->active_links, mem_size);
 
 	return 0;
 }
@@ -357,6 +361,11 @@ static int jesd204_dev_create_links_data(struct jesd204_dev *jdev,
 			init->links, init->num_links);
 	if (IS_ERR_OR_NULL(jdev_top->active_links))
 		return PTR_ERR(jdev_top->active_links);
+
+	jdev_top->staged_links = jesd204_dev_alloc_links_data(jdev,
+			init->links, init->num_links);
+	if (IS_ERR_OR_NULL(jdev_top->staged_links))
+		return PTR_ERR(jdev_top->staged_links);
 
 	jdev_top->num_links = init->num_links;
 	jdev_top->init_links = init->links;

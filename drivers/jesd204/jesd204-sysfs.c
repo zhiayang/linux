@@ -373,7 +373,10 @@ static ssize_t jesd204_link_show_store(struct device *dev,
 	unsigned int idx;
 	int len, ret;
 
-	if (!jdev_top || !jdev_top->num_links || !jdev_top->active_links)
+	if (!jdev_top || !jdev_top->num_links)
+		return -ENOENT;
+
+	if (!jdev_top->active_links || !jdev_top->staged_links)
 		return -ENOENT;
 
 	attr = &devattr->attr;
@@ -402,7 +405,21 @@ static ssize_t jesd204_link_show_store(struct device *dev,
 		goto out;
 	}
 
-	lnk = &jdev_top->active_links[idx];
+	if (strncmp(ptr, "active_", sizeof("active_") - 1) == 0) {
+		if (store) {
+			ret = -EPERM;
+			goto out;
+		}
+		lnk = &jdev_top->active_links[idx];
+		ptr += (sizeof("active_") - 1);
+	} else if (strncmp(ptr, "staged_", sizeof("staged_") - 1) == 0) {
+		lnk = &jdev_top->staged_links[idx];
+		ptr += (sizeof("staged_") - 1);
+	} else {
+		ret = -EINVAL;
+		goto out;
+	}
+
 	ret = jesd204_match_attribute_name(jesd204_lnk_attrs, ptr);
 	if (ret < 0)
 		goto out;
@@ -569,8 +586,9 @@ static struct device_attribute *jesd204_dev_create_lnk_attrs(
 	struct device_attribute *lnkattrs;
 	const struct jesd204_attr *jattr;
 	struct attribute *attr;
-	int num_lnk_attrs = ARRAY_SIZE(jesd204_lnk_attrs);
+	int num_lnk_attrs = ARRAY_SIZE(jesd204_lnk_attrs) * 2;
 	int i1, i2, lnkattr_idx;
+	const char *type;
 
 	if (!jdev_top || !jdev_top->num_links) {
 		*count = 0;
@@ -587,12 +605,18 @@ static struct device_attribute *jesd204_dev_create_lnk_attrs(
 	lnkattr_idx = 0;
 	for (i1 = 0; i1 < jdev_top->num_links; i1++) {
 		for (i2 = 0; i2 < num_lnk_attrs; i2++) {
-			jattr = &jesd204_lnk_attrs[i2];
 			attr = &(lnkattrs[lnkattr_idx].attr);
-			attr->mode = 0444;
+			jattr = &jesd204_lnk_attrs[i2 / 2];
+			if ((i2 % 2) == 1) {
+				type = "staged";
+				attr->mode = 0664;
+			} else {
+				type = "active";
+				attr->mode = 0444;
+			}
 			attr->name = devm_kasprintf(jdev->dev, GFP_KERNEL,
-						    "link%d_%s", i1,
-						    jattr->name);
+						    "link%d_%s_%s", i1,
+						    type, jattr->name);
 			if (!attr->name)
 				return ERR_PTR(-ENOMEM);
 			lnkattrs[lnkattr_idx].show = jesd204_link_show;
