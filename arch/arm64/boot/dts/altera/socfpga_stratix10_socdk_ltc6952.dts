@@ -1,0 +1,65 @@
+/dts-v1/;
+#include "socfpga_stratix10_socdk.dts"
+
+/ {
+	clocks {
+		sys_clk: sys_clk {
+			#clock-cells = <0>;
+			compatible = "fixed-clock";
+			clock-frequency = <100000000>;
+			clock-output-names = "system_clock";
+		};
+
+		dma_clk: dma_clk {
+			#clock-cells = <0x0>;
+			compatible = "fixed-clock";
+			clock-frequency = <250000000>;
+			clock-output-names = "dma_clk";
+		};
+	};
+
+	soc {
+                sys_spi: spi@f9000040 {
+			compatible = "altr,spi-1.0";
+			reg = <0xf9000040 0x00000020>;
+			interrupt-parent = <&intc>;
+			interrupts = <0 24 4>;
+			#address-cells = <0x1>;
+			#size-cells = <0x0>;
+
+                        clk0_ltc6952: ltc6952@0 {
+                		compatible = "adi,ltc6952";
+                		reg = <0>;
+
+                		#address-cells = <1>;
+                		#size-cells = <0>;
+
+                		spi-max-frequency = <10000000>;
+
+				clock-output-names = "ltc6952_out0", "ltc6952_out1", "ltc6952_out2",
+					"ltc6952_out3", "ltc6952_out4", "ltc6952_out5", "ltc6952_out6",
+					"ltc6952_out7", "ltc6952_out8", "ltc6952_out9", "ltc6952_out10",
+					"ltc6952_out11";
+				#clock-cells = <1>;
+
+				adi,vco-frequency-hz = <122880000>;
+				adi,ref-frequency-hz = <122880000>;
+
+				ltc6952_0_c0: channel@0 {
+					reg = <13>;
+					adi,extended-name = "REF_CLK";
+					adi,phase = <0>;
+					adi,divider = <10>;
+				};
+
+				ltc6952_0_c1: channel@1 {
+					reg = <1>;
+					adi,extended-name = "TEST_CLK";
+					adi,phase = <0>;
+					adi,divider = <10>;
+				};
+
+		       	};
+		};
+   	};
+};
