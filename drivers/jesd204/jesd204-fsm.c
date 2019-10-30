@@ -556,3 +556,41 @@ void jesd204_fsm_unreg_device(struct jesd204_dev *jdev)
 	jesd204_fsm_table(jdev, JESD204_LINKS_ALL,
 			  JESD204_STATE_DONT_CARE, jesd204_unreg_dev_states);
 }
+
+int jesd204_fsm_link_change(struct jesd204_dev_top *jdev_top,
+			    unsigned int link_idx)
+{
+	struct jesd204_link *al, *sl;
+	int ret;
+
+	if (link_idx >= jdev_top->num_links)
+		return -EINVAL;
+
+	al = &jdev_top->active_links[link_idx];
+	sl = &jdev_top->staged_links[link_idx];
+
+	/* If no links staged, there is nothing to do */
+	if (memcmp(al, sl, sizeof(*al)) == 0)
+		return 0;
+
+	ret = jesd204_fsm_table(&jdev_top->jdev, link_idx,
+				jdev_top->cur_state,
+				jesd204_unreg_dev_states);
+	if (ret)
+		return ret;
+
+	if (!sl->enabled)
+		goto save_link_settings;
+
+	ret = jesd204_fsm_table(&jdev_top->jdev, link_idx,
+				jdev_top->cur_state,
+				jesd204_start_links_states);
+	if (ret)
+		return ret;
+
+save_link_settings:
+	/* Save new active link settings */
+	memcpy(al, sl, sizeof(*al));
+
+	return 0;
+}

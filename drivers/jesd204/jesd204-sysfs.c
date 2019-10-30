@@ -358,6 +358,36 @@ static ssize_t jesd204_show_store_bool(bool *val, char *wbuf, const char *rbuf,
 	return count;
 }
 
+static int jesd204_show_store_control(struct jesd204_dev_top *jdev_top,
+				      unsigned int link_idx,
+				      char *wbuf, const char *rbuf,
+				      size_t count, bool store)
+{
+	struct jesd204_link *al, *sl;
+	int ret;
+
+	if (!store)
+		return sprintf(wbuf, "%s\n",
+			       "commit|reset");
+
+	al = &jdev_top->active_links[link_idx];
+	sl = &jdev_top->staged_links[link_idx];
+
+	if (sysfs_streq("reset", rbuf)) {
+		memcpy(sl, al, sizeof(*al));
+		return count;
+	}
+
+	if (!sysfs_streq("commit", rbuf))
+		return -EINVAL;
+
+	ret = jesd204_fsm_link_change(jdev_top, link_idx);
+	if (ret < 0)
+		return ret;
+
+	return count;
+}
+
 static ssize_t jesd204_link_show_store(struct device *dev,
 				       struct device_attribute *devattr,
 				       char *wbuf, const char *rbuf,
@@ -415,6 +445,10 @@ static ssize_t jesd204_link_show_store(struct device *dev,
 	} else if (strncmp(ptr, "staged_", sizeof("staged_") - 1) == 0) {
 		lnk = &jdev_top->staged_links[idx];
 		ptr += (sizeof("staged_") - 1);
+	} else if (strncmp(ptr, "control", sizeof("control") - 1) == 0) {
+		ret = jesd204_show_store_control(jdev_top, idx, wbuf, rbuf,
+						 count, store);
+		goto out;
 	} else {
 		ret = -EINVAL;
 		goto out;
@@ -595,7 +629,7 @@ static struct device_attribute *jesd204_dev_create_lnk_attrs(
 		return NULL;
 	}
 
-	*count = jdev_top->num_links * num_lnk_attrs;
+	*count = jdev_top->num_links * num_lnk_attrs + jdev_top->num_links;
 
 	lnkattrs = devm_kcalloc(jdev->dev, *count, sizeof(*lnkattrs),
 				GFP_KERNEL);
@@ -623,6 +657,17 @@ static struct device_attribute *jesd204_dev_create_lnk_attrs(
 			lnkattrs[lnkattr_idx].store = jesd204_link_store;
 			lnkattr_idx++;
 		}
+
+		attr = &(lnkattrs[lnkattr_idx].attr);
+		/* Add one last attribute for link control */
+		attr->name = devm_kasprintf(jdev->dev, GFP_KERNEL,
+					    "link%d_control", i1);
+		if (!attr->name)
+			return ERR_PTR(-ENOMEM);
+		attr->mode = 0664;
+		lnkattrs[lnkattr_idx].show = jesd204_link_show;
+		lnkattrs[lnkattr_idx].store = jesd204_link_store;
+		lnkattr_idx++;
 	}
 
 	return lnkattrs;

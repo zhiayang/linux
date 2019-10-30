@@ -169,6 +169,9 @@ int jesd204_fsm_start_links(struct jesd204_dev *jdev,
 
 void jesd204_fsm_unreg_device(struct jesd204_dev *jdev);
 
+int jesd204_fsm_link_change(struct jesd204_dev_top *jdev_top,
+			    unsigned int link_idx);
+
 int jesd204_dev_create_sysfs(struct jesd204_dev *jdev);
 void jesd204_dev_destroy_sysfs(struct jesd204_dev *jdev);
 
