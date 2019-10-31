@@ -1233,7 +1233,7 @@ static int adis16480_enable_irq(struct adis *adis, bool enable)
 	int ret;
 
 	ret = __adis_read_reg_16(adis, ADIS16480_REG_FNCTIO_CTRL, &val);
-	if (ret < 0)
+	if (ret)
 		return ret;
 
 	val &= ~ADIS16480_DRDY_EN_MSK;
