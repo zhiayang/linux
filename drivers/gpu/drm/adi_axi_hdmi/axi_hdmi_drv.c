@@ -36,6 +36,7 @@
 
 static struct drm_mode_config_funcs axi_hdmi_mode_config_funcs = {
 	.fb_create = drm_gem_fb_create,
+	.output_poll_changed = drm_fb_helper_output_poll_changed,
 	.atomic_check = drm_atomic_helper_check,
 	.atomic_commit = drm_atomic_helper_commit,
 };
@@ -86,7 +87,7 @@ static int axi_hdmi_init(struct drm_driver *ddrv, struct device *dev)
 
 	ret = drm_fbdev_generic_setup(ddev, 32);
 	if (ret) {
-		DRM_ERROR("failed to initialize drm fbdev\n");
+		DRM_ERROR("failed to initialize drm fbdev: %d\n", ret);
 		goto err_crtc;
 	}
 
@@ -120,6 +121,7 @@ static const struct file_operations axi_hdmi_driver_fops = {
 static struct drm_driver axi_hdmi_driver = {
 	.driver_features	= DRIVER_MODESET | DRIVER_GEM | DRIVER_ATOMIC,
 	.unload			= axi_hdmi_unload,
+	.lastclose		= drm_fb_helper_lastclose,
 	.gem_free_object	= drm_gem_cma_free_object,
 	.gem_vm_ops		= &drm_gem_cma_vm_ops,
 	.dumb_create		= drm_gem_cma_dumb_create,
