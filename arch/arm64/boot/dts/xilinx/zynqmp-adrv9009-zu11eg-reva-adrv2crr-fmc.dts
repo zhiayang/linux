@@ -336,7 +336,6 @@
 			"hmc7044_c_out10_REFCLK_QSFP", "hmc7044_c_out11_REFCLK_SFP",
 			"hmc7044_c_out12", "hmc7044_c_out13";
 
-
 		hmc7044_fmc_car_c2: channel@2 {
 			reg = <2>;
 			adi,extended-name = "REFCLK_OUT2";
@@ -353,5 +352,29 @@
 			adi,high-performance-mode-disable;
 			adi,driver-impedance-mode = <3>;
 		};
+
+                hmc7044_fmc_car_c6: channel@6 {
+                        reg = <6>;
+                        adi,extended-name = "SYNC_OUT2";
+                        adi,divider = <3840>;   // 768000
+                        adi,driver-mode = <3>;
+                        adi,startup-mode-dynamic-enable;
+                        adi,high-performance-mode-disable;
+                        adi,driver-impedance-mode = <3>;
+                };
+
+                hmc7044_fmc_car_c8: channel@8 {
+                        reg = <8>;
+                        adi,extended-name = "REFCLK_OUT3";
+                        adi,divider = <24>;     // 12288000
+                        adi,driver-mode = <HMC7044_DRIVER_MODE_LVPECL>;
+                };
+
+                hmc7044_fmc_car_c9: channel@9 {
+                        reg = <9>;
+                        adi,extended-name = "REFCLK_OUT4";
+                        adi,divider = <24>;     // 12288000
+                        adi,driver-mode = <HMC7044_DRIVER_MODE_LVPECL>;
+                };
 	};
 };
