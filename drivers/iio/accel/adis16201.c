@@ -239,6 +239,12 @@ static const struct adis_timeout adis16201_timeouts = {
 	.self_test_ms = ADIS16201_STARTUP_DELAY,
 };
 
+static const struct adis_timeout adis16201_timeouts = {
+	.reset_ms = ADIS16201_STARTUP_DELAY_MS,
+	.sw_reset_ms = ADIS16201_STARTUP_DELAY_MS,
+	.self_test_ms = ADIS16201_STARTUP_DELAY_MS,
+};
+
 static const struct adis_data adis16201_data = {
 	.read_delay = 20,
 	.msc_ctrl_reg = ADIS16201_MSC_CTRL_REG,
