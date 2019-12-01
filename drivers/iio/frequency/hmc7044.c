@@ -76,6 +76,12 @@
 #define HMC7044_100_OHM_EN		BIT(1)
 #define HMC7044_BUF_EN			BIT(0)
 
+#define HMC7044_REG_PLL1_CHARGE_PUMP_CTRL	0x001A
+#define HMC7044_PLL1_CP_CURRENT			0x0F 
+//#define HMC7044_REG_PLL2_CHARGE_PUMP_CTRL      0x0037
+//#define HMC7044_PLL2_CP_CURRENT                0x0f
+
+
 #define HMC7044_REG_CLKIN_PRESCALER(x)	(0x001C + (x))
 #define HMC7044_REG_OSCIN_PRESCALER	0x0020
 
@@ -203,8 +209,8 @@
 #define HMC7044_RECOMM_LCM_MAX	70000
 #define HMC7044_RECOMM_FPD1	10000
 
-#define HMC7044_R1_MAX		65535
-#define HMC7044_N1_MAX		65535
+#define HMC7044_R1_MAX		1
+#define HMC7044_N1_MAX		4
 
 #define HMC7044_R2_MIN		1
 #define HMC7044_R2_MAX		4095
@@ -794,6 +800,8 @@ static int hmc7044_setup(struct iio_dev *indio_dev)
 	/* Disable all channels */
 	for (i = 0; i < HMC7044_NUM_CHAN; i++)
 		hmc7044_write(indio_dev, HMC7044_REG_CH_OUT_CRTL_0(i), 0);
+
+	hmc7044_write(indio_dev, HMC7044_REG_PLL1_CHARGE_PUMP_CTRL, 0X0f);
 
 	/* Load the configuration updates (provided by Analog Devices) */
 	hmc7044_write(indio_dev, HMC7044_REG_CLK_OUT_DRV_LOW_PW, 0x4d);
