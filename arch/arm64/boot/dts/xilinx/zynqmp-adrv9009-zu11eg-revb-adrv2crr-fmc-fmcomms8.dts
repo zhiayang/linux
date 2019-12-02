@@ -1,5 +1,5 @@
 
-#include "zynqmp-adrv9009-zu11eg-revb-adrv2crr-fmc.dts"
+#include "zynqmp-adrv9009-zu11eg-revb-adrv2crr-fmc-sync.dts"
 
 
 &spi1 {
