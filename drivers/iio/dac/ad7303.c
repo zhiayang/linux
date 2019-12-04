@@ -1,8 +1,9 @@
-// SPDX-License-Identifier: GPL-2.0-only
 /*
  * AD7303 Digital to analog converters driver
  *
  * Copyright 2013 Analog Devices Inc.
+ *
+ * Licensed under the GPL-2.
  */
 
 #include <linux/err.h>
@@ -12,15 +13,13 @@
 #include <linux/slab.h>
 #include <linux/sysfs.h>
 #include <linux/regulator/consumer.h>
-#include <linux/of.h>
+#include <linux/property.h>
 
 #include <linux/iio/iio.h>
 #include <linux/iio/buffer.h>
 #include <linux/iio/triggered_buffer.h>
 #include <linux/iio/trigger_consumer.h>
 #include <linux/iio/sysfs.h>
-
-#include <linux/platform_data/ad7303.h>
 
 #define AD7303_CFG_EXTERNAL_VREF BIT(15)
 #define AD7303_CFG_POWER_DOWN(ch) BIT(11 + (ch))
@@ -49,13 +48,10 @@ struct ad7303_state {
 	struct regulator *vdd_reg;
 	struct regulator *vref_reg;
 
-	struct mutex lock;
-
 	struct spi_transfer xfer[2];
 	struct spi_message msg;
 	unsigned int num_transfers;
 
->>>>>>> 97436373d623... iio: ad7303: Add output buffer support
 	/*
 	 * DMA (thus cache coherency maintenance) requires the
 	 * transfer buffers to live in their own cache lines.
@@ -150,7 +146,7 @@ static ssize_t ad7303_write_dac_powerdown(struct iio_dev *indio_dev,
 	if (ret)
 		return ret;
 
-	mutex_lock(&st->lock);
+	mutex_lock(&indio_dev->mlock);
 
 	if (pwr_down)
 		st->config |= AD7303_CFG_POWER_DOWN(chan->channel);
@@ -161,7 +157,7 @@ static ssize_t ad7303_write_dac_powerdown(struct iio_dev *indio_dev,
 	 * mode, so just write one of the DAC channels again */
 	ad7303_write(st, chan->channel, st->dac_cache[chan->channel]);
 
-	mutex_unlock(&st->lock);
+	mutex_unlock(&indio_dev->mlock);
 	return len;
 }
 
@@ -187,9 +183,7 @@ static int ad7303_read_raw(struct iio_dev *indio_dev,
 
 	switch (info) {
 	case IIO_CHAN_INFO_RAW:
-		mutex_lock(&st->lock);
 		*val = st->dac_cache[chan->channel];
-		mutex_unlock(&st->lock);
 		return IIO_VAL_INT;
 	case IIO_CHAN_INFO_SCALE:
 		vref_uv = ad7303_get_vref(st, chan);
@@ -219,11 +213,11 @@ static int ad7303_write_raw(struct iio_dev *indio_dev,
 		if (val >= (1 << chan->scan_type.realbits) || val < 0)
 			return -EINVAL;
 
-		mutex_lock(&st->lock);
+		mutex_lock(&indio_dev->mlock);
 		ret = ad7303_write(st, chan->address, val);
 		if (ret == 0)
 			st->dac_cache[chan->channel] = val;
-		mutex_unlock(&st->lock);
+		mutex_unlock(&indio_dev->mlock);
 		break;
 	default:
 		ret = -EINVAL;
@@ -288,8 +282,6 @@ static int ad7303_probe(struct spi_device *spi)
 
 	st->spi = spi;
 
-	mutex_init(&st->lock);
-
 	st->vdd_reg = devm_regulator_get(&spi->dev, "Vdd");
 	if (IS_ERR(st->vdd_reg))
 		return PTR_ERR(st->vdd_reg);
@@ -298,16 +290,8 @@ static int ad7303_probe(struct spi_device *spi)
 	if (ret)
 		return ret;
 
-	if (spi->dev.of_node) {
-		ext_ref = of_property_read_bool(spi->dev.of_node,
-				"adi,use-external-reference");
-	} else {
-		struct ad7303_platform_data *pdata = spi->dev.platform_data;
-		if (pdata && pdata->use_external_ref)
-			ext_ref = true;
-		else
-			ext_ref = false;
-	}
+	ext_ref = device_property_read_bool(&spi->dev,
+					    "adi,use-external-reference");
 
 	if (ext_ref) {
 		st->vref_reg = devm_regulator_get(&spi->dev, "REF");
