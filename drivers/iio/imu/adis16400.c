@@ -360,13 +360,8 @@ static int adis16400_get_freq(struct adis16400_state *st)
 	int sps, ret;
 	uint16_t t;
 
-<<<<<<< HEAD
-	ret = adis_read_reg_16(&st->adis, ADIS16400_SMPL_PRD, &t);
-	if (ret)
-=======
 	ret = __adis_read_reg_16(&st->adis, ADIS16400_SMPL_PRD, &t);
-	if (ret < 0)
->>>>>>> iio: imu: adis16400: rework locks using ADIS library's state lock
+	if (ret)
 		return ret;
 
 	sps = (t & ADIS16400_SMPL_PRD_TIME_BASE) ? 52851 : 1638404;
@@ -422,13 +417,8 @@ static int __adis16400_set_filter(struct iio_dev *indio_dev, int sps, int val)
 			break;
 	}
 
-<<<<<<< HEAD
-	ret = adis_read_reg_16(&st->adis, ADIS16400_SENS_AVG, &val16);
-	if (ret)
-=======
 	ret = __adis_read_reg_16(&st->adis, ADIS16400_SENS_AVG, &val16);
-	if (ret < 0)
->>>>>>> iio: imu: adis16400: rework locks using ADIS library's state lock
+	if (ret)
 		return ret;
 
 	ret = __adis_write_reg_16(&st->adis, ADIS16400_SENS_AVG,
@@ -625,28 +615,13 @@ static int adis16400_read_raw(struct iio_dev *indio_dev,
 		ret = __adis_read_reg_16(&st->adis,
 						ADIS16400_SENS_AVG,
 						&val16);
-<<<<<<< HEAD
 		if (ret) {
-			mutex_unlock(&indio_dev->mlock);
-			return ret;
-		}
-		ret = st->variant->get_freq(st);
-		if (ret >= 0) {
-			ret /= adis16400_3db_divisors[val16 & 0x07];
-			*val = ret / 1000;
-			*val2 = (ret % 1000) * 1000;
-		}
-		mutex_unlock(&indio_dev->mlock);
-		if (ret)
-=======
-		if (ret < 0) {
 			mutex_unlock(slock);
 			return ret;
 		}
 		ret = st->variant->get_freq(st);
 		mutex_unlock(slock);
-		if (ret < 0)
->>>>>>> iio: imu: adis16400: rework locks using ADIS library's state lock
+		if (ret)
 			return ret;
 		ret /= adis16400_3db_divisors[val16 & 0x07];
 		*val = ret / 1000;
@@ -655,12 +630,8 @@ static int adis16400_read_raw(struct iio_dev *indio_dev,
 	case IIO_CHAN_INFO_SAMP_FREQ:
 		mutex_lock(slock);
 		ret = st->variant->get_freq(st);
-<<<<<<< HEAD
-		if (ret)
-=======
 		mutex_unlock(slock);
-		if (ret < 0)
->>>>>>> iio: imu: adis16400: rework locks using ADIS library's state lock
+		if (ret)
 			return ret;
 		*val = ret / 1000;
 		*val2 = (ret % 1000) * 1000;

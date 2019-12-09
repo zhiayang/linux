@@ -229,15 +229,10 @@ static ssize_t adis16136_read_frequency(struct device *dev,
 	unsigned int freq;
 	int ret;
 
-<<<<<<< HEAD
-	ret = adis16136_get_freq(adis16136, &freq);
-	if (ret)
-=======
 	mutex_lock(slock);
 	ret = __adis16136_get_freq(adis16136, &freq);
 	mutex_unlock(slock);
-	if (ret < 0)
->>>>>>> iio: gyro: adis16136: rework locks using ADIS library's state lock
+	if (ret)
 		return ret;
 
 	return sprintf(buf, "%d\n", freq);
@@ -265,16 +260,10 @@ static int adis16136_set_filter(struct iio_dev *indio_dev, int val)
 	unsigned int freq;
 	int i, ret;
 
-<<<<<<< HEAD
-	ret = adis16136_get_freq(adis16136, &freq);
-	if (ret)
-		return ret;
-=======
 	mutex_lock(slock);
 	ret = __adis16136_get_freq(adis16136, &freq);
-	if (ret < 0)
+	if (ret)
 		goto out_unlock;
->>>>>>> iio: gyro: adis16136: rework locks using ADIS library's state lock
 
 	for (i = ARRAY_SIZE(adis16136_3db_divisors) - 1; i >= 1; i--) {
 		if (freq / adis16136_3db_divisors[i] >= val)
@@ -298,22 +287,13 @@ static int adis16136_get_filter(struct iio_dev *indio_dev, int *val)
 
 	mutex_lock(slock);
 
-<<<<<<< HEAD
-	ret = adis_read_reg_16(&adis16136->adis, ADIS16136_REG_AVG_CNT, &val16);
-	if (ret)
-		goto err_unlock;
-
-	ret = adis16136_get_freq(adis16136, &freq);
-	if (ret)
-=======
 	ret = __adis_read_reg_16(&adis16136->adis, ADIS16136_REG_AVG_CNT,
 				 &val16);
-	if (ret < 0)
+	if (ret)
 		goto err_unlock;
 
 	ret = __adis16136_get_freq(adis16136, &freq);
-	if (ret < 0)
->>>>>>> iio: gyro: adis16136: rework locks using ADIS library's state lock
+	if (ret)
 		goto err_unlock;
 
 	*val = freq / adis16136_3db_divisors[val16 & 0x07];
