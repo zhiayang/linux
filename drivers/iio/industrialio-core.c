@@ -371,8 +371,6 @@ static void iio_device_unregister_debugfs(struct iio_dev *indio_dev)
 
 static void iio_device_register_debugfs(struct iio_dev *indio_dev)
 {
-	struct dentry *d;
-
 	if (indio_dev->info->debugfs_reg_access == NULL)
 		return;
 
@@ -382,23 +380,6 @@ static void iio_device_register_debugfs(struct iio_dev *indio_dev)
 	indio_dev->debugfs_dentry =
 		debugfs_create_dir(dev_name(&indio_dev->dev),
 				   iio_debugfs_dentry);
-	if (IS_ERR(indio_dev->debugfs_dentry))
-		return;
-
-	if (indio_dev->debugfs_dentry == NULL) {
-		dev_warn(indio_dev->dev.parent,
-			 "Failed to create debugfs directory\n");
-		return;
-	}
-
-	d = debugfs_create_file("direct_reg_access", 0644,
-				indio_dev->debugfs_dentry,
-				indio_dev, &iio_debugfs_reg_fops);
-	if (!d) {
-		iio_device_unregister_debugfs(indio_dev);
-		return;
-	}
-
 	debugfs_create_file("direct_reg_access", 0644,
 			    indio_dev->debugfs_dentry, indio_dev,
 			    &iio_debugfs_reg_fops);
