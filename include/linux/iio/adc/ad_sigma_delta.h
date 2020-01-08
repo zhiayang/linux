@@ -43,6 +43,7 @@ struct iio_dev;
  * @addr_shift: Shift of the register address in the communications register.
  * @read_mask: Mask for the communications register having the read bit set.
  * @data_reg: Address of the data register, if 0 the default address of 0x3 will
+ * @irq_flags: flags for the interrupt used by the triggered buffer
  *   be used.
  */
 struct ad_sigma_delta_info {
@@ -56,6 +57,7 @@ struct ad_sigma_delta_info {
 	unsigned int addr_shift;
 	unsigned int read_mask;
 	unsigned int data_reg;
+	unsigned long irq_flags;
 };
 
 /**
@@ -63,7 +65,6 @@ struct ad_sigma_delta_info {
  * @spi: The spi device associated with the Sigma Delta device.
  * @trig: The IIO trigger associated with the Sigma Delta device.
  * @num_slots: Number of sequencer slots
- * @irq_flags: flags for the interrupt used by the triggered buffer
  *
  * Most of the fields are private to the sigma delta library code and should not
  * be accessed by individual drivers.
@@ -73,7 +74,6 @@ struct ad_sigma_delta {
 	struct iio_trigger	*trig;
 
 	unsigned int		num_slots;
-	unsigned long		irq_flags;
 
 /* private: */
 	struct completion	completion;
