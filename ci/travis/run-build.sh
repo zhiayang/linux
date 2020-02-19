@@ -159,6 +159,9 @@ check_all_adi_files_have_been_built() {
 	return $ret
 }
 
+# FIXME: force off this for now; there are upstream drivers which we don't have
+CHECK_ALL_ADI_DRIVERS_HAVE_BEEN_BUILT=0
+
 build_default() {
 	[ -n "$DEFCONFIG" ] || {
 		echo_red "No DEFCONFIG provided"
