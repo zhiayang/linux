@@ -221,7 +221,6 @@ static int uio_dmem_genirq_probe(struct platform_device *pdev)
 			goto bad1;
 		uioinfo->irq = ret;
 	}
-
 	uiomem = &uioinfo->mem[0];
 
 	for (i = 0; i < pdev->num_resources; ++i) {
