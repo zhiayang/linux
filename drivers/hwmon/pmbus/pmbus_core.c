@@ -2535,6 +2535,8 @@ static int __init pmbus_core_init(void)
 	if (IS_ERR(pmbus_debugfs_dir))
 		pmbus_debugfs_dir = NULL;
 
+	crc8_populate_msb(pmbus_crc_table, 0x7);
+
 	return 0;
 }
 
