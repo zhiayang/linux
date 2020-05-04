@@ -132,6 +132,8 @@ struct exynos_adc {
 
 	struct completion	completion;
 
+	struct mutex		lock;
+
 	u32			value;
 	unsigned int            version;
 
@@ -534,7 +536,7 @@ static int exynos_read_raw(struct iio_dev *indio_dev,
 	if (mask != IIO_CHAN_INFO_RAW)
 		return -EINVAL;
 
-	mutex_lock(&indio_dev->mlock);
+	mutex_lock(&info->lock);
 	reinit_completion(&info->completion);
 
 	/* Select the channel to be used and Trigger conversion */
@@ -554,7 +556,7 @@ static int exynos_read_raw(struct iio_dev *indio_dev,
 		ret = IIO_VAL_INT;
 	}
 
-	mutex_unlock(&indio_dev->mlock);
+	mutex_unlock(&info->lock);
 
 	return ret;
 }
@@ -565,7 +567,7 @@ static int exynos_read_s3c64xx_ts(struct iio_dev *indio_dev, int *x, int *y)
 	unsigned long timeout;
 	int ret;
 
-	mutex_lock(&indio_dev->mlock);
+	mutex_lock(&info->lock);
 	info->read_ts = true;
 
 	reinit_completion(&info->completion);
@@ -590,7 +592,7 @@ static int exynos_read_s3c64xx_ts(struct iio_dev *indio_dev, int *x, int *y)
 	}
 
 	info->read_ts = false;
-	mutex_unlock(&indio_dev->mlock);
+	mutex_unlock(&info->lock);
 
 	return ret;
 }
@@ -864,6 +866,8 @@ static int exynos_adc_probe(struct platform_device *pdev)
 	indio_dev->modes = INDIO_DIRECT_MODE;
 	indio_dev->channels = exynos_adc_iio_channels;
 	indio_dev->num_channels = info->data->num_channels;
+
+	mutex_init(&info->lock);
 
 	ret = request_irq(info->irq, exynos_adc_isr,
 					0, dev_name(&pdev->dev), info);
