@@ -49,6 +49,7 @@ struct rockchip_saradc {
 	struct reset_control	*reset;
 	const struct rockchip_saradc_data *data;
 	u16			last_val;
+	struct mutex		lock;
 };
 
 static int rockchip_saradc_read_raw(struct iio_dev *indio_dev,
@@ -60,7 +61,7 @@ static int rockchip_saradc_read_raw(struct iio_dev *indio_dev,
 
 	switch (mask) {
 	case IIO_CHAN_INFO_RAW:
-		mutex_lock(&indio_dev->mlock);
+		mutex_lock(&info->lock);
 
 		reinit_completion(&info->completion);
 
@@ -76,12 +77,12 @@ static int rockchip_saradc_read_raw(struct iio_dev *indio_dev,
 		if (!wait_for_completion_timeout(&info->completion,
 						 SARADC_TIMEOUT)) {
 			writel_relaxed(0, info->regs + SARADC_CTRL);
-			mutex_unlock(&indio_dev->mlock);
+			mutex_unlock(&info->lock);
 			return -ETIMEDOUT;
 		}
 
 		*val = info->last_val;
-		mutex_unlock(&indio_dev->mlock);
+		mutex_unlock(&info->lock);
 		return IIO_VAL_INT;
 	case IIO_CHAN_INFO_SCALE:
 		ret = regulator_get_voltage(info->vref);
@@ -240,6 +241,8 @@ static int rockchip_saradc_probe(struct platform_device *pdev)
 		dev_dbg(&pdev->dev, "no reset control found\n");
 		info->reset = NULL;
 	}
+
+	mutex_init(&info->lock);
 
 	init_completion(&info->completion);
 
