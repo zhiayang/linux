@@ -16,6 +16,9 @@
 
 #include "jesd204-priv.h"
 
+/* IDA to assign each registered device a unique id */
+static DEFINE_IDA(jesd204_ida);
+
 static struct bus_type jesd204_bus_type = {
 	.name = "jesd204",
 };
@@ -79,6 +82,7 @@ static struct jesd204_dev *jesd204_dev_alloc(struct device_node *np)
 			return ERR_PTR(-ENOMEM);
 	}
 
+	jdev->id = -1;
 	jdev->is_top = is_top;
 	jdev->np = of_node_get(np);
 	kref_init(&jdev->ref);
@@ -377,7 +381,7 @@ struct jesd204_dev *jesd204_dev_register(struct device *dev,
 					 const struct jesd204_dev_data *init)
 {
 	struct jesd204_dev *jdev;
-	int ret;
+	int ret, id;
 
 	if (!dev || !init) {
 		dev_err(dev, "Invalid register arguments\n");
@@ -387,20 +391,26 @@ struct jesd204_dev *jesd204_dev_register(struct device *dev,
 	if (!dev_is_jesd204_dev(dev))
 		return NULL;
 
+	id = ida_simple_get(&jesd204_ida, 0, 0, GFP_KERNEL);
+	if (id < 0) {
+		dev_err(dev, "Unable to get unique ID for device\n");
+		return ERR_PTR(id);
+	}
+
 	mutex_lock(&jesd204_device_list_lock);
 
 	jdev = jesd204_dev_from_device(dev);
 	if (jdev) {
 		dev_err(dev, "Device already registered with framework\n");
 		ret = -EEXIST;
-		goto err_unlock;
+		goto err_free_id;
 	}
 
 	jdev = jesd204_dev_find_by_of_node(dev->of_node);
 	if (!jdev) {
 		dev_err(dev, "Device has no configuration node\n");
 		ret = -ENODEV;
-		goto err_unlock;
+		goto err_free_id;
 	}
 
 	jdev->link_ops = init->link_ops;
@@ -414,18 +424,37 @@ struct jesd204_dev *jesd204_dev_register(struct device *dev,
 	if (ret)
 		goto err_put_device;
 
+	jdev->id = id;
+
+	jdev->dev.parent = dev;
+	jdev->dev.groups = jdev->groups;
+	jdev->dev.bus = &jesd204_bus_type;
+	device_initialize(&jdev->dev);
+	dev_set_name(&jdev->dev, "jesd204:%d", id);
+
+	ret = device_add(&jdev->dev);
+	if (ret) {
+		put_device(&jdev->dev);
+		goto err_destroy_sysfs;
+	}
+	jdev->id = id;
+
 	ret = jesd204_fsm_probe(jdev);
 	if (ret)
-		goto err_destroy_sysfs;
+		goto err_device_del;
 
 	mutex_unlock(&jesd204_device_list_lock);
 
 	return jdev;
+
+err_device_del:
+	device_del(&jdev->dev);
 err_destroy_sysfs:
 	jesd204_dev_destroy_sysfs(jdev);
 err_put_device:
 	put_device(dev);
-err_unlock:
+err_free_id:
+	ida_simple_remove(&jesd204_ida, id);
 	mutex_unlock(&jesd204_device_list_lock);
 
 	return ERR_PTR(ret);
@@ -473,6 +502,7 @@ static void __jesd204_dev_release(struct kref *ref)
 {
 	struct jesd204_dev *jdev = container_of(ref, struct jesd204_dev, ref);
 	struct jesd204_dev_top *jdev_top;
+	int id = jdev->id;
 
 	mutex_lock(&jesd204_device_list_lock);
 
@@ -501,6 +531,9 @@ static void __jesd204_dev_release(struct kref *ref)
 	jesd204_device_count--;
 
 	mutex_unlock(&jesd204_device_list_lock);
+
+	if (id > -1)
+		ida_simple_remove(&jesd204_ida, id);
 }
 
 /**
@@ -511,6 +544,9 @@ void jesd204_dev_unregister(struct jesd204_dev *jdev)
 {
 	if (IS_ERR_OR_NULL(jdev))
 		return;
+
+	if (jdev->id > -1)
+		device_del(&jdev->dev);
 
 	jesd204_fsm_unreg_device(jdev);
 	jesd204_dev_destroy_cons(jdev);

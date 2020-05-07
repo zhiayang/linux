@@ -680,8 +680,6 @@ int jesd204_dev_create_sysfs(struct jesd204_dev *jdev)
 	struct device_attribute *conattrs, *lnkattrs;
 	struct attribute **attrs;
 
-	jdev->sysfs_attr_group.name = "jesd204";
-
 	conattrs = jesd204_dev_create_con_attrs(jdev, &conattrs_count);
 	if (IS_ERR(conattrs))
 		return PTR_ERR(conattrs);
@@ -718,12 +716,12 @@ int jesd204_dev_create_sysfs(struct jesd204_dev *jdev)
 
 	jdev->sysfs_attr_group.attrs = attrs;
 
-	return sysfs_create_group(&jdev->parent->kobj, &jdev->sysfs_attr_group);
+	jdev->groups[0] = &jdev->sysfs_attr_group;
+
+	return 0;
 }
 
 void jesd204_dev_destroy_sysfs(struct jesd204_dev *jdev)
 {
-	struct device *dev = jdev->parent;
-
-	sysfs_remove_group(&dev->kobj, &jdev->sysfs_attr_group);
+	/* nothing to do for now */
 }

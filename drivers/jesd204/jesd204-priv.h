@@ -69,7 +69,10 @@ struct jesd204_dev_con_out {
 
 /**
  * struct jesd204_dev - JESD204 device
+ * @dev			underlying device object
+ * @id			unique device id
  * @entry		list entry for the framework to keep a list of devices
+ * @groups		attribute groups for this device
  * @is_top		true if this device is a top device in a topology of
  *			devices that make up a JESD204 link (typically the
  *			device that is the ADC, DAC, or transceiver)
@@ -85,7 +88,12 @@ struct jesd204_dev_con_out {
  * @outputs_count	number of @outputs in the list
  */
 struct jesd204_dev {
+	struct device			dev;
+	int				id;
 	struct list_head		entry;
+
+#define JESD204_MAX_GROUPS	1
+	const struct attribute_group	*groups[JESD204_MAX_GROUPS + 1];
 
 	bool				is_top;
 
