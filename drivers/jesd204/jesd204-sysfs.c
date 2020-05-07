@@ -143,9 +143,9 @@ static ssize_t jesd204_con_printf(struct jesd204_dev *jdev,
 
 	switch (attr_idx) {
 	case JESD204_CON_ATTR_dev:
-		if (!jdev->dev)
+		if (!jdev->parent)
 			return -EINVAL;
-		return sprintf(buf, "%s\n", dev_name(jdev->dev));
+		return sprintf(buf, "%s\n", dev_name(jdev->parent));
 	case JESD204_CON_ATTR_ref:
 		if (con->of.args_count == 1)
 			return sprintf(buf, "%s:%u\n", jdev->np->name,
@@ -277,7 +277,7 @@ static ssize_t name_show(struct device *dev,
 	if (!jdev)
 		return -ENOENT;
 
-	dname = dev_name(jdev->dev);
+	dname = dev_name(jdev->parent);
 	if (!dname)
 		dname = "<no-device>";
 	rname = jdev->np->name;
@@ -582,14 +582,14 @@ static struct device_attribute *jesd204_dev_create_con_attrs(
 		return NULL;
 
 	/* alloc device attributes */
-	conattrs = devm_kcalloc(jdev->dev, *count, sizeof(*conattrs),
+	conattrs = devm_kcalloc(jdev->parent, *count, sizeof(*conattrs),
 				GFP_KERNEL);
 	if (!conattrs)
 		return ERR_PTR(-ENOMEM);
 
 	conattrs_idx = 0;
 	for (i1 = 0; i1 < jdev->inputs_count; i1++) {
-		ret = jesd204_dev_create_con_io_attrs(jdev->dev, conattrs,
+		ret = jesd204_dev_create_con_io_attrs(jdev->parent, conattrs,
 						      conattrs_idx, i1, -1);
 		if (ret < 0)
 			return ERR_PTR(ret);
@@ -599,7 +599,7 @@ static struct device_attribute *jesd204_dev_create_con_attrs(
 	i1 = 0;
 	list_for_each_entry(c, &jdev->outputs, entry) {
 		for (i2 = 0; i2 < c->dests_count; i2++) {
-			ret = jesd204_dev_create_con_io_attrs(jdev->dev,
+			ret = jesd204_dev_create_con_io_attrs(jdev->parent,
 							      conattrs,
 							      conattrs_idx,
 							      i1, i2);
@@ -631,7 +631,7 @@ static struct device_attribute *jesd204_dev_create_lnk_attrs(
 
 	*count = jdev_top->num_links * num_lnk_attrs + jdev_top->num_links;
 
-	lnkattrs = devm_kcalloc(jdev->dev, *count, sizeof(*lnkattrs),
+	lnkattrs = devm_kcalloc(jdev->parent, *count, sizeof(*lnkattrs),
 				GFP_KERNEL);
 	if (!lnkattrs)
 		return ERR_PTR(-ENOMEM);
@@ -648,7 +648,7 @@ static struct device_attribute *jesd204_dev_create_lnk_attrs(
 				type = "active";
 				attr->mode = 0444;
 			}
-			attr->name = devm_kasprintf(jdev->dev, GFP_KERNEL,
+			attr->name = devm_kasprintf(jdev->parent, GFP_KERNEL,
 						    "link%d_%s_%s", i1,
 						    type, jattr->name);
 			if (!attr->name)
@@ -660,7 +660,7 @@ static struct device_attribute *jesd204_dev_create_lnk_attrs(
 
 		attr = &(lnkattrs[lnkattr_idx].attr);
 		/* Add one last attribute for link control */
-		attr->name = devm_kasprintf(jdev->dev, GFP_KERNEL,
+		attr->name = devm_kasprintf(jdev->parent, GFP_KERNEL,
 					    "link%d_control", i1);
 		if (!attr->name)
 			return ERR_PTR(-ENOMEM);
@@ -698,7 +698,7 @@ int jesd204_dev_create_sysfs(struct jesd204_dev *jdev)
 	/* +1 for the NULL pointer at the end */
 	attrs_count = ARRAY_SIZE(jesd204_static_attributes);
 	attrs_count += topattrs_count + conattrs_count + lnkattrs_count + 1;
-	attrs = devm_kcalloc(jdev->dev, attrs_count, sizeof(*attrs),
+	attrs = devm_kcalloc(jdev->parent, attrs_count, sizeof(*attrs),
 			     GFP_KERNEL);
 	if (!attrs)
 		return -ENOMEM;
@@ -718,12 +718,12 @@ int jesd204_dev_create_sysfs(struct jesd204_dev *jdev)
 
 	jdev->sysfs_attr_group.attrs = attrs;
 
-	return sysfs_create_group(&jdev->dev->kobj, &jdev->sysfs_attr_group);
+	return sysfs_create_group(&jdev->parent->kobj, &jdev->sysfs_attr_group);
 }
 
 void jesd204_dev_destroy_sysfs(struct jesd204_dev *jdev)
 {
-	struct device *dev = jdev->dev;
+	struct device *dev = jdev->parent;
 
 	sysfs_remove_group(&dev->kobj, &jdev->sysfs_attr_group);
 }
