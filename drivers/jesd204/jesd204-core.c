@@ -66,14 +66,35 @@ static struct jesd204_dev *jesd204_dev_alloc(struct device_node *np)
 {
 	struct jesd204_dev_top *jdev_top;
 	struct jesd204_dev *jdev;
-	bool is_top = of_property_read_bool(np, "jesd204-top-device");
+	unsigned int link_ids[JESD204_MAX_LINKS];
+	u32 topo_id;
+	int i, ret;
 
-	if (is_top) {
+	if (of_property_read_u32(np, "jesd204-top-device", &topo_id) == 0) {
+		ret = of_property_read_variable_u32_array(np,
+							  "jesd204-link-ids",
+							  link_ids,
+							  1,
+							  JESD204_MAX_LINKS);
+		if (ret < 0) {
+			pr_err("%pOF error getting 'jesd204-link-ids': %d\n",
+			       np, ret);
+			return ERR_PTR(ret);
+		}
+
 		jdev_top = kzalloc(sizeof(*jdev_top), GFP_KERNEL);
 		if (!jdev_top)
 			return ERR_PTR(-ENOMEM);
 
 		jdev = &jdev_top->jdev;
+
+		jdev_top->topo_id = topo_id;
+		jdev_top->link_ids_cnt = ret;
+		for (i = 0; i < jdev_top->link_ids_cnt; i++)
+			jdev_top->link_ids[i] = link_ids[i];
+
+		jdev->is_top = true;
+
 		list_add(&jdev_top->entry, &jesd204_topologies);
 		jesd204_topologies_count++;
 	} else {
@@ -83,7 +104,6 @@ static struct jesd204_dev *jesd204_dev_alloc(struct device_node *np)
 	}
 
 	jdev->id = -1;
-	jdev->is_top = is_top;
 	jdev->np = of_node_get(np);
 	kref_init(&jdev->ref);
 
@@ -144,6 +164,12 @@ static int jesd204_dev_create_con(struct jesd204_dev *jdev,
 	struct jesd204_dev *jdev_in;
 	struct jesd204_dev_list_entry *e;
 
+	if (args->args_count < 2) {
+		pr_err("connection %pOF->%pOF requires 2 args minimum\n",
+		       args->np, jdev->np);
+		return -EINVAL;
+	}
+
 	jdev_in = jesd204_dev_find_by_of_node(args->np);
 	if (!jdev_in) {
 		pr_err("connection %pOF->%pOF invalid\n", args->np, jdev->np);
@@ -162,6 +188,8 @@ static int jesd204_dev_create_con(struct jesd204_dev *jdev,
 			return -ENOMEM;
 		}
 
+		con->topo_id = args->args[0];
+		con->link_id = args->args[1];
 		con->owner = jdev_in;
 		INIT_LIST_HEAD(&con->dests);
 
@@ -326,6 +354,7 @@ int jesd204_dev_init_link_data(struct jesd204_dev *jdev)
 	/* FIXME: fix the case where the driver provides static lane IDs */
 	for (i = 0; i < jdev_top->num_links; i++) {
 		jlink = &jdev_top->active_links[i];
+		jlink->link_id = jdev_top->link_ids[i];
 		ret = jesd204_dev_init_link_lane_ids(jdev, i, jlink);
 		if (ret)
 			return ret;
@@ -348,6 +377,14 @@ static int jesd204_dev_create_links_data(struct jesd204_dev *jdev,
 
 	if (!init->num_links) {
 		dev_err(dev, "num_links shouldn't be zero\n");
+		return -EINVAL;
+	}
+
+	/* FIXME: should we just do a minimum? for now we error out if these mismatch */
+	if (init->num_links != jdev_top->link_ids_cnt) {
+		dev_err(dev,
+			"Driver and DT mismatch for number of links %u vs %u\n",
+			init->num_links, jdev_top->link_ids_cnt);
 		return -EINVAL;
 	}
 

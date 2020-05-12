@@ -10,6 +10,8 @@
 
 #include <linux/jesd204/jesd204.h>
 
+#define JESD204_MAX_LINKS		16
+
 struct jesd204_dev;
 struct jesd204_dev_top;
 
@@ -49,6 +51,10 @@ struct jesd204_dev_list_entry {
  *			belongs to
  * @jdev_top		pointer to JESD204 top device, to which this connection
  *			belongs to
+ * @topo_id		topology ID, that this connection belongs to
+ *			(must match JESD204 top device)
+ * @link_id		JESD204 link ID, that this connection belongs to
+ *			(must match JESD204 top device)
  * @dests		list of JESD204 devices this connection is connected
  *			as input
  * @dests_count		number of connected JESD204 devices to this output
@@ -60,6 +66,8 @@ struct jesd204_dev_con_out {
 	struct list_head		entry;
 	struct jesd204_dev		*owner;
 	struct jesd204_dev_top		*jdev_top;
+	unsigned int			topo_id;
+	unsigned int			link_id;
 	struct list_head		dests;
 	unsigned int			dests_count;
 	struct of_phandle_args		of;
@@ -115,6 +123,11 @@ struct jesd204_dev {
  * @entry		list entry for the framework to keep a list of top
  *			devices (and implicitly topologies)
  * @jdev		JESD204 device data
+ * @topo_id		topology ID for this device (and top-level device)
+ *			(connections should match against this)
+ * @link_ids		JESD204 link IDs for this top-level device
+ *			(connections should match against this)
+ * @link_ids_cnt	number of @link_ids
  * @fsm_complete_cb	callback that gets called after a topology has finished
  *			it's state transition, meaning that all JESD204 devices
  *			have moved to the desired @nxt_state
@@ -137,6 +150,10 @@ struct jesd204_dev_top {
 	struct list_head		entry;
 
 	struct jesd204_dev		jdev;
+
+	unsigned int			topo_id;
+	unsigned int			link_ids[JESD204_MAX_LINKS];
+	unsigned int			link_ids_cnt;
 
 	jesd204_cb_priv			fsm_complete_cb;
 	struct kref			cb_ref;

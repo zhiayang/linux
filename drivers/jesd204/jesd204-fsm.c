@@ -86,6 +86,22 @@ static const struct jesd204_fsm_table_entry jesd204_unreg_dev_states[] = {
 	JESD204_STATE_OP_LAST(LINK_UNINIT),
 };
 
+static bool jesd204_con_belongs_to_topology(struct jesd204_dev_con_out *con,
+					    struct jesd204_dev_top *jdev_top)
+{
+	int i;
+
+	if (jdev_top->topo_id != con->topo_id)
+		return false;
+
+	for (i = 0; i < jdev_top->link_ids_cnt; i++) {
+		if (con->link_id == jdev_top->link_ids[i])
+			return true;
+	}
+
+	return false;
+}
+
 const char *jesd204_state_str(enum jesd204_dev_state state)
 {
 	switch (state) {
@@ -365,13 +381,13 @@ static bool jesd204_dev_has_con_in_topology(struct jesd204_dev *jdev,
 	int i;
 
 	list_for_each_entry(c, &jdev->outputs, entry) {
-		if (c->jdev_top == jdev_top)
+		if (jesd204_con_belongs_to_topology(c, jdev_top))
 			return true;
 	}
 
 	for (i = 0; i < jdev->inputs_count; i++) {
 		c = jdev->inputs[i];
-		if (c->jdev_top == jdev_top)
+		if (jesd204_con_belongs_to_topology(c, jdev_top))
 			return true;
 	}
 
@@ -412,7 +428,9 @@ static int jesd204_dev_initialize_cb(struct jesd204_dev *jdev,
 				     struct jesd204_dev_con_out *con,
 				     void *data)
 {
-	if (con)
+	struct jesd204_dev_top *jdev_top = data;
+
+	if (con && jesd204_con_belongs_to_topology(con, jdev_top))
 		con->jdev_top = data;
 
 	return JESD204_STATE_CHANGE_DONE;
