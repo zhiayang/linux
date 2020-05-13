@@ -14,6 +14,9 @@
 /* FIXME: this part below is in it's own header, but may be upstreamable */
 #include "attr.h"
 
+#define dev_to_jesd204_dev(dev)			\
+	container_of(dev, struct jesd204_dev, dev)
+
 /* FIXME: should go away in newer kernels */
 #define sizeof_field(TYPE, MEMBER) sizeof((((TYPE *)0)->MEMBER))
 
@@ -176,7 +179,7 @@ static ssize_t jesd204_con_show(struct device *dev,
 				struct device_attribute *conattr,
 				char *buf)
 {
-	struct jesd204_dev *jdev = jesd204_dev_from_device(dev);
+	struct jesd204_dev *jdev = dev_to_jesd204_dev(dev);
 	struct jesd204_dev_con_out *con;
 	unsigned int len, idx, iter_idx;
 	struct jesd204_dev_list_entry *e;
@@ -271,7 +274,7 @@ static ssize_t name_show(struct device *dev,
 			 struct device_attribute *devattr,
 			 char *buf)
 {
-	struct jesd204_dev *jdev = jesd204_dev_from_device(dev);
+	struct jesd204_dev *jdev = dev_to_jesd204_dev(dev);
 	const char *dname, *rname;
 
 	if (!jdev)
@@ -393,7 +396,7 @@ static ssize_t jesd204_link_show_store(struct device *dev,
 				       char *wbuf, const char *rbuf,
 				       size_t count, bool store)
 {
-	struct jesd204_dev *jdev = jesd204_dev_from_device(dev);
+	struct jesd204_dev *jdev = dev_to_jesd204_dev(dev);
 	struct jesd204_dev_top *jdev_top = jesd204_dev_top_dev(jdev);
 	const struct jesd204_attr *jattr;
 	struct jesd204_link *lnk;
@@ -499,7 +502,7 @@ static ssize_t jesd204_top_show(struct device *dev,
 			 struct device_attribute *devattr,
 			 char *buf)
 {
-	struct jesd204_dev *jdev = jesd204_dev_from_device(dev);
+	struct jesd204_dev *jdev = dev_to_jesd204_dev(dev);
 	struct jesd204_dev_top *jdev_top = jesd204_dev_top_dev(jdev);
 	struct attribute *attr;
 
