@@ -15,19 +15,34 @@
 
 extern struct list_head jesd204_topologies;
 
-typedef int (*jesd204_cb_con_priv)(struct jesd204_dev *jdev,
-				   struct jesd204_dev_con_out *con,
-				   void *data);
+typedef int (*jesd204_fsm_cb)(struct jesd204_dev *jdev,
+			      struct jesd204_link_opaque *ol,
+			      struct jesd204_dev_con_out *con,
+			      struct jesd204_fsm_data *data);
 
+typedef int (*jesd204_fsm_done_cb)(struct jesd204_dev *jdev,
+				   struct jesd204_link_opaque *ol,
+				   void *data);
 /**
  * struct jesd204_fsm_data - JESD204 device state change data
- * @jdev_top			top JESD204 for which this state change
- * @propagated_cb	callback to propagate to trigger state change
+ * @jdev_top		top JESD204 for which this state change
+ * @link_idx		JESD204 link index for this transition
+ * @fsm_change_cb	callback to propagate during a state transition
+ * @fsm_complete_cb	callback to run after a state transition has completed
+ * @cb_data		callback data for @fsm_change_cb
+ * @cur_state		current state from which this FSM is transitioning
+ * @nxt_state		next state to which this FSM is transitioning
+ * @inputs		true if this is running on the inputs
  */
 struct jesd204_fsm_data {
-	struct jesd204_dev_top	*jdev_top;
-	jesd204_cb_con_priv	fsm_change_cb;
-	bool			inputs;
+	struct jesd204_dev_top		*jdev_top;
+	unsigned int			link_idx;
+	jesd204_fsm_cb			fsm_change_cb;
+	jesd204_fsm_done_cb		fsm_complete_cb;
+	void				*cb_data;
+	enum jesd204_dev_state		cur_state;
+	enum jesd204_dev_state		nxt_state;
+	bool				inputs;
 };
 
 typedef int (*jesd204_propagated_cb)(struct jesd204_dev *jdev,
@@ -86,22 +101,6 @@ static const struct jesd204_fsm_table_entry jesd204_unreg_dev_states[] = {
 	JESD204_STATE_OP_LAST(LINK_UNINIT),
 };
 
-static bool jesd204_con_belongs_to_topology(struct jesd204_dev_con_out *con,
-					    struct jesd204_dev_top *jdev_top)
-{
-	int i;
-
-	if (jdev_top->topo_id != con->topo_id)
-		return false;
-
-	for (i = 0; i < jdev_top->link_ids_cnt; i++) {
-		if (con->link_id == jdev_top->link_ids[i])
-			return true;
-	}
-
-	return false;
-}
-
 const char *jesd204_state_str(enum jesd204_dev_state state)
 {
 	switch (state) {
@@ -138,21 +137,39 @@ const char *jesd204_state_str(enum jesd204_dev_state state)
 	}
 }
 
-static int jesd204_dev_set_error(struct jesd204_dev *jdev,
+static int jesd204_con_link_idx_in_jdev_top(struct jesd204_dev_con_out *con,
+					    struct jesd204_dev_top *jdev_top)
+{
+	int i;
+
+	if (con->topo_id != jdev_top->topo_id)
+		return -EINVAL;
+
+	for (i = 0; i < jdev_top->num_links; i++) {
+		if (jdev_top->link_ids[i] == con->link_id)
+			return i;
+	}
+
+	return -EINVAL;
+}
+
+static int jesd204_dev_set_error(struct jesd204_link_opaque *ol,
 				 struct jesd204_dev_con_out *con,
 				 int err)
 {
-	struct jesd204_dev_top *jdev_top;
-
+	/* FIXME: should we exit here? */
 	if (err == 0)
 		return 0;
 
-	if (con)
+	if (con) {
 		con->error = err;
+		con->state = JESD204_STATE_ERROR;
+	}
 
-	jdev_top = jesd204_dev_top_dev(jdev);
-	if (jdev_top)
-		jdev_top->error = err;
+	if (ol) {
+		ol->error = err;
+		ol->state = JESD204_STATE_ERROR;
+	}
 
 	return err;
 }
@@ -168,6 +185,10 @@ static int jesd204_dev_propagate_cb_inputs(struct jesd204_dev *jdev,
 	for (i = 0; i < jdev->inputs_count; i++) {
 		con = jdev->inputs[i];
 
+		if (data->link_idx != JESD204_LINKS_ALL &&
+		    data->link_idx != con->link_id)
+			continue;
+
 		ret = jesd204_dev_propagate_cb_inputs(con->owner,
 						      propagated_cb, data);
 		if (ret)
@@ -177,7 +198,7 @@ static int jesd204_dev_propagate_cb_inputs(struct jesd204_dev *jdev,
 			break;
 	}
 
-	return jesd204_dev_set_error(jdev, con, ret);
+	return ret;
 }
 
 static int jesd204_dev_propagate_cb_outputs(struct jesd204_dev *jdev,
@@ -190,6 +211,10 @@ static int jesd204_dev_propagate_cb_outputs(struct jesd204_dev *jdev,
 
 	list_for_each_entry(con, &jdev->outputs, entry) {
 		list_for_each_entry(e, &con->dests, entry) {
+			if (data->link_idx != JESD204_LINKS_ALL &&
+			    data->link_idx != con->link_id)
+				continue;
+
 			ret = propagated_cb(e->jdev, con, data);
 			if (ret)
 				goto done;
@@ -202,12 +227,12 @@ static int jesd204_dev_propagate_cb_outputs(struct jesd204_dev *jdev,
 	}
 
 done:
-	return jesd204_dev_set_error(jdev, con, ret);
+	return ret;
 }
 
-static inline int jesd204_dev_propagate_cb(struct jesd204_dev *jdev,
-					   jesd204_propagated_cb propagated_cb,
-					   struct jesd204_fsm_data *data)
+static int jesd204_dev_propagate_cb(struct jesd204_dev *jdev,
+				    jesd204_propagated_cb propagated_cb,
+				    struct jesd204_fsm_data *data)
 {
 	int ret;
 
@@ -222,199 +247,311 @@ static inline int jesd204_dev_propagate_cb(struct jesd204_dev *jdev,
 		goto out;
 
 	ret = propagated_cb(jdev, NULL, data);
+	/* FIXME: error message here? */
 out:
-	return jesd204_dev_set_error(jdev, NULL, ret);
+	return ret;
 }
 
-static void __jesd204_dev_top_fsm_change_cb(struct kref *ref)
+static void __jesd204_link_fsm_done_cb(struct kref *ref)
 {
-	struct jesd204_dev_top *jdev_top;
+	struct jesd204_fsm_data *fsm_data;
+	struct jesd204_link_opaque *ol;
 	struct jesd204_dev *jdev;
 	int ret;
 
-	jdev_top = container_of(ref, typeof(*jdev_top), cb_ref);
-	jdev = &jdev_top->jdev;
+	ol = container_of(ref, typeof(*ol), cb_ref);
+	jdev = &ol->jdev_top->jdev;
+	fsm_data = ol->fsm_data;
 
-	jdev_top->cur_state = jdev_top->nxt_state;
-	if (jdev_top->error) {
+	if (ol->error) {
 		dev_err(jdev->parent, "jesd got error from topology %d\n",
-			jdev_top->error);
-		jdev_top->cur_state = JESD204_STATE_ERROR;
+			ol->error);
 		goto out;
 	}
 
-	if (jdev_top->fsm_complete_cb) {
-		ret = jdev_top->fsm_complete_cb(jdev, jdev_top->cb_data);
-		jesd204_dev_set_error(jdev, NULL, ret);
-		if (ret) {
-			dev_err(jdev->parent,
-				"error from completion cb %d, state %s\n",
-				ret, jesd204_state_str(jdev_top->cur_state));
-			jdev_top->cur_state = JESD204_STATE_ERROR;
-			goto out;
-		}
+	dev_info(jdev->parent, "JESD204 link[%u] transition %s -> %s\n",
+		 ol->link_idx,
+		 jesd204_state_str(fsm_data->cur_state),
+		 jesd204_state_str(fsm_data->nxt_state));
+	ol->state = fsm_data->nxt_state;
+
+	if (!fsm_data->fsm_complete_cb)
+		goto out;
+
+	ret = fsm_data->fsm_complete_cb(jdev, ol, fsm_data->cb_data);
+	if (jesd204_dev_set_error(ol, NULL, ret)) {
+		dev_err(jdev->parent,
+			"error from completion cb %d, state %s\n",
+			ret,
+			jesd204_state_str(ol->state));
 	}
 
 out:
-	/**
-	 * Reset nxt_state ; so that other devices won't run another
-	 * state change
-	 */
-	jdev_top->nxt_state = JESD204_STATE_UNINIT;
-	jdev_top->cb_data = NULL;
+	ol->fsm_data = NULL;
 }
 
-static int jesd204_dev_validate_cur_state(struct jesd204_dev_top *jdev_top,
-					  struct jesd204_dev *jdev,
-					  struct jesd204_dev_con_out *c,
-					  enum jesd204_dev_state state)
+static void __jesd204_fsm_kref_link_put_get(struct jesd204_dev_top *jdev_top,
+					    unsigned int link_idx,
+					    bool put)
 {
-	if (state != jdev_top->cur_state &&
-	    jdev_top->cur_state != JESD204_STATE_DONT_CARE) {
+	struct jesd204_link_opaque *ol;
+
+	if (link_idx != JESD204_LINKS_ALL) {
+		ol = &jdev_top->active_links[link_idx];
+		if (put)
+			kref_put(&ol->cb_ref, __jesd204_link_fsm_done_cb);
+		else
+			kref_get(&ol->cb_ref);
+		return;
+	}
+
+	for (link_idx = 0; link_idx < jdev_top->num_links; link_idx++) {
+		ol = &jdev_top->active_links[link_idx];
+		kref_put(&ol->cb_ref, __jesd204_link_fsm_done_cb);
+		if (put)
+			kref_put(&ol->cb_ref, __jesd204_link_fsm_done_cb);
+		else
+			kref_get(&ol->cb_ref);
+	}
+}
+
+static void jesd204_fsm_kref_link_get(struct jesd204_dev_top *jdev_top,
+				      unsigned int link_idx)
+{
+	__jesd204_fsm_kref_link_put_get(jdev_top, link_idx, false);
+}
+
+static void jesd204_fsm_kref_link_put(struct jesd204_dev_top *jdev_top,
+				      unsigned int link_idx)
+{
+	__jesd204_fsm_kref_link_put_get(jdev_top, link_idx, true);
+}
+
+static int jesd204_dev_validate_cur_state(struct jesd204_dev *jdev,
+					  struct jesd204_link_opaque *ol,
+					  struct jesd204_dev_con_out *c,
+					  enum jesd204_dev_state cur_state,
+					  enum jesd204_dev_state nxt_state)
+{
+	if (cur_state == JESD204_STATE_DONT_CARE)
+		return 0;
+
+	if (cur_state != ol->state) {
 		dev_warn(jdev->parent,
-			 "invalid jesd state: %s, exp: %s, nxt: %s\n",
-			 jesd204_state_str(state),
-			 jesd204_state_str(jdev_top->cur_state),
-			 jesd204_state_str(jdev_top->nxt_state));
-		return jesd204_dev_set_error(jdev, c, -EINVAL);
+			 "JESD204 link[%d] invalid link state: %s, exp: %s, nxt: %s\n",
+			 ol->link_idx,
+			 jesd204_state_str(ol->state),
+			 jesd204_state_str(cur_state),
+			 jesd204_state_str(nxt_state));
+		return jesd204_dev_set_error(ol, c, -EINVAL);
+	}
+
+	if (c && c->link_idx < 0) {
+		dev_warn(jdev->parent,
+			 "JESD204 link[%d] connection link index unitialized\n",
+			 ol->link_idx);
+		return jesd204_dev_set_error(ol, c, -EINVAL);
+	}
+
+	if (c && cur_state != c->state) {
+		dev_warn(jdev->parent,
+			 "JESD204 link[%d] invalid connection state: %s, exp: %s, nxt: %s\n",
+			 ol->link_idx,
+			 jesd204_state_str(c->state),
+			 jesd204_state_str(cur_state),
+			 jesd204_state_str(nxt_state));
+		return jesd204_dev_set_error(ol, c, -EINVAL);
 	}
 
 	return 0;
 }
 
 static int jesd204_dev_update_con_state(struct jesd204_dev *jdev,
-					struct jesd204_dev_top *jdev_top,
-					struct jesd204_dev_con_out *c)
+					struct jesd204_link_opaque *ol,
+					struct jesd204_dev_con_out *c,
+					struct jesd204_fsm_data *fsm_data)
 {
 	int ret;
 
-	if (!c || c->state == jdev_top->nxt_state)
+	if (!c || c->state == fsm_data->nxt_state)
 		return 0;
 
-	if (c->jdev_top) {
-		if (c->jdev_top->nxt_state == JESD204_STATE_UNINIT)
-			return 0;
-		if (c->jdev_top != jdev_top)
-			return 0;
-		kref_get(&c->jdev_top->cb_ref);
-	}
-
-	ret = jesd204_dev_validate_cur_state(jdev_top, jdev, c, c->state);
+	ret = jesd204_dev_validate_cur_state(jdev, ol, c,
+					     fsm_data->cur_state,
+					     fsm_data->nxt_state);
 	if (ret)
 		return ret;
 
-	c->state = jdev_top->nxt_state;
-	if (c->jdev_top)
-		kref_put(&c->jdev_top->cb_ref,
-			 __jesd204_dev_top_fsm_change_cb);
+	c->state = fsm_data->nxt_state;
 
 	return 0;
 }
 
-static int jesd204_fsm_cb(struct jesd204_dev *jdev,
-			  struct jesd204_dev_con_out *con,
-			  struct jesd204_fsm_data *s)
+static int jesd204_fsm_change_one_link_cb(struct jesd204_dev *jdev,
+					  unsigned int link_idx,
+					  struct jesd204_dev_con_out *con,
+					  struct jesd204_fsm_data *fsm_data)
 {
-	struct jesd204_dev_top *jdev_top = s->jdev_top;
+	struct jesd204_dev_top *jdev_top = fsm_data->jdev_top;
+	struct jesd204_link_opaque *ol = &jdev_top->active_links[link_idx];
 	int ret;
 
-	kref_get(&jdev_top->cb_ref);
+	jesd204_fsm_kref_link_get(jdev_top, link_idx);
 
-	if (s->fsm_change_cb) {
-		ret = s->fsm_change_cb(jdev, con, jdev_top->cb_data);
+	ret = fsm_data->fsm_change_cb(jdev, ol, con, fsm_data);
+	if (ret < 0) {
+		dev_err(jdev->parent,
+			"JESD204 link[%u] got error from cb: %d\n",
+			link_idx, ret);
+		return ret;
+	}
+
+	if (ret != JESD204_STATE_CHANGE_DONE)
+		return ret;
+
+	ret = jesd204_dev_update_con_state(jdev, ol, con, fsm_data);
+	if (ret)
+		return ret;
+
+	jesd204_fsm_kref_link_put(jdev_top, link_idx);
+	return 0;
+}
+
+static int jesd204_fsm_change_cb(struct jesd204_dev *jdev,
+				 struct jesd204_dev_con_out *con,
+				 struct jesd204_fsm_data *fsm_data)
+{
+	struct jesd204_dev_top *jdev_top;
+	unsigned int link_idx;
+	int ret;
+
+	if (!fsm_data->fsm_change_cb)
+		return 0;
+
+	jdev_top = fsm_data->jdev_top;
+	link_idx = fsm_data->link_idx;
+
+	if (link_idx != JESD204_LINKS_ALL)
+		return jesd204_fsm_change_one_link_cb(jdev, link_idx,
+						      con, fsm_data);
+
+	for (link_idx = 0; link_idx < jdev_top->num_links; link_idx++) {
+		ret = jesd204_fsm_change_one_link_cb(jdev, link_idx,
+						     con, fsm_data);
 		if (ret < 0)
 			return ret;
-	} else {
-		ret = JESD204_STATE_CHANGE_DONE;
 	}
 
-	if (ret == JESD204_STATE_CHANGE_DONE) {
-		ret = jesd204_dev_update_con_state(jdev, jdev_top, con);
-		kref_put(&jdev_top->cb_ref,  __jesd204_dev_top_fsm_change_cb);
-	} else {
-		ret = 0;
+	return 0;
+}
+
+static int jesd204_fsm_link_init(struct jesd204_dev_top *jdev_top,
+				 struct jesd204_fsm_data *fsm_data,
+				 unsigned int link_idx)
+{
+	struct jesd204_link_opaque *ol;
+
+	/* FIXME: check if any links are transitioning; this assumes they don't */
+	if (link_idx != JESD204_LINKS_ALL) {
+		ol = &jdev_top->active_links[link_idx];
+		ol->fsm_data = fsm_data;
+		kref_init(&ol->cb_ref);
+		return 0;
 	}
 
-	return ret;
+	for (link_idx = 0; link_idx < jdev_top->num_links; link_idx++) {
+		ol = &jdev_top->active_links[link_idx];
+		ol->fsm_data = fsm_data;
+		kref_init(&ol->cb_ref);
+	}
+
+	return 0;
+}
+
+static int jesd204_dev_validate_lnk_states(struct jesd204_dev_top *jdev_top,
+					   unsigned int link_idx,
+					   enum jesd204_dev_state cur_state,
+					   enum jesd204_dev_state nxt_state)
+{
+	struct jesd204_dev *jdev = &jdev_top->jdev;
+	struct jesd204_link_opaque *ol;
+	int ret;
+
+	if (link_idx != JESD204_LINKS_ALL) {
+		ol = &jdev_top->active_links[link_idx];
+		return jesd204_dev_validate_cur_state(jdev, ol, NULL,
+						      cur_state, nxt_state);
+	}
+
+	for (link_idx = 0; link_idx < jdev_top->num_links; link_idx++) {
+		ol = &jdev_top->active_links[link_idx];
+		ret = jesd204_dev_validate_cur_state(jdev, ol, NULL,
+						     cur_state, nxt_state);
+		if (ret)
+			return ret;
+	}
+
+	return 0;
 }
 
 static int __jesd204_fsm(struct jesd204_dev *jdev,
 			 struct jesd204_dev_top *jdev_top,
+			 unsigned int link_idx,
 			 enum jesd204_dev_state cur_state,
 			 enum jesd204_dev_state nxt_state,
-			 jesd204_cb_con_priv fsm_change_cb,
+			 jesd204_fsm_cb fsm_change_cb,
 			 void *cb_data,
-			 jesd204_cb_priv fsm_complete_cb)
+			 jesd204_fsm_done_cb fsm_complete_cb)
 {
 	struct jesd204_fsm_data data;
 	int ret;
 
-	ret = jesd204_dev_validate_cur_state(jdev_top, jdev, NULL, cur_state);
+	ret = jesd204_dev_validate_lnk_states(jdev_top, link_idx,
+					      cur_state, nxt_state);
 	if (ret)
 		return ret;
 
-	kref_init(&jdev_top->cb_ref);
-
 	memset(&data, 0, sizeof(data));
-	data.fsm_change_cb = fsm_change_cb;
 	data.jdev_top = jdev_top;
+	data.cur_state = cur_state;
+	data.nxt_state = nxt_state;
+	data.fsm_change_cb = fsm_change_cb;
+	data.fsm_complete_cb = fsm_complete_cb;
+	data.cb_data = cb_data;
+	data.link_idx = link_idx;
 
-	jdev_top->fsm_complete_cb = fsm_complete_cb;
-	jdev_top->nxt_state = nxt_state;
-	jdev_top->cb_data = cb_data;
-	if (cur_state == JESD204_STATE_DONT_CARE)
-		jdev_top->cur_state = JESD204_STATE_DONT_CARE;
+	ret = jesd204_fsm_link_init(jdev_top, &data, link_idx);
+	if (ret)
+		return ret;
 
 	ret = jesd204_dev_propagate_cb(jdev,
-				       jesd204_fsm_cb,
+				       jesd204_fsm_change_cb,
 				       &data);
 
-	kref_put(&jdev_top->cb_ref, __jesd204_dev_top_fsm_change_cb);
+	jesd204_fsm_kref_link_put(jdev_top, link_idx);
 
 	return ret;
 }
 
-static bool jesd204_dev_has_con_in_topology(struct jesd204_dev *jdev,
-					    struct jesd204_dev_top *jdev_top)
-{
-	struct jesd204_dev_con_out *c;
-	int i;
-
-	list_for_each_entry(c, &jdev->outputs, entry) {
-		if (jesd204_con_belongs_to_topology(c, jdev_top))
-			return true;
-	}
-
-	for (i = 0; i < jdev->inputs_count; i++) {
-		c = jdev->inputs[i];
-		if (jesd204_con_belongs_to_topology(c, jdev_top))
-			return true;
-	}
-
-	return false;
-}
-
 static int jesd204_fsm(struct jesd204_dev *jdev,
+		       unsigned int link_idx,
 		       enum jesd204_dev_state cur_state,
 		       enum jesd204_dev_state nxt_state,
-		       jesd204_cb_con_priv fsm_change_cb,
+		       jesd204_fsm_cb fsm_change_cb,
 		       void *cb_data,
-		       jesd204_cb_priv fsm_complete_cb)
+		       jesd204_fsm_done_cb fsm_complete_cb)
 {
 	struct list_head *jesd204_topologies = jesd204_topologies_get();
 	struct jesd204_dev_top *jdev_top = jesd204_dev_top_dev(jdev);
 	int ret;
 
 	if (jdev_top)
-		return __jesd204_fsm(jdev, jdev_top,
+		return __jesd204_fsm(jdev, jdev_top, link_idx,
 				     cur_state, nxt_state, fsm_change_cb,
 				     cb_data, fsm_complete_cb);
 
 	list_for_each_entry(jdev_top, jesd204_topologies, entry) {
-		if (!jesd204_dev_has_con_in_topology(jdev, jdev_top))
-			continue;
-
-		ret = __jesd204_fsm(jdev, jdev_top,
+		ret = __jesd204_fsm(jdev, jdev_top, link_idx,
 				    cur_state, nxt_state, fsm_change_cb,
 				    cb_data, fsm_complete_cb);
 		if (ret)
@@ -424,14 +561,60 @@ static int jesd204_fsm(struct jesd204_dev *jdev,
 	return 0;
 }
 
-static int jesd204_dev_initialize_cb(struct jesd204_dev *jdev,
+#if 0
+/**
+ * FIXME: paranoid FSM check; checks if a link id has the correct index.
+ * remove it later maybe?
+ */
+static int jesd204_paranoid_cb_check(struct jesd204_dev *jdev,
+				     struct jesd204_link_opaque *ol,
 				     struct jesd204_dev_con_out *con,
-				     void *data)
+				     struct jesd204_fsm_data *fsm_data)
 {
-	struct jesd204_dev_top *jdev_top = data;
+	struct jesd204_dev_top *jdev_top = fsm_data->jdev_top;
 
-	if (con && jesd204_con_belongs_to_topology(con, jdev_top))
-		con->jdev_top = data;
+	if (!jdev) {
+		pr_err("jdev object is null\n");
+		return -EFAULT;
+	}
+
+	if (fsm_data->link_idx >= jdev_top->num_links) {
+		dev_err(&jdev->dev, "fsm_data->link_idx >= jdev_top->num_links %u\n",
+			fsm_data->link_idx);
+		return -EFAULT;
+	}
+
+	if (con->link_id != jdev_top->active_links[fsm_data->link_idx]) {
+		dev_err(&jdev->dev, "ol->link.link_id != jdev_top->active_links[fsm_data->link_idx]\n");
+		return -EFAULT;
+	}
+
+	/* FIXME: add more? */
+
+	return 0;
+}
+#endif
+
+static int jesd204_dev_initialize_cb(struct jesd204_dev *jdev,
+				     struct jesd204_link_opaque *ol,
+				     struct jesd204_dev_con_out *con,
+				     struct jesd204_fsm_data *fsm_data)
+{
+	int ret;
+
+	if (!con)
+		return JESD204_STATE_CHANGE_DONE;
+
+//	int ret = jesd204_paranoid_cb_check(jdev, ol, con, fsm_data);
+
+//	if (ret)
+//		return ret;
+
+	ret = jesd204_con_link_idx_in_jdev_top(con, fsm_data->jdev_top);
+	if (ret >= 0) {
+		con->jdev_top = fsm_data->jdev_top;
+		con->link_idx = ret;
+	}
 
 	return JESD204_STATE_CHANGE_DONE;
 }
@@ -441,52 +624,70 @@ int jesd204_init_topology(struct jesd204_dev_top *jdev_top)
 	if (!jdev_top)
 		return -EINVAL;
 
-	return jesd204_fsm(&jdev_top->jdev,
+	return jesd204_fsm(&jdev_top->jdev, JESD204_LINKS_ALL,
 			   JESD204_STATE_UNINIT, JESD204_STATE_INITIALIZED,
 			   jesd204_dev_initialize_cb, jdev_top, NULL);
 }
 
+static int jesd204_fsm_init_link(struct jesd204_dev *jdev,
+				 unsigned int link_idx,
+				 enum jesd204_dev_state init_state)
+{
+	int ret;
+
+	ret = jesd204_fsm_table(jdev, link_idx,
+				init_state, jesd204_init_links_states);
+	if (ret)
+		return ret;
+
+	return jesd204_dev_init_link_data(jdev, link_idx);
+}
+
+static int jesd204_fsm_start_link(struct jesd204_dev *jdev,
+				  unsigned int link_idx,
+				  enum jesd204_dev_state init_state)
+{
+	return jesd204_fsm_table(jdev, link_idx,
+				 init_state, jesd204_start_links_states);
+}
+
 static int jesd204_fsm_probed_cb(struct jesd204_dev *jdev,
+				 struct jesd204_link_opaque *ol,
 				 struct jesd204_dev_con_out *con,
-				 void *data)
+				 struct jesd204_fsm_data *fsm_data)
 {
 	if (!jdev->parent)
 		return JESD204_STATE_CHANGE_DEFER;
 	return JESD204_STATE_CHANGE_DONE;
 }
 
-static int jesd204_fsm_probe_done(struct jesd204_dev *jdev, void *data)
+static int jesd204_fsm_probe_done(struct jesd204_dev *jdev,
+				  struct jesd204_link_opaque *ol,
+				  void *data)
 {
 	int ret;
 
-	ret = jesd204_fsm_init_links(jdev, JESD204_STATE_PROBED);
+	ret = jesd204_fsm_init_link(jdev, ol->link_idx, JESD204_STATE_PROBED);
 	if (ret)
 		return ret;
 
-	return jesd204_fsm_start_links(jdev, JESD204_STATE_LINK_INIT);
+	return jesd204_fsm_start_link(jdev, ol->link_idx, JESD204_STATE_LINK_INIT);
 }
 
 int jesd204_fsm_probe(struct jesd204_dev *jdev)
 {
-	return jesd204_fsm(jdev,
+	return jesd204_fsm(jdev, JESD204_LINKS_ALL,
 			   JESD204_STATE_INITIALIZED, JESD204_STATE_PROBED,
 			   jesd204_fsm_probed_cb, NULL, jesd204_fsm_probe_done);
 }
 
 static int jesd204_fsm_table_entry_cb(struct jesd204_dev *jdev,
+				      struct jesd204_link_opaque *ol,
 				      struct jesd204_dev_con_out *con,
-				      void *data)
+				      struct jesd204_fsm_data *fsm_data)
 {
-	struct jesd204_dev_top *jdev_top = jesd204_dev_top_dev(jdev);
-	struct jesd204_fsm_table_entry_iter *it = data;
+	struct jesd204_fsm_table_entry_iter *it = fsm_data->cb_data;
 	jesd204_link_cb link_op;
-	int link_idx, ret;
-
-	if (!jdev_top) {
-		if (!con || !con->jdev_top)
-			return -EFAULT;
-		jdev_top = con->jdev_top;
-	}
 
 	if (!jdev->link_ops)
 		return JESD204_STATE_CHANGE_DONE;
@@ -495,34 +696,20 @@ static int jesd204_fsm_table_entry_cb(struct jesd204_dev *jdev,
 	if (!link_op)
 		return JESD204_STATE_CHANGE_DONE;
 
-	/* No need to sanity check link_idx here, it should have been
-	 * checked already. If it's not sane, then let it crash.
-	 */
-	if (it->link_idx != JESD204_LINKS_ALL)
-		return link_op(jdev, it->link_idx,
-			       &jdev_top->active_links[it->link_idx]);
-
-	for (link_idx = 0; link_idx < jdev_top->num_links; link_idx++) {
-		ret = link_op(jdev, link_idx,
-			      &jdev_top->active_links[link_idx]);
-		if (ret != JESD204_STATE_CHANGE_DONE)
-			return ret;
-	}
-
-	return JESD204_STATE_CHANGE_DONE;
+	return link_op(jdev, ol->link_idx, &ol->link);
 }
 
 static int jesd204_fsm_table_entry_done(struct jesd204_dev *jdev,
+					struct jesd204_link_opaque *ol,
 					void *data)
 {
 	struct jesd204_fsm_table_entry_iter *it = data;
 	const struct jesd204_fsm_table_entry *table = it->table;
-	unsigned int link_idx = it->link_idx;
 
 	if (table[0].last)
 		return 0;
 
-	return jesd204_fsm_table(jdev, link_idx, table[0].state, &table[1]);
+	return jesd204_fsm_table(jdev, it->link_idx, table[0].state, &table[1]);
 }
 
 static int jesd204_fsm_table(struct jesd204_dev *jdev,
@@ -530,44 +717,16 @@ static int jesd204_fsm_table(struct jesd204_dev *jdev,
 			     enum jesd204_dev_state init_state,
 			     const struct jesd204_fsm_table_entry *table)
 {
-	struct jesd204_dev_top *jdev_top = jesd204_dev_top_dev(jdev);
 	struct jesd204_fsm_table_entry_iter it;
-
-	if (link_idx != JESD204_LINKS_ALL) {
-		if (!jdev_top)
-			return -EINVAL;
-		if (link_idx >= jdev_top->num_links)
-			return -EINVAL;
-	}
 
 	it.link_idx = link_idx;
 	it.table = table;
 
-	return jesd204_fsm(jdev,
+	return jesd204_fsm(jdev, link_idx,
 			   init_state, table[0].state,
 			   jesd204_fsm_table_entry_cb,
 			   &it,
 			   jesd204_fsm_table_entry_done);
-}
-
-int jesd204_fsm_init_links(struct jesd204_dev *jdev,
-			   enum jesd204_dev_state init_state)
-{
-	int ret;
-
-	ret = jesd204_fsm_table(jdev, JESD204_LINKS_ALL,
-				init_state, jesd204_init_links_states);
-	if (ret)
-		return ret;
-
-	return jesd204_dev_init_link_data(jdev);
-}
-
-int jesd204_fsm_start_links(struct jesd204_dev *jdev,
-			    enum jesd204_dev_state init_state)
-{
-	return jesd204_fsm_table(jdev, JESD204_LINKS_ALL,
-				 init_state, jesd204_start_links_states);
 }
 
 void jesd204_fsm_unreg_device(struct jesd204_dev *jdev)
@@ -579,21 +738,25 @@ void jesd204_fsm_unreg_device(struct jesd204_dev *jdev)
 int jesd204_fsm_link_change(struct jesd204_dev_top *jdev_top,
 			    unsigned int link_idx)
 {
+	struct jesd204_link_opaque *oal, *osl;
 	struct jesd204_link *al, *sl;
 	int ret;
 
 	if (link_idx >= jdev_top->num_links)
 		return -EINVAL;
 
-	al = &jdev_top->active_links[link_idx];
-	sl = &jdev_top->staged_links[link_idx];
+	oal = &jdev_top->active_links[link_idx];
+	osl = &jdev_top->staged_links[link_idx];
+
+	al = &oal->link;
+	sl = &osl->link;
 
 	/* If no links staged, there is nothing to do */
 	if (memcmp(al, sl, sizeof(*al)) == 0)
 		return 0;
 
 	ret = jesd204_fsm_table(&jdev_top->jdev, link_idx,
-				jdev_top->cur_state,
+				oal->state,
 				jesd204_unreg_dev_states);
 	if (ret)
 		return ret;
@@ -602,7 +765,7 @@ int jesd204_fsm_link_change(struct jesd204_dev_top *jdev_top,
 		goto save_link_settings;
 
 	ret = jesd204_fsm_table(&jdev_top->jdev, link_idx,
-				jdev_top->cur_state,
+				oal->state,
 				jesd204_start_links_states);
 	if (ret)
 		return ret;

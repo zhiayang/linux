@@ -373,8 +373,8 @@ static int jesd204_show_store_control(struct jesd204_dev_top *jdev_top,
 		return sprintf(wbuf, "%s\n",
 			       "commit|reset");
 
-	al = &jdev_top->active_links[link_idx];
-	sl = &jdev_top->staged_links[link_idx];
+	al = &jdev_top->active_links[link_idx].link;
+	sl = &jdev_top->staged_links[link_idx].link;
 
 	if (sysfs_streq("reset", rbuf)) {
 		memcpy(sl, al, sizeof(*al));
@@ -443,10 +443,10 @@ static ssize_t jesd204_link_show_store(struct device *dev,
 			ret = -EPERM;
 			goto out;
 		}
-		lnk = &jdev_top->active_links[idx];
+		lnk = &jdev_top->active_links[idx].link;
 		ptr += (sizeof("active_") - 1);
 	} else if (strncmp(ptr, "staged_", sizeof("staged_") - 1) == 0) {
-		lnk = &jdev_top->staged_links[idx];
+		lnk = &jdev_top->staged_links[idx].link;
 		ptr += (sizeof("staged_") - 1);
 	} else if (strncmp(ptr, "control", sizeof("control") - 1) == 0) {
 		ret = jesd204_show_store_control(jdev_top, idx, wbuf, rbuf,
@@ -498,6 +498,7 @@ static ssize_t jesd204_link_store(struct device *dev,
 	return jesd204_link_show_store(dev, devattr, NULL, buf, count, true);
 }
 
+#if 0
 static ssize_t jesd204_top_show(struct device *dev,
 			 struct device_attribute *devattr,
 			 char *buf)
@@ -539,6 +540,7 @@ static struct attribute *jesd204_top_static_attributes[] = {
 	&dev_attr_nxt_state.attr,
 	&dev_attr_change_kref.attr,
 };
+#endif
 
 static int jesd204_dev_create_con_io_attrs(struct device *dev,
 					   struct device_attribute *conattrs,
@@ -691,9 +693,9 @@ int jesd204_dev_create_sysfs(struct jesd204_dev *jdev)
 	if (IS_ERR(lnkattrs))
 		return PTR_ERR(lnkattrs);
 
-	if (jdev->is_top)
-		topattrs_count = ARRAY_SIZE(jesd204_top_static_attributes);
-	else
+//	if (jdev->is_top)
+//		topattrs_count = ARRAY_SIZE(jesd204_top_static_attributes);
+//	else
 		topattrs_count = 0;
 
 	/* +1 for the NULL pointer at the end */
@@ -708,8 +710,8 @@ int jesd204_dev_create_sysfs(struct jesd204_dev *jdev)
 	for (i1 = 0; i1 < ARRAY_SIZE(jesd204_static_attributes); i1++)
 		attrs[i1] = jesd204_static_attributes[i1];
 
-	for (i2 = 0; i2 < topattrs_count; i1++, i2++)
-		attrs[i1] = jesd204_top_static_attributes[i2];
+//	for (i2 = 0; i2 < topattrs_count; i1++, i2++)
+//		attrs[i1] = jesd204_top_static_attributes[i2];
 
 	for (i2 = 0; i2 < lnkattrs_count; i1++, i2++)
 		attrs[i1] = &(lnkattrs[i2].attr);
