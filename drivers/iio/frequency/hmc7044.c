@@ -19,6 +19,8 @@
 #include <linux/iio/sysfs.h>
 #include <dt-bindings/iio/frequency/hmc7044.h>
 
+#include <linux/jesd204/jesd204.h>
+
 #define HMC7044_WRITE		(0 << 15)
 #define HMC7044_READ		(1 << 15)
 #define HMC7044_CNT(x)		(((x) - 1) << 13)
@@ -296,6 +298,7 @@ struct hmc7044 {
 	struct clk_onecell_data		clk_data;
 	struct clk			*clk_input[4];
 	struct mutex			lock;
+	struct jesd204_dev 		*jdev;
 };
 
 static const char * const hmc7044_input_clk_names[] = {
@@ -1419,6 +1422,83 @@ static int hmc7044_status_show(struct seq_file *file, void *offset)
 	return 0;
 }
 
+static int hmc7044_jesd204_link_init(struct jesd204_dev *jdev,
+		unsigned int link_num,
+		struct jesd204_link *lnk)
+{
+	struct device *dev = jesd204_dev_to_device(jdev);
+
+	dev_err(dev, "%s:%d link_num %u\n", __func__, __LINE__, link_num);
+
+	return JESD204_STATE_CHANGE_DONE;
+}
+
+static int hmc7044_jesd204_clks_enable(struct jesd204_dev *jdev,
+		unsigned int link_num,
+		struct jesd204_link *lnk)
+{
+	struct device *dev = jesd204_dev_to_device(jdev);
+
+	dev_err(dev, "%s:%d link_num %u\n", __func__, __LINE__, link_num);
+
+	return JESD204_STATE_CHANGE_DONE;
+}
+static int hmc7044_jesd204_clks_disable(struct jesd204_dev *jdev,
+		unsigned int link_num,
+		struct jesd204_link *lnk)
+{
+	struct device *dev = jesd204_dev_to_device(jdev);
+
+	dev_err(dev, "%s:%d link_num %u\n", __func__, __LINE__, link_num);
+
+	return JESD204_STATE_CHANGE_DONE;
+}
+
+static int hmc7044_jesd204_link_setup(struct jesd204_dev *jdev,
+		unsigned int link_num,
+		struct jesd204_link *lnk)
+{
+	struct device *dev = jesd204_dev_to_device(jdev);
+
+	dev_err(dev, "%s:%d link_num %u\n", __func__, __LINE__, link_num);
+
+	return JESD204_STATE_CHANGE_DONE;
+}
+
+static int hmc7044_jesd204_link_disable(struct jesd204_dev *jdev,
+		unsigned int link_num,
+		struct jesd204_link *lnk)
+{
+	struct device *dev = jesd204_dev_to_device(jdev);
+
+	dev_err(dev, "%s:%d link_num %u\n", __func__, __LINE__, link_num);
+
+	return JESD204_STATE_CHANGE_DONE;
+}
+
+static int hmc7044_jesd204_link_enable(struct jesd204_dev *jdev,
+		unsigned int link_num,
+		struct jesd204_link *lnk)
+{
+	struct device *dev = jesd204_dev_to_device(jdev);
+
+	dev_err(dev, "%s:%d link_num %u\n", __func__, __LINE__, link_num);
+
+	return JESD204_STATE_CHANGE_DONE;
+}
+
+static const struct jesd204_dev_data jesd204_hmc7044_init = {
+	.link_ops = {
+		[JESD204_OP_LINK_INIT] = hmc7044_jesd204_link_init,
+		[JESD204_OP_CLOCKS_ENABLE] = hmc7044_jesd204_clks_enable,
+		[JESD204_OP_CLOCKS_DISABLE] = hmc7044_jesd204_clks_disable,
+		[JESD204_OP_LINK_SETUP] = hmc7044_jesd204_link_setup,
+		[JESD204_OP_LINK_DISABLE] = hmc7044_jesd204_link_disable,
+		[JESD204_OP_LINK_ENABLE] = hmc7044_jesd204_link_enable,
+	},
+};
+
+
 static int hmc7044_probe(struct spi_device *spi)
 {
 	struct iio_dev *indio_dev;
@@ -1482,6 +1562,11 @@ static int hmc7044_probe(struct spi_device *spi)
 				"Failed to create debugfs entry");
 	}
 
+	hmc->jdev = jesd204_dev_register(&spi->dev, &jesd204_hmc7044_init);
+	if (IS_ERR(hmc->jdev)) {
+		ret = PTR_ERR(hmc->jdev);
+	}
+
 	return ret;
 
 }
@@ -1489,6 +1574,9 @@ static int hmc7044_probe(struct spi_device *spi)
 static int hmc7044_remove(struct spi_device *spi)
 {
 	struct iio_dev *indio_dev = spi_get_drvdata(spi);
+	struct hmc7044 *hmc = iio_priv(indio_dev);
+
+	jesd204_dev_unregister(hmc->jdev);
 
 	iio_device_unregister(indio_dev);
 

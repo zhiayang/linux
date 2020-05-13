@@ -35,6 +35,8 @@
 #include <linux/clkdev.h>
 #include <linux/clk-provider.h>
 
+#include <linux/jesd204/jesd204.h>
+
 #include "talise/talise.h"
 #include "talise/talise_jesd204.h"
 #include "talise/talise_arm.h"
@@ -5102,6 +5104,128 @@ static irqreturn_t adrv9009_irq_handler(int irq, void *p)
 	return IRQ_HANDLED;
 }
 
+static int adrv9009_jesd204_link_init(struct jesd204_dev *jdev,
+		unsigned int link_num,
+		struct jesd204_link *lnk)
+{
+	struct device *dev = jesd204_dev_to_device(jdev);
+	struct spi_device *spi = to_spi_device(dev);
+	struct adrv9009_rf_phy *phy = adrv9009_spi_to_phy(spi);
+	taliseJesd204bFramerConfig_t *framer = NULL;
+	taliseJesd204bDeframerConfig_t *deframer = NULL;
+
+	dev_dbg(dev, "%s:%d link_num %u\n", __func__, __LINE__, link_num);
+
+	switch (link_num) {
+	case 0:
+		deframer = &phy->talInit.jesd204Settings.deframerA;
+		break;
+	case 1:
+		framer = &phy->talInit.jesd204Settings.framerA;
+		break;
+	case 2:
+		framer = &phy->talInit.jesd204Settings.framerB;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	if (framer) {
+		lnk->num_converters = framer->M;
+		lnk->num_lanes = hweight8(framer->serializerLanesEnabled);
+		lnk->octets_per_frame = framer->F;
+		lnk->frames_per_multiframe = framer->K;
+		lnk->frames_per_multiframe = framer->K;
+		lnk->did = framer->deviceId;
+		lnk->bid = framer->bankId;
+		lnk->scrambling = framer->scramble;
+		lnk->bits_per_sample = framer->Np;
+		lnk->jesd_version = JESD204_VERSION_B;
+		lnk->subclass = framer->externalSysref ? JESD204_SUBCLASS_1 : JESD204_SUBCLASS_0;
+		lnk->is_transmit = false;
+	} else if (deframer) {
+		lnk->num_converters = deframer->M;
+		lnk->num_lanes = hweight8(deframer->deserializerLanesEnabled);
+		lnk->octets_per_frame = (2 * lnk->num_converters) / lnk->num_lanes;
+		lnk->frames_per_multiframe = deframer->K;
+		lnk->did = deframer->deviceId;
+		lnk->bid = deframer->bankId;
+		lnk->scrambling = deframer->scramble;
+		lnk->bits_per_sample = deframer->Np;
+		lnk->jesd_version = JESD204_VERSION_B;
+		lnk->subclass = deframer->externalSysref ? JESD204_SUBCLASS_1 : JESD204_SUBCLASS_0;
+		lnk->is_transmit = true;
+	};
+
+	return JESD204_STATE_CHANGE_DONE;
+}
+
+static int adrv9009_jesd204_clks_enable(struct jesd204_dev *jdev,
+		unsigned int link_num,
+		struct jesd204_link *lnk)
+{
+	struct device *dev = jesd204_dev_to_device(jdev);
+
+	dev_err(dev, "%s:%d link_num %u\n", __func__, __LINE__, link_num);
+
+	return JESD204_STATE_CHANGE_DONE;
+}
+static int adrv9009_jesd204_clks_disable(struct jesd204_dev *jdev,
+		unsigned int link_num,
+		struct jesd204_link *lnk)
+{
+	struct device *dev = jesd204_dev_to_device(jdev);
+
+	dev_err(dev, "%s:%d link_num %u\n", __func__, __LINE__, link_num);
+
+	return JESD204_STATE_CHANGE_DONE;
+}
+
+static int adrv9009_jesd204_link_setup(struct jesd204_dev *jdev,
+		unsigned int link_num,
+		struct jesd204_link *lnk)
+{
+	struct device *dev = jesd204_dev_to_device(jdev);
+
+	dev_err(dev, "%s:%d link_num %u\n", __func__, __LINE__, link_num);
+
+	return JESD204_STATE_CHANGE_DONE;
+}
+
+static int adrv9009_jesd204_link_disable(struct jesd204_dev *jdev,
+		unsigned int link_num,
+		struct jesd204_link *lnk)
+{
+	struct device *dev = jesd204_dev_to_device(jdev);
+
+	dev_err(dev, "%s:%d link_num %u\n", __func__, __LINE__, link_num);
+
+	return JESD204_STATE_CHANGE_DONE;
+}
+
+static int adrv9009_jesd204_link_enable(struct jesd204_dev *jdev,
+		unsigned int link_num,
+		struct jesd204_link *lnk)
+{
+	struct device *dev = jesd204_dev_to_device(jdev);
+
+	dev_err(dev, "%s:%d link_num %u\n", __func__, __LINE__, link_num);
+
+	return JESD204_STATE_CHANGE_DONE;
+}
+
+static const struct jesd204_dev_data jesd204_adrv9009_init = {
+	.link_ops = {
+		[JESD204_OP_LINK_INIT] = adrv9009_jesd204_link_init,
+		[JESD204_OP_CLOCKS_ENABLE] = adrv9009_jesd204_clks_enable,
+		[JESD204_OP_CLOCKS_DISABLE] = adrv9009_jesd204_clks_disable,
+		[JESD204_OP_LINK_SETUP] = adrv9009_jesd204_link_setup,
+		[JESD204_OP_LINK_DISABLE] = adrv9009_jesd204_link_disable,
+		[JESD204_OP_LINK_ENABLE] = adrv9009_jesd204_link_enable,
+	},
+	.num_links = 3,
+};
+
 static int adrv9009_probe(struct spi_device *spi)
 {
 	struct iio_dev *indio_dev;
@@ -5336,6 +5460,12 @@ static int adrv9009_probe(struct spi_device *spi)
 		 talArmVersionInfo.minorVer, talArmVersionInfo.rcVer,
 		 api_vers[0], api_vers[1], api_vers[2], api_vers[3]);
 
+
+	phy->jdev = jesd204_dev_register(&spi->dev, &jesd204_adrv9009_init);
+	if (IS_ERR(phy->jdev)) {
+		ret = PTR_ERR(phy->jdev);
+	}
+
 	return 0;
 
 out_remove_sysfs_bin:
@@ -5360,6 +5490,8 @@ out_unregister_notifier:
 static int adrv9009_remove(struct spi_device *spi)
 {
 	struct adrv9009_rf_phy *phy = adrv9009_spi_to_phy(spi);
+
+	jesd204_dev_unregister(phy->jdev);
 
 	release_firmware(phy->fw);
 	release_firmware(phy->stream);

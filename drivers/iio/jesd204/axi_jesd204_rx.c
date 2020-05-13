@@ -461,8 +461,9 @@ static int axi_jesd204_rx_apply_config(struct axi_jesd204_rx *jesd,
 			       jesd->base + JESD204_RX_REG_LINK_CONF2);
 	}
 
-	writel_relaxed(config->sysref_lmfc_offset,
-		jesd->base + JESD204_RX_REG_SYSREF_LMFC_OFFSET);
+	if (config->sysref_lmfc_offset)
+		writel_relaxed(config->sysref_lmfc_offset,
+			jesd->base + JESD204_RX_REG_SYSREF_LMFC_OFFSET);
 
 	return 0;
 }
@@ -709,7 +710,103 @@ static int axi_jesd204_rx_pcore_check(struct axi_jesd204_rx *jesd)
 	return 0;
 }
 
-static const struct jesd204_dev_data axi_jesd204_rx_data = {
+static int axi_jesd204_rx_jesd204_clks_enable(struct jesd204_dev *jdev,
+		unsigned int link_num,
+		struct jesd204_link *lnk)
+{
+	struct device *dev = jesd204_dev_to_device(jdev);
+	struct axi_jesd204_rx *jesd = dev_get_drvdata(dev);
+
+	dev_err(dev, "%s:%d link_num %u\n", __func__, __LINE__, link_num);
+
+
+	return JESD204_STATE_CHANGE_DONE;
+}
+static int axi_jesd204_rx_jesd204_clks_disable(struct jesd204_dev *jdev,
+		unsigned int link_num,
+		struct jesd204_link *lnk)
+{
+	struct device *dev = jesd204_dev_to_device(jdev);
+	struct axi_jesd204_rx *jesd = dev_get_drvdata(dev);
+
+	dev_err(dev, "%s:%d link_num %u\n", __func__, __LINE__, link_num);
+
+	return JESD204_STATE_CHANGE_DONE;
+}
+
+static int axi_jesd204_rx_jesd204_link_setup(struct jesd204_dev *jdev,
+		unsigned int link_num,
+		struct jesd204_link *lnk)
+{
+	struct device *dev = jesd204_dev_to_device(jdev);
+	struct axi_jesd204_rx *jesd = dev_get_drvdata(dev);
+	struct jesd204_rx_config config;
+	int ret;
+
+	dev_err(dev, "%s:%d link_num %u\n", __func__, __LINE__, link_num);
+
+	config.device_id = lnk->did;
+	config.bank_id = lnk->bid;
+	config.lanes_per_device = jesd->num_lanes;
+	config.octets_per_frame = lnk->octets_per_frame;
+	config.frames_per_multiframe = lnk->frames_per_multiframe;
+	config.converters_per_device = lnk->num_converters;
+	config.resolution = lnk->converter_resolution;
+	config.bits_per_sample = lnk->bits_per_sample;
+	config.samples_per_frame = lnk->samples_per_conv_frame;
+	config.jesd_version = lnk->jesd_version;
+	config.subclass_version = lnk->subclass;
+	config.sysref_lmfc_offset = 0;
+	config.enable_scrambling = lnk->scrambling;
+	config.high_density = lnk->high_density;
+
+
+	ret = axi_jesd204_rx_apply_config(jesd, &config);
+	if (ret)
+		return ret;
+
+	return JESD204_STATE_CHANGE_DONE;
+}
+
+static int axi_jesd204_rx_jesd204_link_disable(struct jesd204_dev *jdev,
+		unsigned int link_num,
+		struct jesd204_link *lnk)
+{
+	struct device *dev = jesd204_dev_to_device(jdev);
+	struct axi_jesd204_rx *jesd = dev_get_drvdata(dev);
+
+	dev_err(dev, "%s:%d link_num %u\n", __func__, __LINE__, link_num);
+
+	writel_relaxed(0x1, jesd->base + JESD204_RX_REG_LINK_DISABLE);
+
+	return JESD204_STATE_CHANGE_DONE;
+}
+
+static int axi_jesd204_rx_jesd204_link_enable(struct jesd204_dev *jdev,
+		unsigned int link_num,
+		struct jesd204_link *lnk)
+{
+	struct device *dev = jesd204_dev_to_device(jdev);
+	struct axi_jesd204_rx *jesd = dev_get_drvdata(dev);
+
+	dev_err(dev, "%s:%d link_num %u\n", __func__, __LINE__, link_num);
+
+	writel_relaxed(0x3, jesd->base + JESD204_RX_REG_SYSREF_STATUS);
+	writel_relaxed(0x0, jesd->base + JESD204_RX_REG_LINK_DISABLE);
+
+	schedule_delayed_work(&jesd->watchdog_work, HZ);
+
+	return JESD204_STATE_CHANGE_DONE;
+}
+
+static const struct jesd204_dev_data jesd204_axi_jesd204_rx_init = {
+	.link_ops = {
+		[JESD204_OP_CLOCKS_ENABLE] = axi_jesd204_rx_jesd204_clks_enable,
+		[JESD204_OP_CLOCKS_DISABLE] = axi_jesd204_rx_jesd204_clks_disable,
+		[JESD204_OP_LINK_SETUP] = axi_jesd204_rx_jesd204_link_setup,
+		[JESD204_OP_LINK_DISABLE] = axi_jesd204_rx_jesd204_link_disable,
+		[JESD204_OP_LINK_ENABLE] = axi_jesd204_rx_jesd204_link_enable,
+	},
 };
 
 static int axi_jesd204_rx_probe(struct platform_device *pdev)
@@ -843,7 +940,7 @@ static int axi_jesd204_rx_probe(struct platform_device *pdev)
 	device_create_file(&pdev->dev, &dev_attr_status);
 	device_create_file(&pdev->dev, &dev_attr_encoder);
 
-	jesd->jdev = jesd204_dev_register(&pdev->dev, &axi_jesd204_rx_data);
+	jesd->jdev = jesd204_dev_register(&pdev->dev, &jesd204_axi_jesd204_rx_init);
 	if (IS_ERR(jesd->jdev)) {
 		ret = PTR_ERR(jesd->jdev);
 		goto err_disable_device_clk;

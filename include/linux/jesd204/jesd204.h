@@ -21,6 +21,18 @@ enum jesd204_state_change_result {
 	JESD204_STATE_CHANGE_DONE,
 };
 
+enum jesd204_subclass {
+	JESD204_SUBCLASS_0,
+	JESD204_SUBCLASS_1,
+	JESD204_SUBCLASS_2,
+};
+
+enum jesd204_version {
+	JESD204_VERSION_A,
+	JESD204_VERSION_B,
+	JESD204_VERSION_C,
+};
+
 typedef int (*jesd204_cb)(struct jesd204_dev *jdev);
 
 /** struct jesd204_sysref - JESD204 configuration for SYSREF
@@ -38,6 +50,7 @@ struct jesd204_sysref {
  * struct jesd204_link - JESD204 link configuration settings
  * @link_id			JESD204 link ID provided via DT configuration
  * @enabled			true if this link is enabled
+ * @is_transmit		true if this link is transmit (digital to analog)
  * @sample_rate			sample rate for the link
  * @num_lanes			number of JESD204 lanes (L)
  * @num_converters		number of converters per link (M)
@@ -72,6 +85,7 @@ struct jesd204_link {
 	u64 sample_rate;
 
 	bool enabled;
+	bool is_transmit;
 
 	u8 num_lanes;
 	u8 num_converters;
