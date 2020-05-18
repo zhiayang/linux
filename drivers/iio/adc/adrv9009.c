@@ -318,18 +318,18 @@ static int adrv9009_set_jesd_lanerate(struct adrv9009_rf_phy *phy,
 
 	lane_rate_kHz = input_rate_khz * m * 20 / l;
 
-	if (clk_enable)
-		clk_disable_unprepare(link_clk);
+	// if (clk_enable)
+	// 	clk_disable_unprepare(link_clk);
 
-	ret = clk_set_rate(link_clk, lane_rate_kHz);
-	if (ret < 0)
-		goto error;
+	// ret = clk_set_rate(link_clk, lane_rate_kHz);
+	// if (ret < 0)
+	// 	goto error;
 
-	if (clk_enable) {
-		ret = clk_prepare_enable(link_clk);
-		if (ret)
-			goto error;
-	}
+	// if (clk_enable) {
+	// 	ret = clk_prepare_enable(link_clk);
+	// 	if (ret)
+	// 		goto error;
+	// }
 
 	lmfc_tmp = (lane_rate_kHz * 100) / (k * f);
 

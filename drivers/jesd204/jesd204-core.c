@@ -76,7 +76,7 @@ int jesd204_link_get_rate(struct jesd204_link *lnk,
 EXPORT_SYMBOL_GPL(jesd204_link_get_rate);
 
 int jesd204_link_get_rate_khz(struct jesd204_link *lnk,
-				 u32 *lane_rate_khz)
+				 unsigned long *lane_rate_khz)
 {
 	u64 lane_rate_hz;
 	int ret = jesd204_link_get_rate(lnk, &lane_rate_hz);
@@ -88,6 +88,37 @@ int jesd204_link_get_rate_khz(struct jesd204_link *lnk,
 	return ret;
 }
 EXPORT_SYMBOL_GPL(jesd204_link_get_rate_khz);
+
+
+int jesd204_link_get_device_clock(struct jesd204_link *lnk,
+				 unsigned long *device_clock)
+{
+	u64 lane_rate_hz;
+	u32 encoding_n;
+
+	int ret = jesd204_link_get_rate(lnk, &lane_rate_hz);
+
+	switch (lnk->jesd_encoder) {
+	case JESD204_ENC_64B66B:
+		encoding_n = 66; /* JESD 204C */
+		break;
+	case JESD204_ENC_8B10B:
+		encoding_n = 40; /* JESD 204ABC */
+		break;
+	case JESD204_ENC_64B80B:
+		encoding_n = 80; /* JESD 204C */
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	do_div(lane_rate_hz, encoding_n);
+
+	*device_clock = lane_rate_hz;
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(jesd204_link_get_device_clock);
 
 int jesd204_link_get_lmfc_lemc_rate(struct jesd204_link *lnk,
 				u32 *rate_hz)

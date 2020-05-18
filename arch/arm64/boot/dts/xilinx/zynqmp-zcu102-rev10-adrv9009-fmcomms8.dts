@@ -938,8 +938,8 @@
 			compatible = "adi,axi-adxcvr-1.0";
 			reg = <0x85a40000 0x1000>;
 
-			clocks = <&hmc7044 5>, <&hmc7044 9>;
-			clock-names = "conv", "div40";
+			clocks = <&hmc7044 5>;
+			clock-names = "conv";
 
 			#clock-cells = <1>;
 			clock-output-names = "rx_gt_clk", "rx_out_clk";
@@ -959,8 +959,8 @@
 			compatible = "adi,axi-adxcvr-1.0";
 			reg = <0x85a60000 0x1000>;
 
-			clocks = <&hmc7044 4>, <&hmc7044 8>;
-			clock-names = "conv", "div40";
+			clocks = <&hmc7044 4>;
+			clock-names = "conv";
 
 			#clock-cells = <1>;
 			clock-output-names = "rx_os_gt_clk", "rx_os_out_clk";
@@ -980,8 +980,8 @@
 			compatible = "adi,axi-adxcvr-1.0";
 			reg = <0x85a20000 0x1000>;
 
-			clocks = <&hmc7044 4>, <&hmc7044 8>;
-			clock-names = "conv", "div40";
+			clocks = <&hmc7044 4>;
+			clock-names = "conv";
 
 			#clock-cells = <1>;
 			clock-output-names = "tx_gt_clk", "tx_out_clk";

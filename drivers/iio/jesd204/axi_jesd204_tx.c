@@ -536,27 +536,6 @@ static int axi_jesd204_tx_jesd204_link_init(struct jesd204_dev *jdev,
 	return JESD204_STATE_CHANGE_DONE;
 }
 
-static int axi_jesd204_tx_jesd204_clks_enable(struct jesd204_dev *jdev,
-		unsigned int link_num,
-		struct jesd204_link *lnk)
-{
-	struct device *dev = jesd204_dev_to_device(jdev);
-
-	dev_dbg(dev, "%s:%d link_num %u\n", __func__, __LINE__, link_num);
-
-	return JESD204_STATE_CHANGE_DONE;
-}
-static int axi_jesd204_tx_jesd204_clks_disable(struct jesd204_dev *jdev,
-		unsigned int link_num,
-		struct jesd204_link *lnk)
-{
-	struct device *dev = jesd204_dev_to_device(jdev);
-
-	dev_dbg(dev, "%s:%d link_num %u\n", __func__, __LINE__, link_num);
-
-	return JESD204_STATE_CHANGE_DONE;
-}
-
 static int axi_jesd204_tx_jesd204_link_setup(struct jesd204_dev *jdev,
 		unsigned int link_num,
 		struct jesd204_link *lnk)
@@ -564,6 +543,7 @@ static int axi_jesd204_tx_jesd204_link_setup(struct jesd204_dev *jdev,
 	struct device *dev = jesd204_dev_to_device(jdev);
 	struct axi_jesd204_tx *jesd = dev_get_drvdata(dev);
 	struct jesd204_tx_config config;
+	unsigned long rate;
 	int ret;
 
 	dev_dbg(dev, "%s:%d link_num %u\n", __func__, __LINE__, link_num);
@@ -584,8 +564,79 @@ static int axi_jesd204_tx_jesd204_link_setup(struct jesd204_dev *jdev,
 	config.high_density = lnk->high_density;
 
 	ret = axi_jesd204_tx_apply_config(jesd, &config);
-	if (ret)
+	if (ret) {
+		dev_err(dev, "%s: Apply config link:%u failed (%d)\n",
+			__func__, link_num, ret);
 		return ret;
+	}
+
+	ret = jesd204_link_get_rate_khz(lnk, &rate);
+	if (ret) {
+		dev_err(dev, "%s: Link get rate link:%u failed (%d)\n",
+			__func__, link_num, ret);
+		return ret;
+	}
+
+	ret = clk_set_rate(jesd->lane_clk, rate);
+	if (ret) {
+		dev_err(dev, "%s: Link set lane rate %lu Hz link:%u failed (%d)\n",
+			__func__, rate, link_num, ret);
+		return ret;
+	}
+
+	ret = jesd204_link_get_device_clock(lnk, &rate);
+	if (ret) {
+		dev_err(dev, "%s: Link get device clock rate link:%u failed (%d)\n",
+			__func__, link_num, ret);
+		return ret;
+	}
+	ret = clk_set_rate(jesd->device_clk, rate);
+	if (ret) {
+		dev_err(dev, "%s: Link set device clock rate %lu Hz link:%u failed (%d)\n",
+			__func__, rate, link_num, ret);
+		return ret;
+	}
+
+	return JESD204_STATE_CHANGE_DONE;
+}
+
+static int axi_jesd204_tx_jesd204_clks_enable(struct jesd204_dev *jdev,
+		unsigned int link_num,
+		struct jesd204_link *lnk)
+{
+	struct device *dev = jesd204_dev_to_device(jdev);
+	struct axi_jesd204_tx *jesd = dev_get_drvdata(dev);
+	int ret;
+
+	dev_dbg(dev, "%s:%d link_num %u\n", __func__, __LINE__, link_num);
+
+	ret = clk_prepare_enable(jesd->lane_clk);
+		if (ret) {
+		dev_err(dev, "%s: Link enable lane clock link:%u failed (%d)\n",
+			__func__, link_num, ret);
+		return ret;
+	}
+
+	ret = clk_prepare_enable(jesd->device_clk);
+		if (ret) {
+		dev_err(dev, "%s: Link enable device clock link:%u failed (%d)\n",
+			__func__, link_num, ret);
+		return ret;
+	}
+
+	return JESD204_STATE_CHANGE_DONE;
+}
+static int axi_jesd204_tx_jesd204_clks_disable(struct jesd204_dev *jdev,
+		unsigned int link_num,
+		struct jesd204_link *lnk)
+{
+	struct device *dev = jesd204_dev_to_device(jdev);
+	struct axi_jesd204_tx *jesd = dev_get_drvdata(dev);
+
+	dev_dbg(dev, "%s:%d link_num %u\n", __func__, __LINE__, link_num);
+
+	clk_disable_unprepare(jesd->lane_clk);
+	clk_disable_unprepare(jesd->device_clk);
 
 	return JESD204_STATE_CHANGE_DONE;
 }
