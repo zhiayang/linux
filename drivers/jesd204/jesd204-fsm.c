@@ -13,6 +13,8 @@
 
 #define JESD204_LINKS_ALL	((unsigned int)-1)
 
+#define JESD204_FSM_BUSY	BIT(0)
+
 extern struct list_head jesd204_topologies;
 
 typedef int (*jesd204_fsm_cb)(struct jesd204_dev *jdev,
@@ -263,10 +265,14 @@ static void __jesd204_link_fsm_done_cb(struct kref *ref)
 	jdev = &ol->jdev_top->jdev;
 	fsm_data = ol->fsm_data;
 
+	/* clear out this transition information, to make way for the next */
+	clear_bit(JESD204_FSM_BUSY, &ol->flags);
+	ol->fsm_data = NULL;
+
 	if (ol->error) {
 		dev_err(jdev->parent, "jesd got error from topology %d\n",
 			ol->error);
-		goto out;
+		return;
 	}
 
 	dev_info(jdev->parent, "JESD204 link[%u] transition %s -> %s\n",
@@ -276,7 +282,7 @@ static void __jesd204_link_fsm_done_cb(struct kref *ref)
 	ol->state = fsm_data->nxt_state;
 
 	if (!fsm_data->fsm_complete_cb)
-		goto out;
+		return;
 
 	ret = fsm_data->fsm_complete_cb(jdev, ol, fsm_data->cb_data);
 	if (jesd204_dev_set_error(ol, NULL, ret)) {
@@ -285,9 +291,6 @@ static void __jesd204_link_fsm_done_cb(struct kref *ref)
 			ret,
 			jesd204_state_str(ol->state));
 	}
-
-out:
-	ol->fsm_data = NULL;
 }
 
 static void __jesd204_fsm_kref_link_put_get(struct jesd204_dev_top *jdev_top,
@@ -451,7 +454,6 @@ static int jesd204_fsm_link_init(struct jesd204_dev_top *jdev_top,
 {
 	struct jesd204_link_opaque *ol;
 
-	/* FIXME: check if any links are transitioning; this assumes they don't */
 	if (link_idx != JESD204_LINKS_ALL) {
 		ol = &jdev_top->active_links[link_idx];
 		ol->fsm_data = fsm_data;
@@ -466,6 +468,64 @@ static int jesd204_fsm_link_init(struct jesd204_dev_top *jdev_top,
 	}
 
 	return 0;
+}
+
+static int jesd204_fsm_test_and_set_busy(struct jesd204_dev_top *jdev_top,
+					 enum jesd204_dev_state cur_state,
+					 unsigned int link_idx)
+{
+	struct jesd204_dev *jdev = &jdev_top->jdev;
+	struct jesd204_link_opaque *ol;
+
+	/* ignore if the transition is busy */
+	if (cur_state == JESD204_STATE_DONT_CARE)
+		return 0;
+
+	if (link_idx != JESD204_LINKS_ALL) {
+		ol = &jdev_top->active_links[link_idx];
+		if (test_and_set_bit(JESD204_FSM_BUSY, &ol->flags)) {
+			dev_err(jdev->parent, "JESD204 link [%u]: FSM is busy\n",
+				ol->link_idx);
+			return -EBUSY;
+		}
+		return 0;
+	}
+
+	for (link_idx = 0; link_idx < jdev_top->num_links; link_idx++) {
+		ol = &jdev_top->active_links[link_idx];
+		if (test_and_set_bit(JESD204_FSM_BUSY, &ol->flags)) {
+			dev_err(jdev->parent, "JESD204 link [%u]: FSM is busy\n",
+				ol->link_idx);
+			goto err_unwind_busy;
+		}
+	}
+
+	return 0;
+
+err_unwind_busy:
+	for (; link_idx >= 0; link_idx--) {
+		ol = &jdev_top->active_links[link_idx];
+		clear_bit(JESD204_FSM_BUSY, &ol->flags);
+	}
+
+	return -EBUSY;
+}
+
+static void jesd204_fsm_clear_busy(struct jesd204_dev_top *jdev_top,
+				   unsigned int link_idx)
+{
+	struct jesd204_link_opaque *ol;
+
+	if (link_idx != JESD204_LINKS_ALL) {
+		ol = &jdev_top->active_links[link_idx];
+		clear_bit(JESD204_FSM_BUSY, &ol->flags);
+		return;
+	}
+
+	for (link_idx = 0; link_idx < jdev_top->num_links; link_idx++) {
+		ol = &jdev_top->active_links[link_idx];
+		clear_bit(JESD204_FSM_BUSY, &ol->flags);
+	}
 }
 
 static int jesd204_dev_validate_lnk_states(struct jesd204_dev_top *jdev_top,
@@ -506,10 +566,14 @@ static int __jesd204_fsm(struct jesd204_dev *jdev,
 	struct jesd204_fsm_data data;
 	int ret;
 
+	ret = jesd204_fsm_test_and_set_busy(jdev_top, cur_state, link_idx);
+	if (ret)
+		return ret;
+
 	ret = jesd204_dev_validate_lnk_states(jdev_top, link_idx,
 					      cur_state, nxt_state);
 	if (ret)
-		return ret;
+		goto out_clear_busy;
 
 	memset(&data, 0, sizeof(data));
 	data.jdev_top = jdev_top;
@@ -522,13 +586,16 @@ static int __jesd204_fsm(struct jesd204_dev *jdev,
 
 	ret = jesd204_fsm_link_init(jdev_top, &data, link_idx);
 	if (ret)
-		return ret;
+		goto out_clear_busy;
 
 	ret = jesd204_dev_propagate_cb(jdev,
 				       jesd204_fsm_change_cb,
 				       &data);
 
 	jesd204_fsm_kref_link_put(jdev_top, link_idx);
+
+out_clear_busy:
+	jesd204_fsm_clear_busy(jdev_top, link_idx);
 
 	return ret;
 }
