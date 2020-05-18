@@ -33,6 +33,14 @@ enum jesd204_version {
 	JESD204_VERSION_C,
 };
 
+/* JESD204C Supported encoding scheme */
+enum jesd204_enc { /* FIXME: unify with link layer defines */
+	JESD204_ENC_8B10B,
+	JESD204_ENC_64B66B,
+	JESD204_ENC_64B80B,
+};
+
+
 typedef int (*jesd204_cb)(struct jesd204_dev *jdev);
 
 /** struct jesd204_sysref - JESD204 configuration for SYSREF
@@ -59,6 +67,7 @@ struct jesd204_sysref {
  * @bits_per_sample		number of bits per sample (N')
  * @converter_resolution	converter resolution (N)
  * @jesd_version		JESD204 version (A, B or C) (JESDV)
+ * @jesd_encoder		JESD204C encoder (8B10B, 64B66B, 64B80B)
  * @subclass			JESD204 subclass (0,1 or 2) (SUBCLASSV)
  * @did				device ID (DID)
  * @bid				bank ID (BID)
@@ -91,11 +100,13 @@ struct jesd204_link {
 	u8 num_converters;
 	u8 octets_per_frame;
 	u8 frames_per_multiframe;
+	u8 num_of_multiblocks_in_emb; /* E */
 
 	u8 bits_per_sample;
 
 	u8 converter_resolution;
 	u8 jesd_version;
+	u8 jesd_encoder;
 	u8 subclass;
 
 	u8 did;
@@ -160,6 +171,14 @@ void devm_jesd204_unregister(struct device *dev, struct jesd204_dev *jdev);
 
 struct device *jesd204_dev_to_device(struct jesd204_dev *jdev);
 struct jesd204_dev *jesd204_dev_from_device(struct device *dev);
+
+
+int jesd204_link_get_lmfc_lemc_rate(struct jesd204_link *lnk,
+				u32 *rate_hz);
+int jesd204_link_get_rate_khz(struct jesd204_link *lnk,
+				 u32 *lane_rate_khz);
+int jesd204_link_get_rate(struct jesd204_link *lnk,
+				 u64 *lane_rate_hz);
 
 #else /* !IS_ENABLED(CONFIG_JESD204) */
 

@@ -461,10 +461,11 @@
 		jesd204-top-device = <0>;
 		jesd204-link-ids = <DEFRAMER_LINK_TX FRAMER_LINK_RX FRAMER_LINK_ORX>;
 
-		jesd204-inputs = 
+		jesd204-inputs =
+			<&trx0_adrv9009 0 FRAMER_LINK_RX>,
 			<&trx0_adrv9009 0 FRAMER_LINK_ORX>,
-			<&trx0_adrv9009 0 DEFRAMER_LINK_TX>,
-			<&trx0_adrv9009 0 FRAMER_LINK_RX>;
+			<&trx0_adrv9009 0 DEFRAMER_LINK_TX>;
+
 
 
 		/* JESD204 RX */

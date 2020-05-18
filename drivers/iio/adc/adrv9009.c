@@ -5119,12 +5119,15 @@ static int adrv9009_jesd204_link_init(struct jesd204_dev *jdev,
 	switch (link_num) {
 	case 0:
 		deframer = &phy->talInit.jesd204Settings.deframerA;
+		lnk->sample_rate = phy->talInit.tx.txProfile.txInputRate_kHz;
 		break;
 	case 1:
 		framer = &phy->talInit.jesd204Settings.framerA;
+		lnk->sample_rate = phy->talInit.rx.rxProfile.rxOutputRate_kHz;
 		break;
 	case 2:
 		framer = &phy->talInit.jesd204Settings.framerB;
+		lnk->sample_rate = phy->talInit.obsRx.orxProfile.orxOutputRate_kHz;
 		break;
 	default:
 		return -EINVAL;
