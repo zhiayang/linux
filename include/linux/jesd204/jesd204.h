@@ -143,6 +143,7 @@ enum jesd204_dev_op {
 	JESD204_OP_LINK_ENABLE,
 	JESD204_OP_LINK_RUNNING,
 	JESD204_OP_LINK_DISABLE,
+	JESD204_OP_SYSREF,
 	__JESD204_MAX_OPS,
 };
 
@@ -179,6 +180,9 @@ int jesd204_link_get_rate_khz(struct jesd204_link *lnk,
 				 u32 *lane_rate_khz);
 int jesd204_link_get_rate(struct jesd204_link *lnk,
 				 u64 *lane_rate_hz);
+
+int jesd204_sysref_async(struct jesd204_dev *jdev,
+				enum jesd204_sysref_mode mode, u32 num);
 
 #else /* !IS_ENABLED(CONFIG_JESD204) */
 

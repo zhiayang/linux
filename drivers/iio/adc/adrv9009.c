@@ -5469,6 +5469,11 @@ static int adrv9009_probe(struct spi_device *spi)
 		ret = PTR_ERR(phy->jdev);
 	}
 
+	/* FIMXE: Debug/test code */
+	jesd204_sysref_async(phy->jdev, 0, 1);
+	jesd204_sysref_async(phy->jdev, 0, 1);
+	jesd204_sysref_async(phy->jdev, 0, 1);
+
 	return 0;
 
 out_remove_sysfs_bin:

@@ -814,6 +814,7 @@
 
 		jesd204-device;
 		#jesd204-cells = <2>;
+		jesd204-sysref-provider;
 
 		adi,pll1-clkin-frequencies = <122880000 122880000 0 0>;
 		adi,pll1-ref-prio-ctrl = <0xE5>; /* prefer CLKIN1 */

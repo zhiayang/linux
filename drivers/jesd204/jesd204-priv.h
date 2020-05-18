@@ -108,6 +108,7 @@ struct jesd204_dev {
 	const struct attribute_group	*groups[JESD204_MAX_GROUPS + 1];
 
 	bool				is_top;
+	bool				is_sysref_provider;
 
 	struct device			*parent;
 	const jesd204_link_cb		*link_ops;

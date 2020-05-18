@@ -1487,6 +1487,18 @@ static int hmc7044_jesd204_link_enable(struct jesd204_dev *jdev,
 	return JESD204_STATE_CHANGE_DONE;
 }
 
+static int hmc7044_jesd204_sysref(struct jesd204_dev *jdev,
+		unsigned int link_num,
+		struct jesd204_link *lnk)
+{
+	struct device *dev = jesd204_dev_to_device(jdev);
+
+	dev_err(dev, "%s:%d link_num %u\n", __func__, __LINE__, link_num);
+
+
+	return JESD204_STATE_CHANGE_DONE;
+}
+
 static const struct jesd204_dev_data jesd204_hmc7044_init = {
 	.link_ops = {
 		[JESD204_OP_LINK_INIT] = hmc7044_jesd204_link_init,
@@ -1495,6 +1507,7 @@ static const struct jesd204_dev_data jesd204_hmc7044_init = {
 		[JESD204_OP_LINK_SETUP] = hmc7044_jesd204_link_setup,
 		[JESD204_OP_LINK_DISABLE] = hmc7044_jesd204_link_disable,
 		[JESD204_OP_LINK_ENABLE] = hmc7044_jesd204_link_enable,
+		[JESD204_OP_SYSREF] = hmc7044_jesd204_sysref,
 	},
 };
 
