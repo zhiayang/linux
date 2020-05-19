@@ -322,15 +322,16 @@ unlock:
 	return ret;
 }
 
-static int jesd204_dev_init_link_lane_ids(struct jesd204_dev *jdev,
+static int jesd204_dev_init_link_lane_ids(struct jesd204_dev_top *jdev_top,
 					  int link_idx,
 					  struct jesd204_link *jlink)
 {
+	struct jesd204_dev *jdev = &jdev_top->jdev;
 	struct device *dev = jdev->parent;
 	u8 id;
 
 	if (!jlink->num_lanes) {
-		dev_err(dev, "number of lanes is 0 for link %d\n",
+		dev_err(dev, "JESD204 link [%d] number of lanes is 0\n",
 			link_idx);
 		jlink->lane_ids = NULL;
 		return -EINVAL;
@@ -353,21 +354,18 @@ static int jesd204_dev_init_link_lane_ids(struct jesd204_dev *jdev,
 	return 0;
 }
 
-int jesd204_dev_init_link_data(struct jesd204_dev *jdev, unsigned int link_idx)
+int jesd204_dev_init_link_data(struct jesd204_dev_top *jdev_top,
+			       unsigned int link_idx)
 {
-	struct jesd204_dev_top *jdev_top = jesd204_dev_top_dev(jdev);
 	struct jesd204_link_opaque *ol;
 	int ret;
-
-	if (!jdev_top)
-		return 0;
 
 	/* FIXME: fix the case where the driver provides static lane IDs */
 	ol = &jdev_top->active_links[link_idx];
 	ol->link.link_id = jdev_top->link_ids[link_idx];
 	ol->jdev_top = jdev_top;
 	ol->link_idx = link_idx;
-	ret = jesd204_dev_init_link_lane_ids(jdev, link_idx, &ol->link);
+	ret = jesd204_dev_init_link_lane_ids(jdev_top, link_idx, &ol->link);
 	if (ret)
 		return ret;
 
