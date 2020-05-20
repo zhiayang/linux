@@ -264,19 +264,22 @@ static int adrv9009_sysref_req(struct adrv9009_rf_phy *phy,
 {
 	int ret;
 
-	if (!IS_ERR(phy->sysref_req_gpio)) {
-		if (mode == SYSREF_CONT_ON)
-			ret = gpiod_direction_output(phy->sysref_req_gpio, 1);
-		else if (mode == SYSREF_CONT_OFF)
-			ret = gpiod_direction_output(phy->sysref_req_gpio, 0);
-		else if (mode == SYSREF_PULSE) {
-			gpiod_direction_output(phy->sysref_req_gpio, 1);
-			mdelay(1);
-			ret = gpiod_direction_output(phy->sysref_req_gpio, 0);
-		} else
-			ret = -EINVAL;
-	} else
-		ret = -ENODEV;
+
+	jesd204_sysref_async(phy->jdev, 0, 1);
+
+	// if (!IS_ERR(phy->sysref_req_gpio)) {
+	// 	if (mode == SYSREF_CONT_ON)
+	// 		ret = gpiod_direction_output(phy->sysref_req_gpio, 1);
+	// 	else if (mode == SYSREF_CONT_OFF)
+	// 		ret = gpiod_direction_output(phy->sysref_req_gpio, 0);
+	// 	else if (mode == SYSREF_PULSE) {
+	// 		gpiod_direction_output(phy->sysref_req_gpio, 1);
+	// 		mdelay(1);
+	// 		ret = gpiod_direction_output(phy->sysref_req_gpio, 0);
+	// 	} else
+	// 		ret = -EINVAL;
+	// } else
+	// 	ret = -ENODEV;
 
 //	if (ret)
 //		dev_err(&phy->spi->dev, "%s: failed (%d)\n", __func__, ret);
@@ -800,7 +803,7 @@ static int adrv9009_do_setup(struct adrv9009_rf_phy *phy)
 				__func__, __LINE__, errorFlag);
 	}
 
-	/***************************************************/
+#if 0	/***************************************************/
 	/**** Enable Talise JESD204B Framer ***/
 	/***************************************************/
 
@@ -928,6 +931,7 @@ static int adrv9009_do_setup(struct adrv9009_rf_phy *phy)
 
 	adrv9009_sysref_req(phy, SYSREF_CONT_OFF);
 
+
 	/*** < User Sends SYSREF Here > ***/
 
 	/*** < Insert User JESD204B Sync Verification Code Here > ***/
@@ -978,6 +982,8 @@ static int adrv9009_do_setup(struct adrv9009_rf_phy *phy)
 	}
 
 	/*** < User: When links have been verified, proceed > ***/
+
+#endif
 
 	/***********************************************
 	 * Allow Rx1/2 QEC tracking and Tx1/2 QEC       *
@@ -5469,10 +5475,7 @@ static int adrv9009_probe(struct spi_device *spi)
 		ret = PTR_ERR(phy->jdev);
 	}
 
-	/* FIMXE: Debug/test code */
-	jesd204_sysref_async(phy->jdev, 0, 1);
-	jesd204_sysref_async(phy->jdev, 0, 1);
-	jesd204_sysref_async(phy->jdev, 0, 1);
+
 
 	return 0;
 

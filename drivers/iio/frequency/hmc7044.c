@@ -1532,7 +1532,7 @@ static int hmc7044_jesd204_sysref(struct jesd204_dev *jdev,
 	int ret;
 	u32 val;
 
-	dev_err(dev, "%s:%d link_num %u\n", __func__, __LINE__, link_num);
+	dev_dbg(dev, "%s:%d Link%d %u\n", __func__, __LINE__, link_num);
 
 	mutex_lock(&hmc->lock);
 

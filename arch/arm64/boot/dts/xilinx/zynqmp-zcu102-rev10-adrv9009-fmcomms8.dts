@@ -829,7 +829,7 @@
 		adi,pll2-output-frequency = <2949120000>;
 
 		adi,sysref-timer-divider = <3840>;
-		adi,pulse-generator-mode = <7>;
+		adi,pulse-generator-mode = <6>;
 
 		adi,oscin-buffer-mode = <0x15>;
 
