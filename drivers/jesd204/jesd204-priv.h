@@ -128,9 +128,9 @@ struct jesd204_dev_con_out {
 	struct list_head		entry;
 	struct jesd204_dev		*owner;
 	struct jesd204_dev_top		*jdev_top;
-	unsigned int			topo_id;
-	unsigned int			link_id;
-	unsigned int			link_idx;
+	int				topo_id;
+	int				link_id;
+	int				link_idx;
 	struct list_head		dests;
 	unsigned int			dests_count;
 	struct of_phandle_args		of;
@@ -199,7 +199,7 @@ struct jesd204_dev {
 struct jesd204_link_opaque {
 	struct jesd204_link		link;
 	struct jesd204_dev_top		*jdev_top;
-	unsigned int			link_idx;
+	int				link_idx;
 
 	struct kref			cb_ref;
 	enum jesd204_dev_state		state;
@@ -210,9 +210,10 @@ struct jesd204_link_opaque {
 
 /**
  * struct jesd204_dev_top - JESD204 top device (in a JESD204 topology)
+ * @jdev		JESD204 device data
  * @entry		list entry for the framework to keep a list of top
  *			devices (and implicitly topologies)
- * @jdev		JESD204 device data
+ * @initialized		true the topoology connections have been initialized
  * @fsm_strategy	JESD204 FSM strategy for links
  * @fsm_data		ref to JESD204 FSM data for JESD204_LNK_FSM_PARALLEL
  * @cb_ref		kref which for each JESD204 link will increment when it
@@ -230,16 +231,17 @@ struct jesd204_link_opaque {
  * @num_links		number of links
  */
 struct jesd204_dev_top {
+	struct jesd204_dev		jdev;
 	struct list_head		entry;
+	bool				initialized;
 
 	enum jesd204_lnk_fsm_strategy	fsm_strategy;
 	struct jesd204_fsm_data		*fsm_data;
 	struct kref			cb_ref;
 
-	struct jesd204_dev		jdev;
-	unsigned int			topo_id;
+	int				topo_id;
 	unsigned int			link_ids[JESD204_MAX_LINKS];
-	unsigned int			num_links;
+	int				num_links;
 
 	const struct jesd204_link	*init_links;
 	struct jesd204_link_opaque	*active_links;
@@ -259,7 +261,7 @@ static inline struct jesd204_dev_top *jesd204_dev_top_dev(
 const char *jesd204_state_str(enum jesd204_dev_state state);
 
 int jesd204_dev_init_link_data(struct jesd204_dev_top *jdev_top,
-			       unsigned int link_idx);
+			       int link_idx);
 
 int jesd204_init_topology(struct jesd204_dev_top *jdev_top);
 
@@ -268,7 +270,7 @@ int jesd204_fsm_probe(struct jesd204_dev *jdev);
 void jesd204_fsm_unreg_device(struct jesd204_dev *jdev);
 
 int jesd204_fsm_link_change(struct jesd204_dev_top *jdev_top,
-			    unsigned int link_idx);
+			    int link_idx);
 
 int jesd204_dev_create_sysfs(struct jesd204_dev *jdev);
 void jesd204_dev_destroy_sysfs(struct jesd204_dev *jdev);

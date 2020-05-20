@@ -355,7 +355,7 @@ static int jesd204_dev_init_link_lane_ids(struct jesd204_dev_top *jdev_top,
 }
 
 int jesd204_dev_init_link_data(struct jesd204_dev_top *jdev_top,
-			       unsigned int link_idx)
+			       int link_idx)
 {
 	struct jesd204_link_opaque *ol;
 	int ret;
