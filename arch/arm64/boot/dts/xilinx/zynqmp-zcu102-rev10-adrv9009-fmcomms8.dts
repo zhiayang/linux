@@ -83,8 +83,7 @@
 		#jesd204-cells = <2>;
 		jesd204-inputs = <&axi_adrv9009_rx_jesd 0 FRAMER_LINK_RX>,
 			<&axi_adrv9009_rx_os_jesd 0 FRAMER_LINK_ORX>,
-			<&axi_adrv9009_tx_jesd 0 DEFRAMER_LINK_TX>,
-			<&hmc7044 0 DEFRAMER_LINK_TX>;
+			<&axi_adrv9009_tx_jesd 0 DEFRAMER_LINK_TX>;
 
 		/* JESD204 RX */
 		adi,jesd204-framer-a-bank-id = <1>;
@@ -946,7 +945,7 @@
 
 			jesd204-device;
 			#jesd204-cells = <2>;
-
+			jesd204-inputs =  <&hmc7044 0 FRAMER_LINK_RX>;
 			adi,sys-clk-select = <0>;
 			adi,out-clk-select = <3>;
 			adi,use-lpm-enable;
@@ -967,6 +966,7 @@
 
 			jesd204-device;
 			#jesd204-cells = <2>;
+			jesd204-inputs =  <&hmc7044 0 FRAMER_LINK_ORX>;
 
 			adi,sys-clk-select = <0>;
 			adi,out-clk-select = <3>;
@@ -988,6 +988,7 @@
 
 			jesd204-device;
 			#jesd204-cells = <2>;
+			jesd204-inputs =  <&hmc7044 0 DEFRAMER_LINK_TX>;
 
 			adi,sys-clk-select = <3>;
 			adi,out-clk-select = <3>;
