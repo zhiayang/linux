@@ -146,10 +146,9 @@ static const struct iio_chan_spec ad7768_channels[] = {
 		.channel = 0,
 		.scan_index = 0,
 		.scan_type = {
-			.sign = 'u',
+			.sign = 's',
 			.realbits = 24,
 			.storagebits = 32,
-			.shift = 8,
 		},
 	},
 };
@@ -164,6 +163,7 @@ struct ad7768_state {
 	struct completion completion;
 	struct iio_trigger *trig;
 	struct gpio_desc *gpio_sync_in;
+	struct gpio_desc *gpio_reset;
 	bool spi_engine_supported;
 	bool spi_locked;
 	/*
@@ -407,7 +407,7 @@ static int ad7768_read_raw(struct iio_dev *indio_dev,
 
 		ret = ad7768_scan_direct(indio_dev);
 		if (ret >= 0)
-			*val = ret;
+			*val = sign_extend32(ret, chan->scan_type.realbits - 1);
 
 		iio_device_release_direct_mode(indio_dev);
 		if (ret < 0)
@@ -467,6 +467,13 @@ static const struct iio_info ad7768_info = {
 static int ad7768_setup(struct ad7768_state *st)
 {
 	int ret;
+
+	st->gpio_reset = devm_gpiod_get(&st->spi->dev, "reset",
+					  GPIOD_OUT_LOW);
+	if (IS_ERR(st->gpio_reset))
+		return PTR_ERR(st->gpio_reset);
+
+	gpiod_direction_output(st->gpio_reset, 0);
 
 	/*
 	 * Two writes to the SPI_RESET[1:0] bits are required to initiate
