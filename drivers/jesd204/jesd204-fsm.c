@@ -144,14 +144,17 @@ static int jesd204_con_link_idx_in_jdev_top(struct jesd204_dev_con_out *con,
 {
 	int i;
 
-	if (con->topo_id != jdev_top->topo_id)
+	if (con->topo_id != jdev_top->topo_id) {
+	pr_err("%s %d\n", __func__, __LINE__);
 		return -EINVAL;
+	}
 
 	for (i = 0; i < jdev_top->num_links; i++) {
 		if (jdev_top->link_ids[i] == con->link_id)
 			return i;
 	}
 
+	pr_err("%s %d\n", __func__, __LINE__);
 	return -EINVAL;
 }
 
@@ -187,11 +190,13 @@ static int jesd204_dev_propagate_cb_inputs(struct jesd204_dev *jdev,
 	for (i = 0; i < jdev->inputs_count; i++) {
 		con = jdev->inputs[i];
 
+		/* FIXME: i feel something cleaner here */
 		if (data->jdev_top->initialized &&
 		    data->link_idx != JESD204_LINKS_ALL &&
 		    data->link_idx != con->link_idx)
 			continue;
 
+		pr_err("%pOF %s %d con->link_idx %d\n", jdev->np, __func__, __LINE__, con->link_idx);
 		ret = jesd204_dev_propagate_cb_inputs(con->owner,
 						      propagated_cb, data);
 		if (ret)
@@ -219,6 +224,7 @@ static int jesd204_dev_propagate_cb_outputs(struct jesd204_dev *jdev,
 			    data->link_idx != con->link_idx)
 				continue;
 
+		pr_err("%pOF %s %d con->link_idx %d\n", jdev->np, __func__, __LINE__, con->link_idx);
 			ret = propagated_cb(e->jdev, con, data);
 			if (ret)
 				goto done;
@@ -311,6 +317,7 @@ static void __jesd204_all_links_fsm_done_cb(struct kref *ref)
 	int link_idx;
 	int ret;
 
+		pr_err("%s %d %pOF \n", __func__, __LINE__, jdev->np);
 	for (link_idx = 0; link_idx < jdev_top->num_links; link_idx++) {
 		ol = &jdev_top->active_links[link_idx];
 		ret = __jesd204_link_fsm_update_state(jdev, ol, fsm_data);
@@ -318,11 +325,14 @@ static void __jesd204_all_links_fsm_done_cb(struct kref *ref)
 			goto out;
 	}
 
+		pr_err("%s %d %pOF \n", __func__, __LINE__, jdev->np);
 	if (!fsm_data->fsm_complete_one_link_cb)
 		goto out;
 
+		pr_err("%s %d %pOF \n", __func__, __LINE__, jdev->np);
 	/* if we got here, all links transitioned -> call the done callbacks */
 	for (link_idx = 0; link_idx < jdev_top->num_links; link_idx++) {
+		ol = &jdev_top->active_links[link_idx];
 		ret = fsm_data->fsm_complete_one_link_cb(jdev, ol, fsm_data);
 		if (jesd204_dev_set_error(ol, NULL, ret)) {
 			dev_err(jdev->parent,
@@ -332,6 +342,7 @@ static void __jesd204_all_links_fsm_done_cb(struct kref *ref)
 			goto out;
 		}
 	}
+		pr_err("%s %d %pOF \n", __func__, __LINE__, jdev->np);
 out:
 	jdev_top->fsm_data = NULL;
 }
@@ -387,9 +398,8 @@ static void jesd204_fsm_kref_link_put(struct jesd204_dev_top *jdev_top,
 	__jesd204_fsm_kref_link_put_get(jdev_top, link_idx, true);
 }
 
-static int jesd204_dev_validate_cur_state(struct jesd204_dev *jdev,
+static int jesd204_lnk_validate_cur_state(struct jesd204_dev *jdev,
 					  struct jesd204_link_opaque *ol,
-					  struct jesd204_dev_con_out *c,
 					  enum jesd204_dev_state cur_state,
 					  enum jesd204_dev_state nxt_state)
 {
@@ -403,46 +413,41 @@ static int jesd204_dev_validate_cur_state(struct jesd204_dev *jdev,
 			 jesd204_state_str(ol->state),
 			 jesd204_state_str(cur_state),
 			 jesd204_state_str(nxt_state));
-		return jesd204_dev_set_error(ol, c, -EINVAL);
-	}
-
-	if (c && c->link_idx < 0) {
-		dev_warn(jdev->parent,
-			 "JESD204 link[%d] connection link index unitialized\n",
-			 ol->link_idx);
-		return jesd204_dev_set_error(ol, c, -EINVAL);
-	}
-
-	if (c && cur_state != c->state) {
-		dev_warn(jdev->parent,
-			 "JESD204 link[%d] invalid connection state: %s, exp: %s, nxt: %s\n",
-			 ol->link_idx,
-			 jesd204_state_str(c->state),
-			 jesd204_state_str(cur_state),
-			 jesd204_state_str(nxt_state));
-		return jesd204_dev_set_error(ol, c, -EINVAL);
+		return jesd204_dev_set_error(ol, NULL, -EINVAL);
 	}
 
 	return 0;
 }
 
-static int jesd204_dev_update_con_state(struct jesd204_dev *jdev,
-					struct jesd204_link_opaque *ol,
-					struct jesd204_dev_con_out *c,
-					struct jesd204_fsm_data *fsm_data)
+static int jesd204_con_validate_cur_state(struct jesd204_dev *jdev,
+					  struct jesd204_link_opaque *ol,
+					  struct jesd204_dev_con_out *c,
+					  enum jesd204_dev_state cur_state,
+					  enum jesd204_dev_state nxt_state)
 {
-	int ret;
-
-	if (!c || c->state == fsm_data->nxt_state)
+	if (cur_state == JESD204_STATE_DONT_CARE)
 		return 0;
 
-	ret = jesd204_dev_validate_cur_state(jdev, ol, c,
-					     fsm_data->cur_state,
-					     fsm_data->nxt_state);
-	if (ret)
-		return ret;
+	if (c && c->state == nxt_state)
+		return 0;
+#if 0
+	if (c->link_idx < 0) {
+		dev_warn(jdev->parent,
+			 "JESD204 link[%d] connection link index unitialized\n",
+			 ol->link_idx);
+		return jesd204_dev_set_error(ol, c, -EINVAL);
+	}
+#endif
 
-	c->state = fsm_data->nxt_state;
+	if (c && cur_state != c->state) {
+		dev_warn(jdev->parent,
+			 "JESD204 link[%d] invalid connection state: %s, exp: %s, nxt: %s\n",
+			 c->link_idx,
+			 jesd204_state_str(c->state),
+			 jesd204_state_str(cur_state),
+			 jesd204_state_str(nxt_state));
+		return jesd204_dev_set_error(ol, c, -EINVAL);
+	}
 
 	return 0;
 }
@@ -457,6 +462,12 @@ static int jesd204_fsm_propagate_one_link_cb(struct jesd204_dev *jdev,
 
 	jesd204_fsm_kref_link_get(jdev_top, fsm_data->link_idx);
 
+	ret = jesd204_con_validate_cur_state(jdev, ol, con,
+					     fsm_data->cur_state,
+					     fsm_data->nxt_state);
+	if (ret)
+		return ret;
+
 	ret = fsm_data->fsm_change_one_link_cb(jdev, ol, con, fsm_data);
 	if (ret < 0) {
 		dev_err(jdev->parent,
@@ -468,9 +479,8 @@ static int jesd204_fsm_propagate_one_link_cb(struct jesd204_dev *jdev,
 	if (ret != JESD204_STATE_CHANGE_DONE)
 		return ret;
 
-	ret = jesd204_dev_update_con_state(jdev, ol, con, fsm_data);
-	if (ret)
-		return ret;
+	if (con)
+		con->state = fsm_data->nxt_state;
 
 	jesd204_fsm_kref_link_put(jdev_top, fsm_data->link_idx);
 	return 0;
@@ -489,27 +499,35 @@ static int jesd204_fsm_propagated_cb(struct jesd204_dev *jdev,
 	if (!fsm_data->fsm_change_one_link_cb)
 		return 0;
 
+	/* if this transitioned already, we're done */
+	if (con && con->state == fsm_data->nxt_state)
+		return 0;
+
 	jdev_top = fsm_data->jdev_top;
 	link_idx = fsm_data->link_idx;
 
 	if (con && jdev_top->initialized && con->link_idx < 0) {
+		pr_err("%s %d %pOF \n", __func__, __LINE__, jdev->np);
 		dev_err(jdev->parent, "Uninitialized connection in topology\n");
 		return -EINVAL;
 	}
 
 	if (con && con->link_idx > -1) {
+		pr_err("%s %d %pOF \n", __func__, __LINE__, jdev->np);
 		ol = &jdev_top->active_links[con->link_idx];
 		return jesd204_fsm_propagate_one_link_cb(jdev, ol,
 							 con, fsm_data);
 	}
 
 	if (link_idx != JESD204_LINKS_ALL) {
+		pr_err("%s %d %pOF \n", __func__, __LINE__, jdev->np);
 		ol = &jdev_top->active_links[link_idx];
 		return jesd204_fsm_propagate_one_link_cb(jdev, ol,
 							 con, fsm_data);
 	}
 
 	if (!con && jdev_top->initialized) {
+		pr_err("%s %d %pOF \n", __func__, __LINE__, jdev->np);
 		return jesd204_fsm_propagate_one_link_cb(jdev, NULL,
 							 NULL, fsm_data);
 	}
@@ -638,13 +656,13 @@ static int jesd204_dev_validate_lnk_states(struct jesd204_dev_top *jdev_top,
 
 	if (link_idx != JESD204_LINKS_ALL) {
 		ol = &jdev_top->active_links[link_idx];
-		return jesd204_dev_validate_cur_state(jdev, ol, NULL,
+		return jesd204_lnk_validate_cur_state(jdev, ol,
 						      cur_state, nxt_state);
 	}
 
 	for (link_idx = 0; link_idx < jdev_top->num_links; link_idx++) {
 		ol = &jdev_top->active_links[link_idx];
-		ret = jesd204_dev_validate_cur_state(jdev, ol, NULL,
+		ret = jesd204_lnk_validate_cur_state(jdev, ol,
 						     cur_state, nxt_state);
 		if (ret)
 			return ret;
@@ -831,6 +849,7 @@ int jesd204_init_topology(struct jesd204_dev_top *jdev_top)
 {
 	int ret;
 
+	pr_err("%s %d\n", __func__, __LINE__);
 	if (!jdev_top)
 		return -EINVAL;
 
@@ -931,10 +950,10 @@ static int jesd204_fsm_table_entry_cb(struct jesd204_dev *jdev,
 	struct jesd204_fsm_table_entry_iter *it = fsm_data->cb_data;
 	jesd204_link_cb link_op;
 
-	if (!con)
-		dev_err(jdev->parent," CON NULLLL\n");
-	if (!ol)
-		dev_err(jdev->parent," LNK NULLLL\n");
+	if (!con || !ol) {
+		pr_err("NOT SURE HERE\n");
+		return JESD204_STATE_CHANGE_DONE;
+	}
 
 	if (!jdev->link_ops)
 		return JESD204_STATE_CHANGE_DONE;
