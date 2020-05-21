@@ -813,24 +813,19 @@ static int jesd204_fsm_init_link(struct jesd204_dev *jdev,
 {
 	int ret;
 
-	pr_err("%s %d\n", __func__, __LINE__);
 	ret = jesd204_fsm_table(jdev, link_idx,
 				init_state, jesd204_init_links_states, false);
-	pr_err("%s %d\n", __func__, __LINE__);
 	if (ret)
 		return ret;
 
-	pr_err("%s %d\n", __func__, __LINE__);
 	if (link_idx != JESD204_LINKS_ALL)
 		return jesd204_dev_init_link_data(jdev_top, link_idx);
 
-	pr_err("%s %d\n", __func__, __LINE__);
 	for (link_idx = 0; link_idx < jdev_top->num_links; link_idx++) {
 		ret = jesd204_dev_init_link_data(jdev_top, link_idx);
 		if (ret)
 			return ret;
 	}
-	pr_err("%s %d\n", __func__, __LINE__);
 
 	return 0;
 }
@@ -839,7 +834,6 @@ static int jesd204_fsm_start_link(struct jesd204_dev *jdev,
 				  int link_idx,
 				  enum jesd204_dev_state init_state)
 {
-	pr_err("%s %d\n", __func__, __LINE__);
 	return jesd204_fsm_table(jdev, link_idx,
 				 init_state, jesd204_start_links_states,
 				 false);
@@ -960,6 +954,7 @@ int jesd204_fsm_link_change(struct jesd204_dev_top *jdev_top,
 	if (memcmp(al, sl, sizeof(*al)) == 0)
 		return 0;
 
+	/* FIXME: set busy flags here */
 	ret = jesd204_fsm_table(&jdev_top->jdev, link_idx,
 				oal->state,
 				jesd204_unreg_dev_states, false);
