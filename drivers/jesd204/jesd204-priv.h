@@ -36,65 +36,6 @@ enum jesd204_dev_state {
 };
 
 /**
- * Strategies for initializing a top-level device links, when
- * initializing or transitioning multiple (or all) JESD204 links.
- * This is usually useful when 'link_idx' is JESD204_LINKS_ALL.
- *
- * Default is 'parallel', where all links transition through each
- * state.
-
- * For JESD204_LNK_FSM_PARALLEL, it's something like (for 3 links):
- *   JESD204 link[0] transition initialized -> probed
- *   JESD204 link[1] transition initialized -> probed
- *   JESD204 link[2] transition initialized -> probed
- *   JESD204 link[0] transition probed -> link_init
- *   JESD204 link[1] transition probed -> link_init
- *   JESD204 link[2] transition probed -> link_init
- *   JESD204 link[0] transition link_init -> link_supported
- *   JESD204 link[1] transition link_init -> link_supported
- *   JESD204 link[2] transition link_init -> link_supported
- *   JESD204 link[0] transition link_supported -> link_setup
- *   JESD204 link[1] transition link_supported -> link_setup
- *   JESD204 link[2] transition link_supported -> link_setup
- *   JESD204 link[0] transition link_setup -> clocks_enable
- *   JESD204 link[1] transition link_setup -> clocks_enable
- *   JESD204 link[2] transition link_setup -> clocks_enable
- *   JESD204 link[0] transition clocks_enable -> link_enable
- *   JESD204 link[1] transition clocks_enable -> link_enable
- *   JESD204 link[2] transition clocks_enable -> link_enable
- *   JESD204 link[0] transition link_enable -> link_running
- *   JESD204 link[1] transition link_enable -> link_running
- *   JESD204 link[2] transition link_enable -> link_running
- *
- * For JESD204_LNK_FSM_SEQUENTIONAL, it's something like (for 3 links):
- *   JESD204 link[0] transition initialized -> probed
- *   JESD204 link[0] transition probed -> link_init
- *   JESD204 link[0] transition link_init -> link_supported
- *   JESD204 link[0] transition link_supported -> link_setup
- *   JESD204 link[0] transition link_setup -> clocks_enable
- *   JESD204 link[0] transition clocks_enable -> link_enable
- *   JESD204 link[0] transition link_enable -> link_running
- *   JESD204 link[1] transition initialized -> probed
- *   JESD204 link[1] transition probed -> link_init
- *   JESD204 link[1] transition link_init -> link_supported
- *   JESD204 link[1] transition link_supported -> link_setup
- *   JESD204 link[1] transition link_setup -> clocks_enable
- *   JESD204 link[1] transition clocks_enable -> link_enable
- *   JESD204 link[1] transition link_enable -> link_running
- *   JESD204 link[2] transition initialized -> probed
- *   JESD204 link[2] transition probed -> link_init
- *   JESD204 link[2] transition link_init -> link_supported
- *   JESD204 link[2] transition link_supported -> link_setup
- *   JESD204 link[2] transition link_setup -> clocks_enable
- *   JESD204 link[2] transition clocks_enable -> link_enable
- *   JESD204 link[2] transition link_enable -> link_running
- */
-enum jesd204_lnk_fsm_strategy {
-	JESD204_LNK_FSM_PARALLEL,
-	JESD204_LNK_FSM_SEQUENTIONAL,
-};
-
-/**
  * struct jesd204_dev_list_entry - Entry for a JESD204 device in a list
  * @entry		list entry for a device to keep a list of devices
  * @jdev		pointer to JESD204 device for this list entry
@@ -214,7 +155,6 @@ struct jesd204_link_opaque {
  * @entry		list entry for the framework to keep a list of top
  *			devices (and implicitly topologies)
  * @initialized		true the topoology connections have been initialized
- * @fsm_strategy	JESD204 FSM strategy for links
  * @fsm_data		ref to JESD204 FSM data for JESD204_LNK_FSM_PARALLEL
  * @cb_ref		kref which for each JESD204 link will increment when it
  *			needs to defer a state transition; this is similar to the
@@ -235,7 +175,6 @@ struct jesd204_dev_top {
 	struct list_head		entry;
 	bool				initialized;
 
-	enum jesd204_lnk_fsm_strategy	fsm_strategy;
 	struct jesd204_fsm_data		*fsm_data;
 	struct kref			cb_ref;
 
