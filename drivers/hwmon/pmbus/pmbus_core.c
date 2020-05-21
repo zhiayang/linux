@@ -318,6 +318,79 @@ int pmbus_block_write(struct i2c_client *client, u8 cmd, u8 w_len, u8 *data_w)
 }
 EXPORT_SYMBOL_GPL(pmbus_block_write);
 
+/* Block read command.
+ * @client: Handle to slave device
+ * @cmd: Byte interpreted by slave
+ * @data_r: Byte array into which data will be read.
+ *
+ * Returns nr of bytes read or negative errno.
+ * (PMBus allows at most 255 bytes).
+ */
+int pmbus_block_read(struct i2c_client *client, u8 cmd, u8 *data_r)
+{
+	u8 write_buf[PMBUS_BLOCK_MAX + 1];
+	struct i2c_msg msgs[2] = {
+		{
+			.addr = client->addr,
+			.flags = 0,
+			.buf = write_buf,
+			.len = 1,
+		},
+		{
+			.addr = client->addr,
+			.flags = I2C_M_RD,
+			.len = PMBUS_BLOCK_MAX,
+		}
+	};
+	u8 addr = 0;
+	u8 crc = 0;
+	int ret;
+
+	msgs[0].buf[0] = cmd;
+
+	msgs[0].buf = i2c_get_dma_safe_msg_buf(&msgs[0], 1);
+	if (!msgs[0].buf)
+		return -ENOMEM;
+
+	msgs[1].buf = i2c_get_dma_safe_msg_buf(&msgs[1], 1);
+	if (!msgs[1].buf) {
+		i2c_put_dma_safe_msg_buf(msgs[0].buf, &msgs[0], false);
+		return -ENOMEM;
+	}
+
+	ret = i2c_transfer(client->adapter, msgs, 2);
+	if (ret != 2) {
+		dev_err(&client->dev, "I2C transfer error.");
+		goto cleanup;
+	}
+
+	if (client->flags & I2C_CLIENT_PEC) {
+		addr = i2c_8bit_addr_from_msg(&msgs[0]);
+		crc = crc8(pmbus_crc_table, &addr, 1, crc);
+		crc = crc8(pmbus_crc_table, msgs[0].buf,  msgs[0].len, crc);
+
+		addr = i2c_8bit_addr_from_msg(&msgs[1]);
+		crc = crc8(pmbus_crc_table, &addr, 1, crc);
+		crc = crc8(pmbus_crc_table, msgs[1].buf,  msgs[1].buf[0] + 1,
+			   crc);
+
+		if (crc != msgs[1].buf[msgs[1].buf[0] + 1]) {
+			ret = -EBADMSG;
+			goto cleanup;
+		}
+	}
+
+	memcpy(data_r, &msgs[1].buf[1], msgs[1].buf[0]);
+	ret = msgs[1].buf[0];
+
+cleanup:
+	i2c_put_dma_safe_msg_buf(msgs[0].buf, &msgs[0], true);
+	i2c_put_dma_safe_msg_buf(msgs[1].buf, &msgs[1], true);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(pmbus_block_read);
+
 /* Group command.
  * @clients: Array of handles to slave devices
  * @cmds: Array of bytes interpreted by slave
