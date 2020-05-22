@@ -494,10 +494,15 @@ static int jesd204_fsm_propagated_cb(struct jesd204_dev *jdev,
 		return jesd204_fsm_propagate_cb(jdev, ol, con, fsm_data);
 	}
 
+	/* FIXME: this implies top-level device ; see about making this better logic; same as Point1 */
+	if (!con) {
+		return jesd204_fsm_propagate_cb(jdev, NULL, NULL, fsm_data);
+	}
 
 	if (jdev_top->initialized)
 		return 0;
 
+	/* FIXME: make this better; same as Point1 */
 	for (link_idx = 0; link_idx < jdev_top->num_links; link_idx++) {
 		ol = &jdev_top->active_links[link_idx];
 		ret = jesd204_fsm_propagate_cb(jdev, ol, con, fsm_data);
@@ -879,11 +884,9 @@ static int jesd204_fsm_table_entry_cb(struct jesd204_dev *jdev,
 				      struct jesd204_fsm_data *fsm_data)
 {
 	struct jesd204_fsm_table_entry_iter *it = fsm_data->cb_data;
+	struct jesd204_dev_top *jdev_top;
 	jesd204_link_cb link_op;
-
-	/* FIXME: we may need to see if we should allow this */
-	if (!con)
-		return JESD204_STATE_CHANGE_DONE;
+	int link_idx, ret, ret1;
 
 	if (!jdev->link_ops)
 		return JESD204_STATE_CHANGE_DONE;
@@ -892,7 +895,29 @@ static int jesd204_fsm_table_entry_cb(struct jesd204_dev *jdev,
 	if (!link_op)
 		return JESD204_STATE_CHANGE_DONE;
 
-	return link_op(jdev, con->link_idx, &ol->link);
+	if (con)
+		return link_op(jdev, con->link_idx, &ol->link);
+
+	/* FIXME: see about better logic here (Point1) */
+	jdev_top = fsm_data->jdev_top;
+	link_idx = fsm_data->link_idx;
+	/* this should be the top-level device */
+	if (link_idx != JESD204_LINKS_ALL) {
+		ol = &jdev_top->active_links[link_idx];
+		return link_op(jdev, link_idx, &ol->link);
+	}
+
+	ret1 = JESD204_STATE_CHANGE_DONE;
+	for (link_idx = 0; link_idx < jdev_top->num_links; link_idx++) {
+		ol = &jdev_top->active_links[link_idx];
+		ret = link_op(jdev, link_idx, &ol->link);
+		if (ret < 0)
+			return ret;
+		if (ret == JESD204_STATE_CHANGE_DEFER)
+			ret1 = JESD204_STATE_CHANGE_DEFER;
+	}
+
+	return ret1;
 }
 
 static int jesd204_fsm_table_entry_done(struct jesd204_dev *jdev,
