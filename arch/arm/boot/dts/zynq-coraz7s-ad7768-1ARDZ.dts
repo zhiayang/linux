@@ -49,8 +49,9 @@
 		line-name = "cn0540_sw_ff_gpio";
 	};
 	cn0540_shutdown_gpio{
+		gpio-hog;
 		gpios = <94 GPIO_ACTIVE_HIGH>;
-		output-low;
+		output-high;
 		line-name = "cn0540_shutdown_gpio";
 	};
 };

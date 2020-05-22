@@ -534,6 +534,7 @@ static int ad7768_setup(struct ad7768_state *st)
 	ret = ad7768_spi_reg_write(st, AD7768_REG_ANALOG2, 0x1);
 	if (ret)
 		return ret;
+	st->common_mode_voltage = 1;
 
 	/* Set the default sampling frequency to 256000 kSPS */
 	return ad7768_set_freq(st, st->spi_engine_supported ? 256000 : 32000);
