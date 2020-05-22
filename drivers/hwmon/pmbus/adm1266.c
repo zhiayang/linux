@@ -38,7 +38,10 @@
 #define ADM1266_BLACKBOX_INFO	0xE6
 #define ADM1266_PDIO_STATUS	0xE9
 #define ADM1266_GPIO_STATUS	0xEA
+#define ADM1266_STATUS_MFR_2	0xED
+#define ADM1266_REFRESH_FLASH	0xF5
 #define ADM1266_MEMORY_CONFIG	0xF8
+#define ADM1266_MEMORY_CRC	0xF9
 #define ADM1266_SWITCH_MEMORY	0xFA
 #define ADM1266_UPDATE_FW	0xFC
 #define ADM1266_FW_PASSWORD	0xFD
@@ -64,6 +67,11 @@
 
 /* ADM1266 STATUS_MFR defines */
 #define ADM1266_STATUS_PART_LOCKED(x)	FIELD_GET(BIT(2), x)
+#define ADM1266_RUNNING_REFRESH(x)	FIELD_GET(BIT(3), x)
+#define ADM1266_ALL_CRC_FAULT(x)	FIELD_GET(BIT(5), x)
+
+/* ADM1266 STATUS_MFR_2 defines */
+#define ADM1266_MAIN_CONFIG_FAULT(x)	FIELD_GET(GENMASK(9, 8), x)
 
 /* ADM1266 GO_COMMAND defines */
 #define ADM1266_GO_COMMAND_STOP		BIT(0)
@@ -72,6 +80,8 @@
 
 #define ADM1266_FIRMWARE_OFFSET		0x00000
 #define ADM1266_FIRMWARE_SIZE		131072
+#define ADM1266_CONFIG_OFFSET		0x30000
+#define ADM1266_CONFIG_SIZE		131072
 #define ADM1266_BLACKBOX_OFFSET		0x7F700
 #define ADM1266_BLACKBOX_SIZE		64
 
@@ -110,6 +120,11 @@ static const struct nvmem_cell_info adm1266_nvmem_cells[] = {
 		.name           = "firmware",
 		.offset         = ADM1266_FIRMWARE_OFFSET,
 		.bytes          = ADM1266_FIRMWARE_SIZE,
+	},
+	{
+		.name           = "configuration",
+		.offset         = ADM1266_CONFIG_OFFSET,
+		.bytes          = ADM1266_CONFIG_SIZE,
 	},
 };
 
@@ -355,6 +370,16 @@ static int adm1266_set_go_command_op(void *pdata, u64 val)
 
 	reg = FIELD_GET(GENMASK(4, 0), val);
 
+	if (data->master_dev) {
+		u8 write_data[2];
+
+		write_data[0] = reg;
+		write_data[1] = 0x0;
+
+		return adm1266_group_cmd(data, ADM1266_GO_COMMAND,
+					 write_data, 2, true);
+	}
+
 	return i2c_smbus_write_word_data(data->client, ADM1266_GO_COMMAND, reg);
 }
 
@@ -457,6 +482,9 @@ static int adm1266_read_mem_cell(struct adm1266_data *data,
 		return ret;
 	case ADM1266_FIRMWARE_OFFSET:
 		/* firmware is write-only */
+		return 0;
+	case ADM1266_CONFIG_OFFSET:
+		/* configuration is write-only */
 		return 0;
 	default:
 		return -EINVAL;
@@ -569,6 +597,7 @@ static int adm1266_write_hex(struct adm1266_data *data,
 	u8 first_writes[7];
 	u8 byte_count;
 	u8 reg_address;
+	bool to_slaves = false;
 	int ret;
 	int i;
 
@@ -599,8 +628,11 @@ static int adm1266_write_hex(struct adm1266_data *data,
 		if (ret < 0)
 			return ret;
 
+		if (offset == ADM1266_FIRMWARE_OFFSET)
+			to_slaves = true;
+
 		ret = adm1266_group_cmd(data, reg_address, write_buf,
-					byte_count, true);
+					byte_count, to_slaves);
 		if (ret < 0) {
 			dev_err(&data->client->dev, "Firmware write error: %d.",
 				ret);
@@ -621,6 +653,90 @@ static int adm1266_write_hex(struct adm1266_data *data,
 			}
 		}
 		mdelay(write_delay);
+	}
+
+	return 0;
+}
+
+static int adm1266_verify_memory(struct adm1266_data *data)
+{
+	int ret;
+	int reg;
+	u8 cmd[2];
+
+	cmd[0] = 0;
+	ret = adm1266_group_cmd(data, ADM1266_STORE_USER_ALL, cmd, 0, true);
+	if (ret < 0)
+		return ret;
+
+	/* after issuing a STORE_USER_ALL command, wait 300 ms */
+	mdelay(300);
+
+	cmd[0] = 0;
+	ret = adm1266_group_cmd(data, ADM1266_MEMORY_CRC, cmd, 1, true);
+	if (ret < 0)
+		return ret;
+
+	/* after issuing a memory recalculate crc command, wait 1000 ms */
+	mdelay(1000);
+
+	reg = pmbus_read_word_data(data->client, 0, ADM1266_STATUS_MFR_2);
+	if (reg < 0)
+		return reg;
+
+	if (ADM1266_MAIN_CONFIG_FAULT(reg)) {
+		dev_err(&data->client->dev, "Main memory corrupted.");
+		return -EFAULT;
+	}
+
+	return 0;
+}
+
+static int adm1266_refresh_memory(struct adm1266_data *data)
+{
+	int ret;
+	u8 cmd;
+
+	ret = adm1266_unlock_all_dev(data);
+	if (ret < 0) {
+		dev_err(&data->client->dev, "Could not unlock dev.");
+		return ret;
+	}
+
+	cmd = 0x2;
+	ret = adm1266_group_cmd(data, ADM1266_REFRESH_FLASH, &cmd, 1, true);
+	if (ret < 0) {
+		dev_err(&data->client->dev, "Could not refresh flash.");
+		return ret;
+	}
+
+	do {
+		/* after issuing a refresh flash command, wait 9000 ms */
+		mdelay(9000);
+
+		ret = pmbus_read_byte_data(data->client, 0, ADM1266_STATUS_MFR);
+		if (ret < 0) {
+			dev_err(&data->client->dev, "Could not read status.");
+			return ret;
+		}
+
+	} while (ADM1266_RUNNING_REFRESH(ret));
+
+	cmd = 0;
+	ret = adm1266_group_cmd(data, ADM1266_MEMORY_CRC, &cmd, 1, true);
+	if (ret < 0)
+		return ret;
+
+	/* after issuing a memory recalculate crc command, wait 1000 ms */
+	mdelay(1000);
+
+	ret = pmbus_read_byte_data(data->client, 0, ADM1266_STATUS_MFR);
+	if (ret < 0)
+		return ret;
+
+	if (ADM1266_ALL_CRC_FAULT(ret)) {
+		dev_err(&data->client->dev, "CRC checks failed.");
+		return ret;
 	}
 
 	return 0;
@@ -670,6 +786,70 @@ static int adm1266_program_firmware(struct adm1266_data *data)
 	if (ret < 0) {
 		dev_err(&data->client->dev, "Could not reset all devs.");
 		return ret;
+	}
+
+	return 0;
+}
+
+static int adm1266_program_config(struct adm1266_data *data)
+{
+	u8 cmd[2];
+	u8 value;
+	int ret;
+
+	value = ADM1266_GO_COMMAND_STOP | ADM1266_GO_COMMAND_SEQ_RES;
+	ret = pmbus_write_word_data(data->client, 0, ADM1266_GO_COMMAND, value);
+	if (ret < 0) {
+		dev_err(&data->client->dev, "Could not stop sequence.");
+		return ret;
+	}
+
+	/* after issuing a stop command, wait 100 ms */
+	mdelay(100);
+
+	ret = adm1266_unlock_device(data);
+	if (ret < 0) {
+		dev_err(&data->client->dev, "Could not unlock dev.");
+		return ret;
+	}
+
+	value = 0;
+	ret = pmbus_block_write(data->client, ADM1266_SWITCH_MEMORY, 1, &value);
+	if (ret < 0) {
+		dev_err(&data->client->dev, "Could not switch to main mem.");
+		return ret;
+	}
+
+	/* after issuing a SWITCH_MEMORY command, wait 1000 ms */
+	mdelay(1000);
+
+	ret = adm1266_write_hex(data, ADM1266_CONFIG_OFFSET,
+				ADM1266_CONFIG_SIZE);
+	if (ret < 0) {
+		dev_err(&data->client->dev, "Could not write configuration.");
+		return ret;
+	}
+
+	if (data->master_dev) {
+		cmd[0] = 0;
+		cmd[1] = 0;
+		ret = adm1266_group_cmd(data, ADM1266_GO_COMMAND, cmd, 2, true);
+		if (ret < 0) {
+			dev_err(&data->client->dev,
+				"Could not restart sequence.");
+			return ret;
+		}
+
+		/* after issuing a restart sequence command, wait 350 ms */
+		mdelay(350);
+
+		ret = adm1266_verify_memory(data);
+		if (ret < 0)
+			return ret;
+
+		ret = adm1266_refresh_memory(data);
+		if (ret < 0)
+			return ret;
 	}
 
 	return 0;
@@ -726,6 +906,22 @@ static int adm1266_write_mem_cell(struct adm1266_data *data,
 
 		if (fw_writen)
 			return adm1266_program_firmware(data);
+
+		return 0;
+	case ADM1266_CONFIG_OFFSET:
+		if (offset < cell_start || offset + bytes >= cell_end)
+			return -EINVAL;
+
+		if (offset == ADM1266_CONFIG_OFFSET)
+			memset(data->dev_mem, 0, ADM1266_CONFIG_SIZE);
+
+		memcpy(data->dev_mem + offset, val, bytes);
+
+		fw_writen = adm1266_check_ending(data, ADM1266_CONFIG_OFFSET,
+						 ADM1266_CONFIG_SIZE);
+
+		if (fw_writen)
+			return adm1266_program_config(data);
 
 		return 0;
 	default:
