@@ -90,7 +90,13 @@ static const struct jesd204_fsm_table_entry jesd204_init_links_states[] = {
 /* States to transition to start a JESD204 link */
 static const struct jesd204_fsm_table_entry jesd204_start_links_states[] = {
 	JESD204_STATE_OP(LINK_SUPPORTED),
+	JESD204_STATE_OP(LINK_PRE_SETUP),
 	JESD204_STATE_OP(LINK_SETUP),
+	JESD204_STATE_OP(OPT_SETUP_STAGE1),
+	JESD204_STATE_OP(OPT_SETUP_STAGE2),
+	JESD204_STATE_OP(OPT_SETUP_STAGE3),
+	JESD204_STATE_OP(OPT_SETUP_STAGE4),
+	JESD204_STATE_OP(OPT_SETUP_STAGE5),
 	JESD204_STATE_OP(CLOCKS_ENABLE),
 	JESD204_STATE_OP(LINK_ENABLE),
 	JESD204_STATE_OP_LAST(LINK_RUNNING),
@@ -118,6 +124,8 @@ const char *jesd204_state_str(enum jesd204_dev_state state)
 		return "link_init";
 	case JESD204_STATE_LINK_SUPPORTED:
 		return "link_supported";
+	case JESD204_STATE_LINK_PRE_SETUP:
+		return "link_pre_setup";
 	case JESD204_STATE_LINK_SETUP:
 		return "link_setup";
 	case JESD204_STATE_CLOCKS_ENABLE:
@@ -132,6 +140,16 @@ const char *jesd204_state_str(enum jesd204_dev_state state)
 		return "link_running";
 	case JESD204_STATE_LINK_UNINIT:
 		return "link_uninit";
+	case JESD204_STATE_OPT_SETUP_STAGE1:
+		return "opt_setup_stage1";
+	case JESD204_STATE_OPT_SETUP_STAGE2:
+		return "opt_setup_stage2";
+	case JESD204_STATE_OPT_SETUP_STAGE3:
+		return "opt_setup_stage3";
+	case JESD204_STATE_OPT_SETUP_STAGE4:
+		return "opt_setup_stage4";
+	case JESD204_STATE_OPT_SETUP_STAGE5:
+		return "opt_setup_stage5";
 	case JESD204_STATE_DONT_CARE:
 		return "dont_care";
 	default:

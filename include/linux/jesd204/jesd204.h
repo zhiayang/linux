@@ -137,13 +137,20 @@ enum jesd204_dev_op {
 	JESD204_OP_LINK_INIT,
 	JESD204_OP_LINK_UNINIT,
 	JESD204_OP_LINK_SUPPORTED,
+	JESD204_OP_LINK_PRE_SETUP,
+	JESD204_OP_LINK_SETUP,
+	JESD204_OP_OPT_SETUP_STAGE1,
+	JESD204_OP_OPT_SETUP_STAGE2,
+	JESD204_OP_OPT_SETUP_STAGE3,
+	JESD204_OP_OPT_SETUP_STAGE4,
+	JESD204_OP_OPT_SETUP_STAGE5,
 	JESD204_OP_CLOCKS_ENABLE,
 	JESD204_OP_CLOCKS_DISABLE,
-	JESD204_OP_LINK_SETUP,
 	JESD204_OP_LINK_ENABLE,
 	JESD204_OP_LINK_RUNNING,
 	JESD204_OP_LINK_DISABLE,
 	JESD204_OP_SYSREF,
+
 	__JESD204_MAX_OPS,
 };
 
@@ -186,7 +193,19 @@ int jesd204_link_get_device_clock(struct jesd204_link *lnk,
 int jesd204_sysref_async(struct jesd204_dev *jdev,
 				enum jesd204_sysref_mode mode, u32 num);
 
+bool jesd204_dev_is_top(struct jesd204_dev *jdev);
+
+static inline bool jesd204_enabled(void)
+{
+	return true;
+}
+
 #else /* !IS_ENABLED(CONFIG_JESD204) */
+
+static inline bool jesd204_enabled(void)
+{
+	return false;
+}
 
 static inline struct jesd204_dev *jesd204_dev_register(
 		struct device *dev, const struct jesd204_dev_data *init)

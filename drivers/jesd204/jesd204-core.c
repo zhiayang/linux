@@ -192,6 +192,12 @@ int jesd204_sysref_async(struct jesd204_dev *tp_jdev,
 }
 EXPORT_SYMBOL(jesd204_sysref_async);
 
+bool jesd204_dev_is_top(struct jesd204_dev *jdev)
+{
+	return jdev->is_top;
+}
+EXPORT_SYMBOL(jesd204_dev_is_top);
+
 struct list_head *jesd204_topologies_get(void)
 {
 	return &jesd204_topologies;
