@@ -552,11 +552,13 @@ static int axi_jesd204_tx_jesd204_link_setup(struct jesd204_dev *jdev,
 	config.device_id = lnk->did;
 	config.bank_id = lnk->bid;
 	config.lanes_per_device = jesd->num_lanes;
+	//config.lanes_per_device = lnk->num_lanes;
 	config.octets_per_frame = lnk->octets_per_frame;
 	config.frames_per_multiframe = lnk->frames_per_multiframe;
 	config.converters_per_device = lnk->num_converters;
 	config.resolution = lnk->converter_resolution;
 	config.bits_per_sample = lnk->bits_per_sample;
+	config.control_bits_per_sample = lnk->ctrl_bits_per_sample;
 	config.samples_per_frame = lnk->samples_per_conv_frame;
 	config.jesd_version = lnk->jesd_version;
 	config.subclass_version = lnk->subclass;
@@ -631,19 +633,6 @@ static int axi_jesd204_tx_jesd204_link_setup(struct jesd204_dev *jdev,
 		return ret;
 	}
 
-	return JESD204_STATE_CHANGE_DONE;
-}
-
-static int axi_jesd204_tx_jesd204_clks_enable(struct jesd204_dev *jdev,
-		unsigned int link_num,
-		struct jesd204_link *lnk)
-{
-	struct device *dev = jesd204_dev_to_device(jdev);
-	struct axi_jesd204_tx *jesd = dev_get_drvdata(dev);
-	int ret;
-
-	dev_dbg(dev, "%s:%d Link%u\n", __func__, __LINE__, link_num);
-
 	ret = clk_prepare_enable(jesd->lane_clk);
 		if (ret) {
 		dev_err(dev, "%s: Link%u enable lane clock failed (%d)\n",
@@ -657,6 +646,22 @@ static int axi_jesd204_tx_jesd204_clks_enable(struct jesd204_dev *jdev,
 			__func__, link_num, ret);
 		return ret;
 	}
+
+	return JESD204_STATE_CHANGE_DONE;
+}
+
+static int axi_jesd204_tx_jesd204_clks_enable(struct jesd204_dev *jdev,
+		unsigned int link_num,
+		struct jesd204_link *lnk)
+{
+	struct device *dev = jesd204_dev_to_device(jdev);
+	struct axi_jesd204_tx *jesd = dev_get_drvdata(dev);
+	int ret;
+
+	dev_dbg(dev, "%s:%d Link%u\n", __func__, __LINE__, link_num);
+
+	writel_relaxed(0x3, jesd->base + JESD204_TX_REG_SYSREF_STATUS);
+	writel_relaxed(0x0, jesd->base + JESD204_TX_REG_LINK_DISABLE);
 
 	return JESD204_STATE_CHANGE_DONE;
 }
@@ -698,8 +703,10 @@ static int axi_jesd204_tx_jesd204_link_enable(struct jesd204_dev *jdev,
 
 	dev_dbg(dev, "%s:%d Link%u\n", __func__, __LINE__, link_num);
 
-	writel_relaxed(0x3, jesd->base + JESD204_TX_REG_SYSREF_STATUS);
-	writel_relaxed(0x0, jesd->base + JESD204_TX_REG_LINK_DISABLE);
+	/* This is done in the previous state */
+
+	// writel_relaxed(0x3, jesd->base + JESD204_TX_REG_SYSREF_STATUS);
+	// writel_relaxed(0x0, jesd->base + JESD204_TX_REG_LINK_DISABLE);
 
 	return JESD204_STATE_CHANGE_DONE;
 }

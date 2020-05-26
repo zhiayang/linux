@@ -5,6 +5,7 @@
  *
  * Copyright 2018-2019 Analog Devices Inc.
  */
+#define DEBUG
 #include <linux/module.h>
 #include <linux/spi/spi.h>
 #include <linux/delay.h>
@@ -1434,21 +1435,21 @@ static int hmc7044_jesd204_link_supported(struct jesd204_dev *jdev,
 	int ret;
 	u32 rate;
 
-	dev_err(dev, "%s:%d link_num %u\n", __func__, __LINE__, link_num);
+	dev_dbg(dev, "%s:%d link_num %u\n", __func__, __LINE__, link_num);
 
 	ret = jesd204_link_get_lmfc_lemc_rate(lnk, &rate);
 	if (ret < 0)
 		return ret;
 
 	if (hmc->jdev_lmfc_lemc_rate) {
-		hmc->jdev_lmfc_lemc_rate =  min(hmc->jdev_lmfc_lemc_rate, rate);
-		hmc->jdev_lmfc_lemc_gcd =  gcd(hmc->jdev_lmfc_lemc_gcd, rate);
+		hmc->jdev_lmfc_lemc_rate = min(hmc->jdev_lmfc_lemc_rate, rate);
+		hmc->jdev_lmfc_lemc_gcd = gcd(hmc->jdev_lmfc_lemc_gcd, rate);
 	} else {
 		hmc->jdev_lmfc_lemc_rate = rate;
-		hmc->jdev_lmfc_lemc_gcd =  gcd(hmc->pll2_freq, rate);
+		hmc->jdev_lmfc_lemc_gcd = gcd(hmc->pll2_freq, rate);
 	}
 
-	dev_err(dev, "%s:%d link_num %u LMFC/LEMC %u/%u gcd %u\n",
+	dev_dbg(dev, "%s:%d link_num %u LMFC/LEMC %u/%u gcd %u\n",
 		__func__, __LINE__, link_num, hmc->jdev_lmfc_lemc_rate,
 		rate, hmc->jdev_lmfc_lemc_gcd);
 
@@ -1461,22 +1462,23 @@ static int hmc7044_jesd204_clks_enable(struct jesd204_dev *jdev,
 {
 	struct device *dev = jesd204_dev_to_device(jdev);
 
-	dev_err(dev, "%s:%d link_num %u\n", __func__, __LINE__, link_num);
+	dev_dbg(dev, "%s:%d link_num %u\n", __func__, __LINE__, link_num);
 
 	return JESD204_STATE_CHANGE_DONE;
 }
+
 static int hmc7044_jesd204_clks_disable(struct jesd204_dev *jdev,
 		unsigned int link_num,
 		struct jesd204_link *lnk)
 {
 	struct device *dev = jesd204_dev_to_device(jdev);
 
-	dev_err(dev, "%s:%d link_num %u\n", __func__, __LINE__, link_num);
+	dev_dbg(dev, "%s:%d link_num %u\n", __func__, __LINE__, link_num);
 
 	return JESD204_STATE_CHANGE_DONE;
 }
 
-static int hmc7044_jesd204_link_setup(struct jesd204_dev *jdev,
+static int hmc7044_jesd204_link_pre_setup(struct jesd204_dev *jdev,
 		unsigned int link_num,
 		struct jesd204_link *lnk)
 {
@@ -1484,9 +1486,9 @@ static int hmc7044_jesd204_link_setup(struct jesd204_dev *jdev,
 	struct iio_dev *indio_dev = dev_get_drvdata(dev);
 	struct hmc7044 *hmc = iio_priv(indio_dev);
 	int i, ret;
-	u32 sysref_timer;
+	u32 sysref_timer, val;
 
-	dev_err(dev, "%s:%d link_num %u\n", __func__, __LINE__, link_num);
+	dev_dbg(dev, "%s:%d link_num %u\n", __func__, __LINE__, link_num);
 
 	/* Program the output channels */
 	for (i = 0; i < hmc->num_channels; i++) {
@@ -1532,7 +1534,7 @@ static int hmc7044_jesd204_sysref(struct jesd204_dev *jdev,
 	int ret;
 	u32 val;
 
-	dev_dbg(dev, "%s:%d Link%d %u\n", __func__, __LINE__, link_num);
+	dev_dbg(dev, "%s:%d Link%d\n", __func__, __LINE__, link_num);
 
 	mutex_lock(&hmc->lock);
 
@@ -1557,7 +1559,7 @@ static const struct jesd204_dev_data jesd204_hmc7044_init = {
 		[JESD204_OP_LINK_SUPPORTED] = hmc7044_jesd204_link_supported,
 		[JESD204_OP_CLOCKS_ENABLE] = hmc7044_jesd204_clks_enable,
 		[JESD204_OP_CLOCKS_DISABLE] = hmc7044_jesd204_clks_disable,
-		[JESD204_OP_LINK_SETUP] = hmc7044_jesd204_link_setup,
+		[JESD204_OP_LINK_PRE_SETUP] = hmc7044_jesd204_link_pre_setup,
 		[JESD204_OP_SYSREF] = hmc7044_jesd204_sysref,
 	},
 };

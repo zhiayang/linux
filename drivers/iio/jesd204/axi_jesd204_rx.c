@@ -620,9 +620,9 @@ static void axi_jesd204_rx_watchdog(struct work_struct *work)
 			writel_relaxed(0x1, jesd->base + JESD204_RX_REG_LINK_DISABLE);
 			mdelay(100);
 			writel_relaxed(0x0, jesd->base + JESD204_RX_REG_LINK_DISABLE);
+			jesd204_sysref_async(jesd->jdev, 0, 1);
 		}
 
-		jesd204_sysref_async(jesd->jdev, 0, 1);
 	}
 
 	schedule_delayed_work(&jesd->watchdog_work, HZ);

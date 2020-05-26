@@ -54,24 +54,19 @@
 		spi-max-frequency = <25000000>;
 
 		interrupt-parent = <&gpio>;
-		interrupts = <119 1>;
+		//Pinterrupts = <119 1>;
 
 		reset-gpios = <&gpio 120 0>;
 		rx1-enable-gpios = <&gpio 121 0>;
 		rx2-enable-gpios = <&gpio 122 0>;
 		tx1-enable-gpios = <&gpio 123 0>;
 		tx2-enable-gpios = <&gpio 124 0>;
-		sysref-req-gpio = <&gpio 145 0>;
+		//sysref-req-gpio = <&gpio 145 0>;
 
 		/* Clocks */
-		clocks = <&axi_adrv9009_rx_jesd>, <&axi_adrv9009_tx_jesd>,
-			<&axi_adrv9009_rx_os_jesd>, <&hmc7044 0>,
-			<&hmc7044 5>, <&hmc7044 1>, <&hmc7044 6>,
-			<&hmc7044 4>;
+		clocks = <&hmc7044 0>;
 
-		clock-names = "jesd_rx_clk", "jesd_tx_clk", "jesd_rx_os_clk",
-			"dev_clk", "fmc_clk", "sysref_dev_clk",
-			"sysref_fmc_clk", "fmc2_clk";
+		clock-names = "dev_clk";
 
 
 		clock-output-names = "rx_sampl_clk", "rx_os_sampl_clk", "tx_sampl_clk";
@@ -432,7 +427,7 @@
 		spi-max-frequency = <25000000>;
 
 		interrupt-parent = <&gpio>;
-		interrupts = <134 1>;
+		//interrupts = <134 1>;
 
 		reset-gpios = <&gpio 135 0>;
 		rx1-enable-gpios = <&gpio 136 0>;
@@ -441,14 +436,9 @@
 		tx2-enable-gpios = <&gpio 139 0>;
 
 		/* Clocks */
-		clocks = <&axi_adrv9009_rx_jesd>, <&axi_adrv9009_tx_jesd>,
-			<&axi_adrv9009_rx_os_jesd>, <&hmc7044 2>,
-			<&hmc7044 5>, <&hmc7044 3>, <&hmc7044 7>,
-			<&hmc7044 4>;
+		clocks = <&hmc7044 2>;
 
-		clock-names = "jesd_rx_clk", "jesd_tx_clk", "jesd_rx_os_clk",
-			"dev_clk", "fmc_clk", "sysref_dev_clk",
-			"sysref_fmc_clk", "fmc2_clk";
+		clock-names = "dev_clk";
 
 		clock-output-names = "rx_sampl_clk", "rx_os_sampl_clk", "tx_sampl_clk";
 		#clock-cells = <1>;
