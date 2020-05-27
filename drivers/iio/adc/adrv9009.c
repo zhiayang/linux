@@ -5976,19 +5976,43 @@ static int adrv9009_jesd204_setup_stage5(struct jesd204_dev *jdev,
 }
 
 static const struct jesd204_dev_data jesd204_adrv9009_init = {
-	.link_ops = {
-		[JESD204_OP_LINK_INIT] = adrv9009_jesd204_link_init,
-		[JESD204_OP_CLOCKS_ENABLE] = adrv9009_jesd204_clks_enable,
-		[JESD204_OP_CLOCKS_DISABLE] = adrv9009_jesd204_clks_disable,
-		[JESD204_OP_LINK_SETUP] = adrv9009_jesd204_link_setup,
-		[JESD204_OP_LINK_DISABLE] = adrv9009_jesd204_link_disable,
-		[JESD204_OP_LINK_ENABLE] = adrv9009_jesd204_link_enable,
-		[JESD204_OP_LINK_RUNNING] = adrv9009_jesd204_link_running,
-		[JESD204_OP_OPT_SETUP_STAGE1] = adrv9009_jesd204_setup_stage1,
-		[JESD204_OP_OPT_SETUP_STAGE2] = adrv9009_jesd204_setup_stage2,
-		[JESD204_OP_OPT_SETUP_STAGE3] = adrv9009_jesd204_setup_stage3,
-		[JESD204_OP_OPT_SETUP_STAGE4] = adrv9009_jesd204_setup_stage4,
-		[JESD204_OP_OPT_SETUP_STAGE5] = adrv9009_jesd204_setup_stage5,
+	.state_ops = {
+		[JESD204_OP_LINK_INIT] = {
+			.per_link = adrv9009_jesd204_link_init,
+		},
+		[JESD204_OP_CLOCKS_ENABLE] = {
+			.per_link = adrv9009_jesd204_clks_enable,
+		},
+		[JESD204_OP_CLOCKS_DISABLE] = {
+			.per_link = adrv9009_jesd204_clks_disable,
+		},
+		[JESD204_OP_LINK_SETUP] = {
+			.per_link = adrv9009_jesd204_link_setup,
+		},
+		[JESD204_OP_LINK_DISABLE] = {
+			.per_link = adrv9009_jesd204_link_disable,
+		},
+		[JESD204_OP_LINK_ENABLE] = {
+			.per_link = adrv9009_jesd204_link_enable,
+		},
+		[JESD204_OP_LINK_RUNNING] = {
+			.per_link = adrv9009_jesd204_link_running,
+		},
+		[JESD204_OP_OPT_SETUP_STAGE1] = {
+			.per_link = adrv9009_jesd204_setup_stage1,
+		},
+		[JESD204_OP_OPT_SETUP_STAGE2] = {
+			.per_link = adrv9009_jesd204_setup_stage2,
+		},
+		[JESD204_OP_OPT_SETUP_STAGE3] = {
+			.per_link = adrv9009_jesd204_setup_stage3,
+		},
+		[JESD204_OP_OPT_SETUP_STAGE4] = {
+			.per_link = adrv9009_jesd204_setup_stage4,
+		},
+		[JESD204_OP_OPT_SETUP_STAGE5] = {
+			.per_link = adrv9009_jesd204_setup_stage5,
+		},
 	},
 
 	.num_links = 3,

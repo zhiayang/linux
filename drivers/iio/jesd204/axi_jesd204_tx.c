@@ -712,13 +712,25 @@ static int axi_jesd204_tx_jesd204_link_enable(struct jesd204_dev *jdev,
 }
 
 static const struct jesd204_dev_data jesd204_axi_jesd204_tx_init = {
-	.link_ops = {
-		[JESD204_OP_LINK_INIT] = axi_jesd204_tx_jesd204_link_init,
-		[JESD204_OP_CLOCKS_ENABLE] = axi_jesd204_tx_jesd204_clks_enable,
-		[JESD204_OP_CLOCKS_DISABLE] = axi_jesd204_tx_jesd204_clks_disable,
-		[JESD204_OP_LINK_SETUP] = axi_jesd204_tx_jesd204_link_setup,
-		[JESD204_OP_LINK_DISABLE] = axi_jesd204_tx_jesd204_link_disable,
-		[JESD204_OP_LINK_ENABLE] = axi_jesd204_tx_jesd204_link_enable,
+	.state_ops = {
+		[JESD204_OP_LINK_INIT] = {
+			.per_link = axi_jesd204_tx_jesd204_link_init,
+		},
+		[JESD204_OP_CLOCKS_ENABLE] = {
+			.per_link = axi_jesd204_tx_jesd204_clks_enable,
+		},
+		[JESD204_OP_CLOCKS_DISABLE] = {
+			.per_link = axi_jesd204_tx_jesd204_clks_disable,
+		},
+		[JESD204_OP_LINK_SETUP] = {
+			.per_link = axi_jesd204_tx_jesd204_link_setup,
+		},
+		[JESD204_OP_LINK_DISABLE] = {
+			.per_link = axi_jesd204_tx_jesd204_link_disable,
+		},
+		[JESD204_OP_LINK_ENABLE] = {
+			.per_link = axi_jesd204_tx_jesd204_link_enable,
+		},
 	},
 };
 

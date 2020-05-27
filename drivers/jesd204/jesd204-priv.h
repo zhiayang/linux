@@ -96,9 +96,7 @@ struct jesd204_dev_con_out {
  *			device that is the ADC, DAC, or transceiver)
  * @error		error code for this device if something happened
  * @parent		parent device that registers itself as a JESD204 device
- * @link_ops		ops called for **each** JESD204 link individually during a transition
- * @pre_transition_ops	ops to be called (once) before the @link_ops are called for each link
- * @post_transition_ops	ops to be called (once) after the @link_ops are called for each link
+ * @state_ops		ops for each state transition of type @struct jesd204_state_ops
  * @np			reference in the device-tree for this JESD204 device
  * @ref			ref count for this JESD204 device
  * @inputs		array of pointers to output connections from other
@@ -121,9 +119,7 @@ struct jesd204_dev {
 
 	int				error;
 	struct device			*parent;
-	const jesd204_link_cb		*link_ops;
-	const jesd204_dev_cb		*pre_transition_ops;
-	const jesd204_dev_cb		*post_transition_ops;
+	const struct jesd204_state_ops	*state_ops;
 	struct device_node		*np;
 	struct kref			ref;
 

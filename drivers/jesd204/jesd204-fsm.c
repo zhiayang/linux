@@ -889,10 +889,10 @@ static int jesd204_fsm_table_entry_cb(struct jesd204_dev *jdev,
 	unsigned int link_idx;
 	int ret, ret1;
 
-	if (!jdev->link_ops)
+	if (!jdev->state_ops)
 		return JESD204_STATE_CHANGE_DONE;
 
-	link_op = jdev->link_ops[it->table[0].op];
+	link_op = jdev->state_ops[it->table[0].op].per_link;
 	if (!link_op)
 		return JESD204_STATE_CHANGE_DONE;
 
@@ -931,9 +931,9 @@ static int jesd204_fsm_table_entry_done(struct jesd204_dev *jdev,
 	jesd204_dev_cb op;
 	int ret;
 
-	if (jdev->post_transition_ops &&
-	    jdev->post_transition_ops[table[0].op]) {
-		op = jdev->post_transition_ops[table[0].op];
+	if (jdev->state_ops &&
+	    jdev->state_ops[table[0].op].post_transition) {
+		op = jdev->state_ops[table[0].op].post_transition;
 		ret = op(jdev, fsm_data->link_idx);
 		if (ret < 0)
 			return jesd204_dev_set_error(jdev, NULL, NULL, ret);
@@ -958,9 +958,9 @@ static int jesd204_fsm_table(struct jesd204_dev *jdev,
 
 	it.table = table;
 
-	if (jdev->pre_transition_ops &&
-	    jdev->pre_transition_ops[table[0].op]) {
-		op = jdev->pre_transition_ops[table[0].op];
+	if (jdev->state_ops &&
+	    jdev->state_ops[table[0].op].pre_transition) {
+		op = jdev->state_ops[table[0].op].pre_transition;
 		ret = op(jdev, link_idx);
 		if (ret < 0)
 			return jesd204_dev_set_error(jdev, NULL, NULL, ret);

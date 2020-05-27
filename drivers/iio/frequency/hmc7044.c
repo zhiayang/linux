@@ -1555,12 +1555,22 @@ static int hmc7044_jesd204_sysref(struct jesd204_dev *jdev,
 }
 
 static const struct jesd204_dev_data jesd204_hmc7044_init = {
-	.link_ops = {
-		[JESD204_OP_LINK_SUPPORTED] = hmc7044_jesd204_link_supported,
-		[JESD204_OP_CLOCKS_ENABLE] = hmc7044_jesd204_clks_enable,
-		[JESD204_OP_CLOCKS_DISABLE] = hmc7044_jesd204_clks_disable,
-		[JESD204_OP_LINK_PRE_SETUP] = hmc7044_jesd204_link_pre_setup,
-		[JESD204_OP_SYSREF] = hmc7044_jesd204_sysref,
+	.state_ops = {
+		[JESD204_OP_LINK_SUPPORTED] = {
+			.per_link = hmc7044_jesd204_link_supported,
+		},
+		[JESD204_OP_CLOCKS_ENABLE] = {
+			.per_link = hmc7044_jesd204_clks_enable,
+		},
+		[JESD204_OP_CLOCKS_DISABLE] = {
+			.per_link = hmc7044_jesd204_clks_disable,
+		},
+		[JESD204_OP_LINK_PRE_SETUP] = {
+			.per_link = hmc7044_jesd204_link_pre_setup,
+		},
+		[JESD204_OP_SYSREF] = {
+			.per_link = hmc7044_jesd204_sysref,
+		},
 	},
 };
 
