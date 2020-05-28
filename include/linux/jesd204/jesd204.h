@@ -9,18 +9,6 @@
 
 struct jesd204_dev;
 
-enum jesd204_sysref_mode {
-	JESD204_SYSREF_DISABLED,
-	JESD204_SYSREF_CONTINUOUS,
-	JESD204_SYSREF_ONESHOT,
-};
-
-enum jesd204_state_change_result {
-	JESD204_STATE_CHANGE_ERROR = -1,
-	JESD204_STATE_CHANGE_DEFER = 0,
-	JESD204_STATE_CHANGE_DONE,
-};
-
 enum jesd204_subclass {
 	JESD204_SUBCLASS_0,
 	JESD204_SUBCLASS_1,
@@ -40,8 +28,19 @@ enum jesd204_enc { /* FIXME: unify with link layer defines */
 	JESD204_ENC_64B80B,
 };
 
+enum jesd204_sysref_mode {
+	JESD204_SYSREF_DISABLED,
+	JESD204_SYSREF_CONTINUOUS,
+	JESD204_SYSREF_ONESHOT,
+};
 
-typedef int (*jesd204_cb)(struct jesd204_dev *jdev);
+enum jesd204_state_change_result {
+	JESD204_STATE_CHANGE_ERROR = -1,
+	JESD204_STATE_CHANGE_DEFER = 0,
+	JESD204_STATE_CHANGE_DONE,
+};
+
+#define JESD204_LINKS_ALL		((unsigned int)(-1))
 
 /** struct jesd204_sysref - JESD204 configuration for SYSREF
  * @mode			SYSREF mode (see @jesd204_sysref_mode)
@@ -58,7 +57,7 @@ struct jesd204_sysref {
  * struct jesd204_link - JESD204 link configuration settings
  * @link_id			JESD204 link ID provided via DT configuration
  * @enabled			true if this link is enabled
- * @is_transmit		true if this link is transmit (digital to analog)
+ * @is_transmit			true if this link is transmit (digital to analog)
  * @sample_rate			sample rate for the link
  * @num_lanes			number of JESD204 lanes (L)
  * @num_converters		number of converters per link (M)
@@ -129,8 +128,11 @@ struct jesd204_link {
 	u8 dac_phase_adj;
 };
 
+typedef int (*jesd204_dev_cb)(struct jesd204_dev *jdev,
+			      unsigned int link_idx);
+
 typedef int (*jesd204_link_cb)(struct jesd204_dev *jdev,
-			       unsigned int link_index,
+			       unsigned int link_idx,
 			       struct jesd204_link *lnk);
 
 enum jesd204_dev_op {
@@ -156,13 +158,18 @@ enum jesd204_dev_op {
 
 /**
  * struct jesd204_dev_data - JESD204 device initialization data
- * @link_ops		JESD204 operations this device passes to the framework
- *			for JESD204 link management
+ * @link_ops		ops called for **each** JESD204 link individually during a transition
+ * @pre_transition_ops	ops to be called (once) before the @link_ops are called for each link
+ * @post_transition_ops	ops to be called (once) after the @link_ops are called for each link
+ * @sizeof_priv		amount of data to allocate for private information
  * @links		JESD204 initial link configuration
  * @num_links		number of JESD204 links
  */
 struct jesd204_dev_data {
 	const jesd204_link_cb			link_ops[__JESD204_MAX_OPS];
+	const jesd204_dev_cb			pre_transition_ops[__JESD204_MAX_OPS];
+	const jesd204_dev_cb			post_transition_ops[__JESD204_MAX_OPS];
+	size_t					sizeof_priv;
 	const struct jesd204_link		*links;
 	unsigned int				num_links;
 };
@@ -180,6 +187,7 @@ void devm_jesd204_unregister(struct device *dev, struct jesd204_dev *jdev);
 struct device *jesd204_dev_to_device(struct jesd204_dev *jdev);
 struct jesd204_dev *jesd204_dev_from_device(struct device *dev);
 
+void *jesd204_dev_priv(struct jesd204_dev *jdev);
 
 int jesd204_link_get_lmfc_lemc_rate(struct jesd204_link *lnk,
 				u32 *rate_hz);
@@ -230,6 +238,11 @@ static inline struct device *jesd204_dev_to_device(struct jesd204_dev *jdev)
 }
 
 static inline struct jesd204_dev *jesd204_dev_from_device(struct device *dev)
+{
+	return NULL;
+}
+
+static void *jesd204_dev_priv(struct jesd204_dev *jdev)
 {
 	return NULL;
 }

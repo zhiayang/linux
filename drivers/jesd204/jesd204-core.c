@@ -208,6 +208,12 @@ static inline bool dev_is_jesd204_dev(struct device *dev)
 	return device_property_read_bool(dev, "jesd204-device");
 }
 
+void *jesd204_dev_priv(struct jesd204_dev *jdev)
+{
+	return jdev->priv;
+}
+EXPORT_SYMBOL(jesd204_dev_priv);
+
 struct jesd204_dev *jesd204_dev_from_device(struct device *dev)
 {
 	struct jesd204_dev *jdev;
@@ -234,7 +240,7 @@ static int jesd204_dev_alloc_links(struct jesd204_dev_top *jdev_top)
 {
 	struct jesd204_link_opaque *links;
 	size_t mem_size;
-	int i;
+	unsigned int i;
 
 	mem_size = jdev_top->num_links * sizeof(*links);
 
@@ -395,7 +401,7 @@ static int jesd204_dev_create_con(struct jesd204_dev *jdev,
 
 		con->topo_id = args->args[0];
 		con->link_id = args->args[1];
-		con->link_idx = -1;
+		con->link_idx = JESD204_LINKS_ALL;
 		con->owner = jdev_in;
 		INIT_LIST_HEAD(&con->dests);
 
@@ -493,7 +499,7 @@ unlock:
 }
 
 static int jesd204_dev_init_link_lane_ids(struct jesd204_dev_top *jdev_top,
-					  int link_idx,
+					  unsigned int link_idx,
 					  struct jesd204_link *jlink)
 {
 	struct jesd204_dev *jdev = &jdev_top->jdev;
@@ -507,7 +513,11 @@ static int jesd204_dev_init_link_lane_ids(struct jesd204_dev_top *jdev_top,
 		return -EINVAL;
 	}
 
-	/* FIXME: see about the case where lane IDs are provided via init */
+	/* We have some lane IDs provided statically for this link ID; exit */
+	if (jdev_top->init_links &&
+	    jdev_top->init_links[link_idx].lane_ids)
+		return 0;
+
 	if (jlink->lane_ids)
 		devm_kfree(dev, jlink->lane_ids);
 
@@ -524,13 +534,12 @@ static int jesd204_dev_init_link_lane_ids(struct jesd204_dev_top *jdev_top,
 	return 0;
 }
 
-int jesd204_dev_init_link_data(struct jesd204_dev_top *jdev_top,
-			       int link_idx)
+static int __jesd204_dev_init_link_data(struct jesd204_dev_top *jdev_top,
+					unsigned int link_idx)
 {
 	struct jesd204_link_opaque *ol;
 	int ret;
 
-	/* FIXME: fix the case where the driver provides static lane IDs */
 	ol = &jdev_top->active_links[link_idx];
 	ol->link.link_id = jdev_top->link_ids[link_idx];
 	ol->jdev_top = jdev_top;
@@ -545,12 +554,30 @@ int jesd204_dev_init_link_data(struct jesd204_dev_top *jdev_top,
 	return 0;
 }
 
+/* FIXME: see about maybe handling lane IDs assigned via the link_op for init links */
+int jesd204_dev_init_link_data(struct jesd204_dev_top *jdev_top,
+			       unsigned int link_idx)
+{
+	int ret;
+
+	if (link_idx != JESD204_LINKS_ALL)
+		return __jesd204_dev_init_link_data(jdev_top, link_idx);
+
+	for (link_idx = 0; link_idx < jdev_top->num_links; link_idx++) {
+		ret = __jesd204_dev_init_link_data(jdev_top, link_idx);
+		if (ret)
+			return ret;
+	}
+
+	return 0;
+}
+
 static int jesd204_dev_init_links_data(struct jesd204_dev *jdev,
 				       const struct jesd204_dev_data *init)
 {
 	struct jesd204_dev_top *jdev_top = jesd204_dev_top_dev(jdev);
 	struct device *dev = jdev->parent;
-	int i;
+	unsigned int i;
 
 	if (!jdev_top)
 		return 0;
@@ -630,6 +657,8 @@ struct jesd204_dev *jesd204_dev_register(struct device *dev,
 	}
 
 	jdev->link_ops = init->link_ops;
+	jdev->pre_transition_ops = init->pre_transition_ops;
+	jdev->post_transition_ops = init->post_transition_ops;
 	jdev->parent = get_device(dev);
 
 	ret = jesd204_dev_init_links_data(jdev, init);
@@ -658,6 +687,15 @@ struct jesd204_dev *jesd204_dev_register(struct device *dev,
 	ret = jesd204_fsm_probe(jdev);
 	if (ret)
 		goto err_device_del;
+
+	if (init->sizeof_priv) {
+		jdev->priv = devm_kzalloc(jdev->parent, init->sizeof_priv,
+					  GFP_KERNEL);
+		if (!jdev->priv) {
+			ret = -ENOMEM;
+			goto err_device_del;
+		}
+	}
 
 	mutex_unlock(&jesd204_device_list_lock);
 
@@ -743,8 +781,9 @@ static void __jesd204_dev_release(struct kref *ref)
 		kfree(jdev_top->active_links);
 		kfree(jdev_top->staged_links);
 		kfree(jdev_top);
-	} else
+	} else {
 		kfree(jdev);
+	}
 
 	jesd204_device_count--;
 
@@ -766,7 +805,7 @@ void jesd204_dev_unregister(struct jesd204_dev *jdev)
 	if (jdev->id > -1)
 		device_del(&jdev->dev);
 
-	jesd204_fsm_unreg_device(jdev);
+	jesd204_fsm_uninit_device(jdev);
 	jesd204_dev_destroy_cons(jdev);
 	kref_put(&jdev->ref, __jesd204_dev_release);
 }

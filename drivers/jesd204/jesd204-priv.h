@@ -75,9 +75,9 @@ struct jesd204_dev_con_out {
 	struct list_head		entry;
 	struct jesd204_dev		*owner;
 	struct jesd204_dev_top		*jdev_top;
-	int				topo_id;
-	int				link_id;
-	int				link_idx;
+	unsigned int			topo_id;
+	unsigned int			link_id;
+	unsigned int			link_idx;
 	struct list_head		dests;
 	unsigned int			dests_count;
 	struct of_phandle_args		of;
@@ -90,12 +90,15 @@ struct jesd204_dev_con_out {
  * @dev			underlying device object
  * @id			unique device id
  * @entry		list entry for the framework to keep a list of devices
- * @groups		attribute groups for this device
+ * @priv		private data to be returned to the driver
  * @is_top		true if this device is a top device in a topology of
  *			devices that make up a JESD204 link (typically the
  *			device that is the ADC, DAC, or transceiver)
+ * @error		error code for this device if something happened
  * @parent		parent device that registers itself as a JESD204 device
- * @link_ops		JESD204 operations for JESD204 link management
+ * @link_ops		ops called for **each** JESD204 link individually during a transition
+ * @pre_transition_ops	ops to be called (once) before the @link_ops are called for each link
+ * @post_transition_ops	ops to be called (once) after the @link_ops are called for each link
  * @np			reference in the device-tree for this JESD204 device
  * @ref			ref count for this JESD204 device
  * @inputs		array of pointers to output connections from other
@@ -104,29 +107,34 @@ struct jesd204_dev_con_out {
  * @outputs		list of output connections that take input from this
  *			device
  * @outputs_count	number of @outputs in the list
+ * @groups		list of attribute groups for this device
+ * @sysfs_attr_group	actual group for sysfs attributes
  */
 struct jesd204_dev {
 	struct device			dev;
 	int				id;
 	struct list_head		entry;
-
-#define JESD204_MAX_GROUPS	1
-	const struct attribute_group	*groups[JESD204_MAX_GROUPS + 1];
+	void				*priv;
 
 	bool				is_top;
 	bool				is_sysref_provider;
 
+	int				error;
 	struct device			*parent;
 	const jesd204_link_cb		*link_ops;
+	const jesd204_dev_cb		*pre_transition_ops;
+	const jesd204_dev_cb		*post_transition_ops;
 	struct device_node		*np;
 	struct kref			ref;
-
-	struct attribute_group		sysfs_attr_group;
 
 	struct jesd204_dev_con_out	**inputs;
 	unsigned int			inputs_count;
 	struct list_head		outputs;
 	unsigned int			outputs_count;
+
+#define JESD204_MAX_GROUPS	1
+	const struct attribute_group	*groups[JESD204_MAX_GROUPS + 1];
+	struct attribute_group		sysfs_attr_group;
 };
 
 /**
@@ -147,7 +155,7 @@ struct jesd204_dev {
 struct jesd204_link_opaque {
 	struct jesd204_link		link;
 	struct jesd204_dev_top		*jdev_top;
-	int				link_idx;
+	unsigned int			link_idx;
 
 	struct kref			cb_ref;
 	enum jesd204_dev_state		state;
@@ -187,7 +195,7 @@ struct jesd204_dev_top {
 
 	int				topo_id;
 	unsigned int			link_ids[JESD204_MAX_LINKS];
-	int				num_links;
+	unsigned int			num_links;
 
 	const struct jesd204_link	*init_links;
 	struct jesd204_link_opaque	*active_links;
@@ -207,16 +215,16 @@ static inline struct jesd204_dev_top *jesd204_dev_top_dev(
 const char *jesd204_state_str(enum jesd204_dev_state state);
 
 int jesd204_dev_init_link_data(struct jesd204_dev_top *jdev_top,
-			       int link_idx);
+			       unsigned int link_idx);
 
 int jesd204_init_topology(struct jesd204_dev_top *jdev_top);
 
 int jesd204_fsm_probe(struct jesd204_dev *jdev);
 
-void jesd204_fsm_unreg_device(struct jesd204_dev *jdev);
+void jesd204_fsm_uninit_device(struct jesd204_dev *jdev);
 
 int jesd204_fsm_link_change(struct jesd204_dev_top *jdev_top,
-			    int link_idx);
+			    unsigned int link_idx);
 
 int jesd204_dev_create_sysfs(struct jesd204_dev *jdev);
 void jesd204_dev_destroy_sysfs(struct jesd204_dev *jdev);
