@@ -30,13 +30,13 @@ static LIST_HEAD(jesd204_topologies);
 static unsigned int jesd204_device_count;
 static unsigned int jesd204_topologies_count;
 
-int jesd204_link_get_rate(struct jesd204_link *lnk,
-				 u64 *lane_rate_hz)
+int jesd204_link_get_rate(struct jesd204_link *lnk, u64 *lane_rate_hz)
 {
 	u64 rate, encoding_n, encoding_d;
 
 	if (!lnk->num_lanes || !lnk->num_converters ||
-		!lnk->bits_per_sample || !lnk->sample_rate) {
+	    !lnk->bits_per_sample || !lnk->sample_rate) {
+		/* FIXME: make this a bit more verbose */
 		pr_err("%s: Invalid pramater", __func__);
 		return -EINVAL;
 	}
@@ -76,10 +76,14 @@ int jesd204_link_get_rate(struct jesd204_link *lnk,
 EXPORT_SYMBOL_GPL(jesd204_link_get_rate);
 
 int jesd204_link_get_rate_khz(struct jesd204_link *lnk,
-				 unsigned long *lane_rate_khz)
+			      unsigned long *lane_rate_khz)
 {
 	u64 lane_rate_hz;
-	int ret = jesd204_link_get_rate(lnk, &lane_rate_hz);
+	int ret;
+
+	ret = jesd204_link_get_rate(lnk, &lane_rate_hz);
+	if (ret)
+		return ret;
 
 	do_div(lane_rate_hz, 1000);
 
@@ -89,14 +93,16 @@ int jesd204_link_get_rate_khz(struct jesd204_link *lnk,
 }
 EXPORT_SYMBOL_GPL(jesd204_link_get_rate_khz);
 
-
 int jesd204_link_get_device_clock(struct jesd204_link *lnk,
-				 unsigned long *device_clock)
+				  unsigned long *device_clock)
 {
 	u64 lane_rate_hz;
 	u32 encoding_n;
+	int ret;
 
-	int ret = jesd204_link_get_rate(lnk, &lane_rate_hz);
+	ret = jesd204_link_get_rate(lnk, &lane_rate_hz);
+	if (ret)
+		return ret;
 
 	switch (lnk->jesd_encoder) {
 	case JESD204_ENC_64B66B:
@@ -121,14 +127,14 @@ int jesd204_link_get_device_clock(struct jesd204_link *lnk,
 EXPORT_SYMBOL_GPL(jesd204_link_get_device_clock);
 
 int jesd204_link_get_lmfc_lemc_rate(struct jesd204_link *lnk,
-				u32 *rate_hz)
+				    unsigned long *rate_hz)
 {
 	u64 lane_rate_hz;
 	u32 bkw;
 	int ret;
 
 	ret = jesd204_link_get_rate(lnk, &lane_rate_hz);
-	if (ret < 0)
+	if (ret)
 		return ret;
 
 	switch (lnk->jesd_encoder) {
@@ -159,7 +165,6 @@ int jesd204_link_get_lmfc_lemc_rate(struct jesd204_link *lnk,
 	return 0;
 }
 EXPORT_SYMBOL_GPL(jesd204_link_get_lmfc_lemc_rate);
-
 
 static struct jesd204_dev *jesd204_dev_sysref_provider(struct jesd204_dev *tp_jdev)
 {
