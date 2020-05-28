@@ -1433,7 +1433,7 @@ static int hmc7044_jesd204_link_supported(struct jesd204_dev *jdev,
 	struct iio_dev *indio_dev = dev_get_drvdata(dev);
 	struct hmc7044 *hmc = iio_priv(indio_dev);
 	int ret;
-	u32 rate;
+	unsigned long rate;
 
 	dev_dbg(dev, "%s:%d link_num %u\n", __func__, __LINE__, link_num);
 
