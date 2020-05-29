@@ -1499,16 +1499,16 @@ static int ad9523_probe(struct spi_device *spi)
 		return -EINVAL;
 	}
 
-	st->jdev = jesd204_dev_register(&spi->dev, &jesd204_ad9523_init);
-	if (IS_ERR(st->jdev))
-		return PTR_ERR(st->jdev);
-	
 	indio_dev = devm_iio_device_alloc(&spi->dev, sizeof(*st));
 	if (indio_dev == NULL)
 		return -ENOMEM;
 
 	st = iio_priv(indio_dev);
 
+	st->jdev = jesd204_dev_register(&spi->dev, &jesd204_ad9523_init);
+	if (IS_ERR(st->jdev))
+		return PTR_ERR(st->jdev);
+	
 	mutex_init(&st->lock);
 
 	st->reg = devm_regulator_get(&spi->dev, "vcc");

@@ -6022,6 +6022,7 @@ static int adrv9009_probe(struct spi_device *spi)
 {
 	struct iio_dev *indio_dev;
 	struct adrv9009_rf_phy *phy;
+	struct jesd204_dev *jdev;
 	struct clk *clk = NULL;
 	const char *name;
 	int ret;
@@ -6033,11 +6034,11 @@ static int adrv9009_probe(struct spi_device *spi)
 
 	dev_info(&spi->dev, "%s : enter", __func__);
 
-	phy->jdev = jesd204_dev_register(&spi->dev, &jesd204_adrv9009_init);
-	if (IS_ERR(phy->jdev))
-		return PTR_ERR(phy->jdev);
+	jdev = jesd204_dev_register(&spi->dev, &jesd204_adrv9009_init);
+	if (IS_ERR(jdev))
+		return PTR_ERR(jdev);
 
-	clk = devm_clk_get(&spi->dev, phy->jdev ? "dev_clk" : (id == ID_ADRV90082) ?
+	clk = devm_clk_get(&spi->dev, jdev ? "dev_clk" : (id == ID_ADRV90082) ?
 			   "jesd_tx_clk" : "jesd_rx_clk");
 	if (IS_ERR(clk))
 		return PTR_ERR(clk);
@@ -6050,6 +6051,7 @@ static int adrv9009_probe(struct spi_device *spi)
 	phy->indio_dev = indio_dev;
 	phy->spi = spi;
 	phy->spi_device_id = id;
+	phy->jdev = jdev;
 
 	ret = adrv9009_phy_parse_dt(indio_dev, &spi->dev);
 	if (ret < 0)
@@ -6303,7 +6305,7 @@ static int adrv9009_probe(struct spi_device *spi)
 
 	}
 
-	ret = jesd204_start_fsm_from_probe(jdev);
+	ret = jesd204_start_fsm_from_probe(phy->jdev);
 	if (ret)
 		goto out_remove_sysfs_bin;
 

@@ -738,6 +738,7 @@ static int axi_jesd204_tx_probe(struct platform_device *pdev)
 {
 	struct jesd204_tx_config config;
 	struct axi_jesd204_tx *jesd;
+	struct jesd204_dev *jdev;
 	struct resource *res;
 	int irq;
 	int ret;
@@ -746,10 +747,9 @@ static int axi_jesd204_tx_probe(struct platform_device *pdev)
 	if (!pdev->dev.of_node)
 		return -ENODEV;
 
-	jesd->jdev = jesd204_dev_register(&pdev->dev,
-					  &jesd204_axi_jesd204_tx_init);
-	if (IS_ERR(jesd->jdev))
-		return PTR_ERR(jesd->jdev);
+	jdev = jesd204_dev_register(&pdev->dev, &jesd204_axi_jesd204_tx_init);
+	if (IS_ERR(jdev))
+		return PTR_ERR(jdev);
 
 	irq = platform_get_irq(pdev, 0);
 	if (irq < 0)
@@ -762,6 +762,7 @@ static int axi_jesd204_tx_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	jesd->dev = &pdev->dev;
+	jesd->jdev = jdev;
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	jesd->base = devm_ioremap_resource(&pdev->dev, res);

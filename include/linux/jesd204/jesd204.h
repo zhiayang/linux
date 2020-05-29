@@ -212,17 +212,7 @@ int jesd204_sysref_async(struct jesd204_dev *jdev,
 
 bool jesd204_dev_is_top(struct jesd204_dev *jdev);
 
-static inline bool jesd204_enabled(void)
-{
-	return true;
-}
-
 #else /* !IS_ENABLED(CONFIG_JESD204) */
-
-static inline bool jesd204_enabled(void)
-{
-	return false;
-}
 
 static inline struct jesd204_dev *jesd204_dev_register(
 		struct device *dev, const struct jesd204_dev_data *init)

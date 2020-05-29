@@ -904,6 +904,7 @@ static int axi_jesd204_rx_probe(struct platform_device *pdev)
 {
 	struct jesd204_rx_config config;
 	struct axi_jesd204_rx *jesd;
+	struct jesd204_dev *jdev;
 	struct resource *res;
 	int irq;
 	int ret;
@@ -912,10 +913,9 @@ static int axi_jesd204_rx_probe(struct platform_device *pdev)
 	if (!pdev->dev.of_node)
 		return -ENODEV;
 
-	jesd->jdev = jesd204_dev_register(&pdev->dev,
-					  &jesd204_axi_jesd204_rx_init);
-	if (IS_ERR(jesd->jdev))
-		return PTR_ERR(jesd->jdev);
+	jdev = jesd204_dev_register(&pdev->dev, &jesd204_axi_jesd204_rx_init);
+	if (IS_ERR(jdev))
+		return PTR_ERR(jdev);
 
 	irq = platform_get_irq(pdev, 0);
 	if (irq < 0)
@@ -928,6 +928,7 @@ static int axi_jesd204_rx_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	jesd->dev = &pdev->dev;
+	jesd->jdev = jdev;
 
 	ret = axi_jesd204_rx_parse_dt_config(pdev->dev.of_node, jesd, &config);
 	if (ret)

@@ -596,13 +596,13 @@ static int adxcvr_probe(struct platform_device *pdev)
 	unsigned int synth_conf, xcvr_type;
 	int i, ret;
 
-	st->jdev = jesd204_dev_register(&pdev->dev, &adxcvr_jesd204_data);
-	if (IS_ERR(st->jdev))
-		return PTR_ERR(st->jdev);
-
 	st = devm_kzalloc(&pdev->dev, sizeof(*st), GFP_KERNEL);
 	if (!st)
 		return -ENOMEM;
+
+	st->jdev = jesd204_dev_register(&pdev->dev, &adxcvr_jesd204_data);
+	if (IS_ERR(st->jdev))
+		return PTR_ERR(st->jdev);
 
 	st->conv_clk = devm_clk_get(&pdev->dev, "conv");
 	if (IS_ERR(st->conv_clk))
