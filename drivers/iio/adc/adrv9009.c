@@ -275,7 +275,7 @@ static int adrv9009_sysref_req(struct adrv9009_rf_phy *phy,
 			ret = gpiod_direction_output(phy->sysref_req_gpio, 0);
 		} else
 			ret = -EINVAL;
-	} else if (jesd204_enabled()) {
+	} else if (phy->jdev) {
 		ret = jesd204_sysref_async(phy->jdev, 0, 1);
 	} else {
 		ret = -ENODEV;
@@ -520,7 +520,7 @@ static int adrv9009_setup_stage1(struct adrv9009_rf_phy *phy)
 	dev_clk = clk_round_rate(phy->dev_clk,
 				 phy->talInit.clocks.deviceClock_kHz * 1000);
 
-	if (!jesd204_enabled()) {
+	if (!phy->jdev) {
 		fmc_clk = clk_round_rate(phy->fmc_clk,
 					phy->talInit.clocks.deviceClock_kHz * 1000);
 
@@ -905,7 +905,7 @@ static int adrv9009_do_setup(struct adrv9009_rf_phy *phy)
 	// dev_clk = clk_round_rate(phy->dev_clk,
 	// 			 phy->talInit.clocks.deviceClock_kHz * 1000);
 
-	// if (!jesd204_enabled()) {
+	// if (!phy->jdev) {
 	// 	fmc_clk = clk_round_rate(phy->fmc_clk,
 	// 				phy->talInit.clocks.deviceClock_kHz * 1000);
 
@@ -1198,7 +1198,7 @@ static int adrv9009_do_setup(struct adrv9009_rf_phy *phy)
 	if (ret < 0)
 		goto out_disable_tx_clk;
 
-	if (!jesd204_enabled()) {
+	if (!phy->jdev) {
 		/***************************************************/
 		/**** Enable Talise JESD204B Framer ***/
 		/***************************************************/
@@ -1417,7 +1417,7 @@ static int adrv9009_do_setup(struct adrv9009_rf_phy *phy)
 		goto out_disable_obs_rx_clk;
 
 
-	if (!jesd204_enabled()) {
+	if (!phy->jdev) {
 	/* Function to turn radio on, Enables transmitters and receivers */
 	/* that were setup during TALISE_initialize() */
 
@@ -1563,7 +1563,7 @@ static int adrv9009_multi_chip_sync(struct adrv9009_rf_phy *phy, int step)
 
 	dev_dbg(&phy->spi->dev, "%s:%d\n",__func__, step);
 
-	if (jesd204_enabled())
+	if (phy->jdev)
 		return 0;
 
 	switch (step) {
@@ -6033,9 +6033,11 @@ static int adrv9009_probe(struct spi_device *spi)
 
 	dev_info(&spi->dev, "%s : enter", __func__);
 
+	phy->jdev = jesd204_dev_register(&spi->dev, &jesd204_adrv9009_init);
+	if (IS_ERR(phy->jdev))
+		return PTR_ERR(phy->jdev);
 
-
-	clk = devm_clk_get(&spi->dev, jesd204_enabled() ? "dev_clk" : (id == ID_ADRV90082) ?
+	clk = devm_clk_get(&spi->dev, phy->jdev ? "dev_clk" : (id == ID_ADRV90082) ?
 			   "jesd_tx_clk" : "jesd_rx_clk");
 	if (IS_ERR(clk))
 		return PTR_ERR(clk);
@@ -6063,7 +6065,7 @@ static int adrv9009_probe(struct spi_device *spi)
 	phy->sysref_req_gpio = devm_gpiod_get(&spi->dev, "sysref-req",
 						GPIOD_OUT_HIGH);
 
-	if (!jesd204_enabled()) {
+	if (!phy->jdev) {
 
 		if (id == ID_ADRV90082)
 			phy->jesd_tx_clk = clk;
@@ -6176,7 +6178,7 @@ static int adrv9009_probe(struct spi_device *spi)
 		return -EINVAL;
 	}
 
-	if (!jesd204_enabled()) {
+	if (!phy->jdev) {
 	ret = adrv9009_setup(phy);
 	if (ret < 0) {
 		/* Try once more */
@@ -6287,7 +6289,7 @@ static int adrv9009_probe(struct spi_device *spi)
 		}
 	}
 
-	if (!jesd204_enabled()) {
+	if (!phy->jdev) {
 	TALISE_getArmVersion_v2(phy->talDevice, &talArmVersionInfo);
 	TALISE_getApiVersion(phy->talDevice, &api_vers[0], &api_vers[1], &api_vers[2],
 			     &api_vers[3]);
@@ -6301,12 +6303,9 @@ static int adrv9009_probe(struct spi_device *spi)
 
 	}
 
-	phy->jdev = jesd204_dev_register(&spi->dev, &jesd204_adrv9009_init);
-	if (IS_ERR(phy->jdev)) {
-		ret = PTR_ERR(phy->jdev);
-	}
-
-
+	ret = jesd204_start_fsm_from_probe(jdev);
+	if (ret)
+		goto out_remove_sysfs_bin;
 
 	return 0;
 

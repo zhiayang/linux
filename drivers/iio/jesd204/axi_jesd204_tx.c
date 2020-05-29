@@ -746,6 +746,11 @@ static int axi_jesd204_tx_probe(struct platform_device *pdev)
 	if (!pdev->dev.of_node)
 		return -ENODEV;
 
+	jesd->jdev = jesd204_dev_register(&pdev->dev,
+					  &jesd204_axi_jesd204_tx_init);
+	if (IS_ERR(jesd->jdev))
+		return PTR_ERR(jesd->jdev);
+
 	irq = platform_get_irq(pdev, 0);
 	if (irq < 0)
 		return irq;
@@ -831,12 +836,9 @@ static int axi_jesd204_tx_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, jesd);
 
-	jesd->jdev = jesd204_dev_register(&pdev->dev, &jesd204_axi_jesd204_tx_init);
-	if (IS_ERR(jesd->jdev)) {
-		ret = PTR_ERR(jesd->jdev);
+	ret = jesd204_start_fsm_from_probe(jesd->jdev);
+	if (ret)
 		goto err_disable_device_clk;
-	}
-
 
 	return 0;
 err_disable_device_clk:

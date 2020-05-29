@@ -596,6 +596,10 @@ static int adxcvr_probe(struct platform_device *pdev)
 	unsigned int synth_conf, xcvr_type;
 	int i, ret;
 
+	st->jdev = jesd204_dev_register(&pdev->dev, &adxcvr_jesd204_data);
+	if (IS_ERR(st->jdev))
+		return PTR_ERR(st->jdev);
+
 	st = devm_kzalloc(&pdev->dev, sizeof(*st), GFP_KERNEL);
 	if (!st)
 		return -ENOMEM;
@@ -714,6 +718,10 @@ static int adxcvr_probe(struct platform_device *pdev)
 
 	device_create_file(st->dev, &dev_attr_reg_access);
 
+	ret = jesd204_start_fsm_from_probe(st->jdev);
+	if (ret)
+		goto disable_unprepare;
+
 	dev_info(&pdev->dev, "AXI-ADXCVR-%s (%d.%.2d.%c) using %s at 0x%08llX mapped to 0x%p. Number of lanes: %d.",
 		st->tx_enable ? "TX" : "RX",
 		ADI_AXI_PCORE_VER_MAJOR(st->xcvr.version),
@@ -722,15 +730,6 @@ static int adxcvr_probe(struct platform_device *pdev)
 		adxcvr_gt_names[st->xcvr.type],
 		(unsigned long long)mem->start, st->regs,
 		st->num_lanes);
-
-	st->jdev = jesd204_dev_register(&pdev->dev, &adxcvr_jesd204_data);
-
-	if (IS_ERR(st->jdev)) {
-		dev_err(&pdev->dev,
-			"error registering with then JESD204 framework (%ld)\n",
-			PTR_ERR(st->jdev));
-		return PTR_ERR(st->jdev);
-	}
 
 	return 0;
 

@@ -1499,6 +1499,10 @@ static int ad9523_probe(struct spi_device *spi)
 		return -EINVAL;
 	}
 
+	st->jdev = jesd204_dev_register(&spi->dev, &jesd204_ad9523_init);
+	if (IS_ERR(st->jdev))
+		return PTR_ERR(st->jdev);
+	
 	indio_dev = devm_iio_device_alloc(&spi->dev, sizeof(*st));
 	if (indio_dev == NULL)
 		return -ENOMEM;
@@ -1562,11 +1566,9 @@ static int ad9523_probe(struct spi_device *spi)
 	if (ret)
 		goto error_disable_reg;
 
-	st->jdev = jesd204_dev_register(&spi->dev, &jesd204_ad9523_init);
-	if (IS_ERR(st->jdev)) {
-		ret = PTR_ERR(st->jdev);
+	ret = jesd204_start_fsm_from_probe(st->jdev);
+	if (ret)
 		goto err_unreg_iio;
-	}
 
 	dev_info(&spi->dev, "probed %s\n", indio_dev->name);
 

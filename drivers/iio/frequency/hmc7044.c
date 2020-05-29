@@ -1581,6 +1581,10 @@ static int hmc7044_probe(struct spi_device *spi)
 	struct hmc7044 *hmc;
 	int ret;
 
+	hmc->jdev = jesd204_dev_register(&spi->dev, &jesd204_hmc7044_init);
+	if (IS_ERR(hmc->jdev))
+		return PTR_ERR(hmc->jdev);
+
 	indio_dev = devm_iio_device_alloc(&spi->dev, sizeof(*hmc));
 	if (!indio_dev)
 		return -ENOMEM;
@@ -1638,12 +1642,7 @@ static int hmc7044_probe(struct spi_device *spi)
 				"Failed to create debugfs entry");
 	}
 
-	hmc->jdev = jesd204_dev_register(&spi->dev, &jesd204_hmc7044_init);
-	if (IS_ERR(hmc->jdev)) {
-		ret = PTR_ERR(hmc->jdev);
-	}
-
-	return ret;
+	return jesd204_start_fsm_from_probe(hmc->jdev);
 
 }
 
