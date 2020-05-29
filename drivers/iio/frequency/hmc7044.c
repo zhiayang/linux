@@ -1587,7 +1587,7 @@ static int hmc7044_probe(struct spi_device *spi)
 
 	hmc = iio_priv(indio_dev);
 
-	hmc->jdev = jesd204_dev_register(&spi->dev, &jesd204_hmc7044_init);
+	hmc->jdev = devm_jesd204_dev_register(&spi->dev, &jesd204_hmc7044_init);
 	if (IS_ERR(hmc->jdev))
 		return PTR_ERR(hmc->jdev);
 
@@ -1650,8 +1650,6 @@ static int hmc7044_remove(struct spi_device *spi)
 {
 	struct iio_dev *indio_dev = spi_get_drvdata(spi);
 	struct hmc7044 *hmc = iio_priv(indio_dev);
-
-	jesd204_dev_unregister(hmc->jdev);
 
 	iio_device_unregister(indio_dev);
 

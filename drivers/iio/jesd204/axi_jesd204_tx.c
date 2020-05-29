@@ -747,7 +747,8 @@ static int axi_jesd204_tx_probe(struct platform_device *pdev)
 	if (!pdev->dev.of_node)
 		return -ENODEV;
 
-	jdev = jesd204_dev_register(&pdev->dev, &jesd204_axi_jesd204_tx_init);
+	jdev = devm_jesd204_dev_register(&pdev->dev,
+					 &jesd204_axi_jesd204_tx_init);
 	if (IS_ERR(jdev))
 		return PTR_ERR(jdev);
 
@@ -858,8 +859,6 @@ static int axi_jesd204_tx_remove(struct platform_device *pdev)
 {
 	struct axi_jesd204_tx *jesd = platform_get_drvdata(pdev);
 	int irq = platform_get_irq(pdev, 0);
-
-	jesd204_dev_unregister(jesd->jdev);
 
 	of_clk_del_provider(pdev->dev.of_node);
 

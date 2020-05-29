@@ -6034,7 +6034,7 @@ static int adrv9009_probe(struct spi_device *spi)
 
 	dev_info(&spi->dev, "%s : enter", __func__);
 
-	jdev = jesd204_dev_register(&spi->dev, &jesd204_adrv9009_init);
+	jdev = devm_jesd204_dev_register(&spi->dev, &jesd204_adrv9009_init);
 	if (IS_ERR(jdev))
 		return PTR_ERR(jdev);
 
@@ -6334,8 +6334,6 @@ out_unregister_notifier:
 static int adrv9009_remove(struct spi_device *spi)
 {
 	struct adrv9009_rf_phy *phy = adrv9009_spi_to_phy(spi);
-
-	jesd204_dev_unregister(phy->jdev);
 
 	release_firmware(phy->fw);
 	release_firmware(phy->stream);

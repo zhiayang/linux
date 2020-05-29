@@ -1141,7 +1141,7 @@ static int ad9680_setup(struct spi_device *spi,
 
 	/* Register with JESD204 framework, and if all is good exit early */
 	if (jesd204_init)
-		conv->jdev = jesd204_dev_register(&spi->dev, jesd204_init);
+		conv->jdev = devm_jesd204_dev_register(&spi->dev, jesd204_init);
 
 	if (IS_ERR(conv->jdev)) {
 		dev_err(&spi->dev,
@@ -1776,7 +1776,6 @@ static int ad9680_probe(struct spi_device *spi)
 	return 0;
 
 err_unreg_jesd:
-	jesd204_dev_unregister(conv->jdev);
 
 	return ret;
 }
@@ -1786,7 +1785,6 @@ static int ad9680_remove(struct spi_device *spi)
 	struct axiadc_converter *conv = spi_get_drvdata(spi);
 
 	cancel_delayed_work_sync(&conv->watchdog_work);
-	jesd204_dev_unregister(conv->jdev);
 	if (conv->running) {
 		clk_disable_unprepare(conv->lane_clk);
 		clk_disable_unprepare(conv->sysref_clk);

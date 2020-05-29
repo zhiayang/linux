@@ -1505,7 +1505,7 @@ static int ad9523_probe(struct spi_device *spi)
 
 	st = iio_priv(indio_dev);
 
-	st->jdev = jesd204_dev_register(&spi->dev, &jesd204_ad9523_init);
+	st->jdev = devm_jesd204_dev_register(&spi->dev, &jesd204_ad9523_init);
 	if (IS_ERR(st->jdev))
 		return PTR_ERR(st->jdev);
 	
@@ -1587,8 +1587,6 @@ static int ad9523_remove(struct spi_device *spi)
 {
 	struct iio_dev *indio_dev = spi_get_drvdata(spi);
 	struct ad9523_state *st = iio_priv(indio_dev);
-
-	jesd204_dev_unregister(st->jdev);
 
 	iio_device_unregister(indio_dev);
 

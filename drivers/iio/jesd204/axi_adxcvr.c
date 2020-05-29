@@ -600,7 +600,7 @@ static int adxcvr_probe(struct platform_device *pdev)
 	if (!st)
 		return -ENOMEM;
 
-	st->jdev = jesd204_dev_register(&pdev->dev, &adxcvr_jesd204_data);
+	st->jdev = devm_jesd204_dev_register(&pdev->dev, &adxcvr_jesd204_data);
 	if (IS_ERR(st->jdev))
 		return PTR_ERR(st->jdev);
 
@@ -750,8 +750,6 @@ disable_unprepare:
 static int adxcvr_remove(struct platform_device *pdev)
 {
 	struct adxcvr_state *st = platform_get_drvdata(pdev);
-
-	jesd204_dev_unregister(st->jdev);
 
 	device_remove_file(st->dev, &dev_attr_reg_access);
 	adxcvr_eyescan_unregister(st);
