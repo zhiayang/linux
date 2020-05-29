@@ -870,13 +870,14 @@ static int jesd204_fsm_probe_done(struct jesd204_dev *jdev,
 				      JESD204_STATE_LINK_INIT);
 }
 
-int jesd204_fsm_probe(struct jesd204_dev *jdev)
+int jesd204_start_fsm_from_probe(struct jesd204_dev *jdev)
 {
 	return jesd204_fsm(jdev, JESD204_LINKS_ALL,
 			   JESD204_STATE_INITIALIZED, JESD204_STATE_PROBED,
 			   jesd204_fsm_probed_cb, NULL,
 			   jesd204_fsm_probe_done, true);
 }
+EXPORT_SYMBOL_GPL(jesd204_start_fsm_from_probe);
 
 static int jesd204_fsm_table_entry_cb(struct jesd204_dev *jdev,
 				      struct jesd204_link_opaque *ol,
