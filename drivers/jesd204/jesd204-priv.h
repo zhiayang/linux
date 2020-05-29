@@ -91,6 +91,7 @@ struct jesd204_dev_con_out {
  * @id			unique device id
  * @entry		list entry for the framework to keep a list of devices
  * @priv		private data to be returned to the driver
+ * @probed		true if this driver has finished probing
  * @is_top		true if this device is a top device in a topology of
  *			devices that make up a JESD204 link (typically the
  *			device that is the ADC, DAC, or transceiver)
@@ -114,6 +115,7 @@ struct jesd204_dev {
 	struct list_head		entry;
 	void				*priv;
 
+	bool				probed;
 	bool				is_top;
 	bool				is_sysref_provider;
 
