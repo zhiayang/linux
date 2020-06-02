@@ -676,8 +676,6 @@ static struct jesd204_dev *jesd204_dev_register(struct device *dev,
 	if (ret)
 		goto err_put_device;
 
-	jdev->id = id;
-
 	jdev->dev.parent = dev;
 	jdev->dev.groups = jdev->groups;
 	jdev->dev.bus = &jesd204_bus_type;
@@ -726,31 +724,35 @@ static void jesd204_of_unregister_devices(void)
 	}
 }
 
+static void __jesd204_dev_release(struct kref *ref);
+
+static void jesd204_dev_kref_put(struct jesd204_dev *jdev)
+{
+	kref_put(&jdev->ref, __jesd204_dev_release);
+}
+
 static void jesd204_dev_destroy_cons(struct jesd204_dev *jdev)
 {
 	struct jesd204_dev_con_out *c, *c1;
 	struct jesd204_dev_list_entry *e, *e1;
 	unsigned int i;
 
-	/* FIXME: not sure if this is correct ??? */
+	/* FIXME: fine-tune this and check for leaks */
 
 	/* remove this device from the outputs of other devices */
 	for (i = 0; i < jdev->inputs_count; i++) {
 		c = jdev->inputs[i];
 		list_for_each_entry_safe(e, e1, &c->dests, entry) {
 			list_del(&e->entry);
-			jesd204_dev_unregister(e->jdev);
+			jesd204_dev_kref_put(e->jdev);
+			jesd204_dev_kref_put(c->owner);
 			kfree(e);
 		}
 	}
-	kfree(jdev->inputs);
-	jdev->inputs_count = 0;
 
-	list_for_each_entry_safe(c, c1, &jdev->outputs, entry) {
-		list_del(&c->entry);
-		jesd204_dev_unregister(c->owner);
-		kfree(c);
-	}
+	kfree(jdev->inputs);
+	jdev->inputs = NULL;
+	jdev->inputs_count = 0;
 }
 
 /* Free memory allocated. */
@@ -761,38 +763,55 @@ static void __jesd204_dev_release(struct kref *ref)
 	int id = jdev->id;
 
 	mutex_lock(&jesd204_device_list_lock);
+		pr_err("%pOF %s %d\n", jdev->np, __func__, __LINE__);
 
 	if (jdev->parent) {
 		jesd204_dev_destroy_sysfs(jdev);
 		put_device(jdev->parent);
 	}
+		pr_err("%pOF %s %d\n", jdev->np, __func__, __LINE__);
 
 	if (jdev->is_top) {
+		pr_err("%pOF %s %d\n", jdev->np, __func__, __LINE__);
 		jdev_top = jesd204_dev_top_dev(jdev);
+		pr_err("%pOF %s %d\n", jdev->np, __func__, __LINE__);
 		if (jdev_top) {
+		pr_err("%pOF %s %d\n", jdev->np, __func__, __LINE__);
 			list_del(&jdev_top->entry);
+		pr_err("%pOF %s %d\n", jdev->np, __func__, __LINE__);
 			jesd204_topologies_count--;
 		}
 	} else
 		jdev_top = NULL;
 
+		pr_err("%pOF %s %d\n", jdev->np, __func__, __LINE__);
 	list_del(&jdev->entry);
+		pr_err("%pOF %s %d\n", jdev->np, __func__, __LINE__);
 	of_node_put(jdev->np);
 
+		pr_err("%pOF %s %d\n", jdev->np, __func__, __LINE__);
 	if (jdev_top) {
+		pr_err("%pOF %s %d\n", jdev->np, __func__, __LINE__);
 		kfree(jdev_top->active_links);
+		pr_err("%pOF %s %d\n", jdev->np, __func__, __LINE__);
 		kfree(jdev_top->staged_links);
+		pr_err("%pOF %s %d\n", jdev->np, __func__, __LINE__);
 		kfree(jdev_top);
+		pr_err("%pOF %s %d\n", jdev->np, __func__, __LINE__);
 	} else {
+		pr_err("%pOF %s %d\n", jdev->np, __func__, __LINE__);
 		kfree(jdev);
+		pr_err("%pOF %s %d\n", jdev->np, __func__, __LINE__);
 	}
 
 	jesd204_device_count--;
 
+		pr_err("%pOF %s %d\n", jdev->np, __func__, __LINE__);
 	mutex_unlock(&jesd204_device_list_lock);
 
 	if (id > -1)
 		ida_simple_remove(&jesd204_ida, id);
+		pr_err("%pOF %s %d\n", jdev->np, __func__, __LINE__);
 }
 
 /**
@@ -804,12 +823,14 @@ static void jesd204_dev_unregister(struct jesd204_dev *jdev)
 	if (IS_ERR_OR_NULL(jdev))
 		return;
 
-	if (jdev->id > -1)
+	if (jdev->id > -1) {
+		jdev->id = -1;
 		device_del(&jdev->dev);
+	}
 
 	jesd204_fsm_uninit_device(jdev);
 	jesd204_dev_destroy_cons(jdev);
-	kref_put(&jdev->ref, __jesd204_dev_release);
+	jesd204_dev_kref_put(jdev);
 }
 
 static void devm_jesd204_dev_unreg(struct device *dev, void *res)
