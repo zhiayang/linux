@@ -624,6 +624,72 @@ static int jesd204_dev_init_links_data(struct device *parent,
 	return 0;
 }
 
+#define state_op(op) \
+static int op ## jesd204_dev_pre(struct jesd204_dev *jdev, unsigned int link_idx) \
+{	\
+	pr_err("%pOF pre link %d\n", jdev ? jdev->np : NULL, link_idx);	\
+	return JESD204_STATE_CHANGE_DONE; \
+}\
+\
+static int op ## jesd204_dev_post(struct jesd204_dev *jdev, unsigned int link_idx) \
+{	\
+	pr_err("%pOF post link %d\n", jdev ? jdev->np : NULL, link_idx);	\
+	return JESD204_STATE_CHANGE_DONE; \
+}\
+\
+static int op ## jesd204_link(struct jesd204_dev *jdev, \
+			       unsigned int link_idx, \
+			       struct jesd204_link *lnk) \
+{\
+	pr_err("%pOF PER link %d\n", jdev ? jdev->np : NULL, link_idx);	\
+	return JESD204_STATE_CHANGE_DONE; \
+}
+
+
+state_op(LINK_INIT)
+state_op(LINK_UNINIT)
+state_op(LINK_SUPPORTED)
+state_op(LINK_PRE_SETUP)
+state_op(LINK_SETUP)
+state_op(OPT_SETUP_STAGE1)
+state_op(OPT_SETUP_STAGE2)
+state_op(OPT_SETUP_STAGE3)
+state_op(OPT_SETUP_STAGE4)
+state_op(OPT_SETUP_STAGE5)
+state_op(CLOCKS_ENABLE)
+state_op(CLOCKS_DISABLE)
+state_op(LINK_ENABLE)
+state_op(LINK_RUNNING)
+state_op(LINK_DISABLE)
+state_op(SYSREF)
+
+#define state_op_entry(op)	\
+[JESD204_OP_ ## op] = \
+{\
+	.pre_transition = op ## jesd204_dev_pre, \
+	.post_transition = op ## jesd204_dev_post, \
+	.per_link = op ## jesd204_link, \
+},
+
+static const struct jesd204_state_ops test_state_ops[] = {
+	state_op_entry(LINK_INIT)
+	state_op_entry(LINK_UNINIT)
+	state_op_entry(LINK_SUPPORTED)
+	state_op_entry(LINK_PRE_SETUP)
+	state_op_entry(LINK_SETUP)
+	state_op_entry(OPT_SETUP_STAGE1)
+	state_op_entry(OPT_SETUP_STAGE2)
+	state_op_entry(OPT_SETUP_STAGE3)
+	state_op_entry(OPT_SETUP_STAGE4)
+	state_op_entry(OPT_SETUP_STAGE5)
+	state_op_entry(CLOCKS_ENABLE)
+	state_op_entry(CLOCKS_DISABLE)
+	state_op_entry(LINK_ENABLE)
+	state_op_entry(LINK_RUNNING)
+	state_op_entry(LINK_DISABLE)
+	state_op_entry(SYSREF)
+};
+	
 static struct jesd204_dev *jesd204_dev_register(struct device *dev,
 						const struct jesd204_dev_data *init)
 {
@@ -670,7 +736,8 @@ static struct jesd204_dev *jesd204_dev_register(struct device *dev,
 		goto err_free_id;
 #endif
 
-	jdev->state_ops = init->state_ops;
+	//jdev->state_ops = init->state_ops;
+	jdev->state_ops = test_state_ops;
 
 	jdev->dev.parent = dev;
 	jdev->dev.groups = jdev->groups;
