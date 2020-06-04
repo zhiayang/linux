@@ -5,7 +5,7 @@
  *
  * Licensed under the GPL-2.
  */
-//#define DEBUG
+#define DEBUG
 //#define _DEBUG
 
 #include <linux/module.h>
@@ -5858,8 +5858,7 @@ static int adrv9009_jesd204_link_setup(struct jesd204_dev *jdev,
 }
 
 static int adrv9009_jesd204_setup_stage1(struct jesd204_dev *jdev,
-		unsigned int link_num,
-		struct jesd204_link *lnk)
+		unsigned int link_num)
 {
 	struct device *dev = jesd204_dev_to_device(jdev);
 	struct spi_device *spi = to_spi_device(dev);
@@ -5869,19 +5868,18 @@ static int adrv9009_jesd204_setup_stage1(struct jesd204_dev *jdev,
 
 	dev_dbg(dev, "%s:%d link_num %u\n", __func__, __LINE__, link_num);
 
-	if (link_num == 2) {
-		ret = TALISE_enableMultichipSync(phy->talDevice, 0, &mcsStatus);
-		if (ret != TALACT_NO_ACTION)
-			return -EFAULT;
 
-		if ((mcsStatus & 0x08) != 0x08) {
-			dev_err(&phy->spi->dev, "%s:%d Unexpected MCS sync status (0x%X)",
-				__func__, __LINE__, mcsStatus);
-			return -EFAULT;
-		}
-		if (jesd204_dev_is_top(jdev)) {
-			jesd204_sysref_async(phy->jdev, 0, 1);
-		}
+	ret = TALISE_enableMultichipSync(phy->talDevice, 0, &mcsStatus);
+	if (ret != TALACT_NO_ACTION)
+		return -EFAULT;
+
+	if ((mcsStatus & 0x08) != 0x08) {
+		dev_err(&phy->spi->dev, "%s:%d Unexpected MCS sync status (0x%X)",
+			__func__, __LINE__, mcsStatus);
+		return -EFAULT;
+	}
+	if (jesd204_dev_is_top(jdev)) {
+		jesd204_sysref_async(phy->jdev, 0, 1);
 	}
 
 	return JESD204_STATE_CHANGE_DONE;
@@ -5999,7 +5997,8 @@ static const struct jesd204_dev_data jesd204_adrv9009_init = {
 			.per_link = adrv9009_jesd204_link_running,
 		},
 		[JESD204_OP_OPT_SETUP_STAGE1] = {
-			.per_link = adrv9009_jesd204_setup_stage1,
+			.pre_transition = adrv9009_jesd204_setup_stage1,
+			//.per_link = adrv9009_jesd204_setup_stage1,
 		},
 		[JESD204_OP_OPT_SETUP_STAGE2] = {
 			.per_link = adrv9009_jesd204_setup_stage2,
