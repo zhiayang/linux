@@ -197,6 +197,8 @@ struct jesd204_dev_top {
 	struct jesd204_link_opaque	*staged_links;
 };
 
+int jesd204_device_count_get(void);
+
 struct list_head *jesd204_topologies_get(void);
 
 static inline struct jesd204_dev_top *jesd204_dev_top_dev(
