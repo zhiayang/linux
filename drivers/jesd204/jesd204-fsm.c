@@ -59,8 +59,24 @@ struct jesd204_fsm_table_entry {
 	bool			last;
 };
 
+/**
+ * struct jesd204_fsm_table_entry_iter - JESD204 table state iterator
+ * @table		current entry in a state table
+ * @pre_hook_ran	matrix of JESD204 device IDs & max ops
+ *			Becase it is undeterministic how the per-link ops
+ *			are ran (because we traverse the connections between
+ *			devices), we need to run the pre_transition hooks
+ *			once, so the only way to do it simple, is to keep
+ *			this check-matrix, to mark that the hook was ran
+ *			for a certain device & state
+ * @post_hook_refcount	refcounts that are armed right in the pre_hook phase
+ *			for each JEDS204 device; once decremented to zero, the
+ *			callback is ran (if any)
+ */
 struct jesd204_fsm_table_entry_iter {
 	const struct jesd204_fsm_table_entry	*table;
+	bool					*pre_hook_ran;
+	int					*post_hook_refcount;
 };
 
 #define _JESD204_STATE_OP(x, _last)	\
@@ -870,7 +886,7 @@ static int jesd204_fsm_probe_done(struct jesd204_dev *jdev,
 				      JESD204_STATE_LINK_INIT);
 }
 
-int jesd204_start_fsm_from_probe(struct jesd204_dev *jdev)
+int jesd204_fsm_start(struct jesd204_dev *jdev, unsigned int link_idx)
 {
 	int ret;
 
@@ -882,7 +898,7 @@ int jesd204_start_fsm_from_probe(struct jesd204_dev *jdev)
 
 	jdev->fsm_started = true;
 
-	ret = jesd204_fsm(jdev, JESD204_LINKS_ALL,
+	ret = jesd204_fsm(jdev, link_idx,
 			  JESD204_STATE_INITIALIZED, JESD204_STATE_PROBED,
 			  jesd204_fsm_probed_cb, NULL,
 			  jesd204_fsm_probe_done, true);
@@ -892,7 +908,70 @@ int jesd204_start_fsm_from_probe(struct jesd204_dev *jdev)
 
 	return ret;
 }
-EXPORT_SYMBOL_GPL(jesd204_start_fsm_from_probe);
+EXPORT_SYMBOL_GPL(jesd204_fsm_start);
+
+static int jesd204_fsm_table_entry_pre_hook(struct jesd204_dev *jdev,
+					    struct jesd204_fsm_table_entry_iter *it,
+					    struct jesd204_fsm_data *fsm_data)
+{
+	jesd204_dev_cb op;
+	int ret, idx;
+
+	idx = (jdev->id * __JESD204_MAX_OPS) + it->table[0].op;
+
+	if (it->pre_hook_ran[idx])
+		return JESD204_STATE_CHANGE_DONE;
+
+	op = jdev->state_ops[it->table[0].op].pre_transition;
+	if (!op)
+		goto out_arm_post_hook;
+
+	ret = op(jdev, fsm_data->link_idx);
+	if (ret < 0)
+		return jesd204_dev_set_error(jdev, NULL, NULL, ret);
+
+out_arm_post_hook:
+	if (fsm_data->link_idx != JESD204_LINKS_ALL) {
+		it->post_hook_refcount[jdev->id] = 1;
+	} else {
+		/**
+		 * A bit non-intuitive here, but the idea is that if the FSM is
+		 * moving on the inputs, we should refcount the outputs
+		 */
+		if (fsm_data->inputs)
+			it->post_hook_refcount[jdev->id] = jdev->outputs_count;
+		else
+			it->post_hook_refcount[jdev->id] = jdev->inputs_count;
+	}
+
+	it->pre_hook_ran[idx] = true;
+
+	return JESD204_STATE_CHANGE_DONE;
+}
+
+static int jesd204_fsm_table_entry_post_hook(struct jesd204_dev *jdev,
+					     struct jesd204_fsm_table_entry_iter *it,
+					     struct jesd204_fsm_data *fsm_data)
+{
+	jesd204_dev_cb op;
+	int ret;
+
+	if (it->post_hook_refcount[jdev->id])
+		it->post_hook_refcount[jdev->id]--;
+
+	if (it->post_hook_refcount[jdev->id])
+		return 0;
+
+	op = jdev->state_ops[it->table[0].op].post_transition;
+	if (!op)
+		return 0;
+
+	ret = op(jdev, fsm_data->link_idx);
+	if (ret < 0)
+		return jesd204_dev_set_error(jdev, NULL, NULL, ret);
+
+	return ret;
+}
 
 static int jesd204_fsm_table_entry_cb(struct jesd204_dev *jdev,
 				      struct jesd204_link_opaque *ol,
@@ -903,17 +982,29 @@ static int jesd204_fsm_table_entry_cb(struct jesd204_dev *jdev,
 	struct jesd204_dev_top *jdev_top;
 	jesd204_link_cb link_op;
 	unsigned int link_idx;
-	int ret, ret1;
+	int ret;
 
 	if (!jdev->state_ops)
 		return JESD204_STATE_CHANGE_DONE;
 
+	ret = jesd204_fsm_table_entry_pre_hook(jdev, it, fsm_data);
+	if (ret < 0)
+		return ret;
+
+	if (ret != JESD204_STATE_CHANGE_DONE)
+		return ret;
+
 	link_op = jdev->state_ops[it->table[0].op].per_link;
 	if (!link_op)
-		return JESD204_STATE_CHANGE_DONE;
+		goto run_post_hook;
 
-	if (con)
-		return link_op(jdev, con->link_idx, &ol->link);
+	if (con) {
+		ret = link_op(jdev, con->link_idx, &ol->link);
+		goto run_post_hook;
+	}
+
+	/* FIXME: we may need to separate the callback propagated over the topology
+	   a bit better */
 
 	/* From here-on it's assumed that this is called for the top-level device */
 
@@ -922,20 +1013,34 @@ static int jesd204_fsm_table_entry_cb(struct jesd204_dev *jdev,
 
 	if (link_idx != JESD204_LINKS_ALL) {
 		ol = &jdev_top->active_links[link_idx];
-		return link_op(jdev, link_idx, &ol->link);
+		ret = link_op(jdev, link_idx, &ol->link);
+		goto run_post_hook;
 	}
 
-	ret1 = JESD204_STATE_CHANGE_DONE;
 	for (link_idx = 0; link_idx < jdev_top->num_links; link_idx++) {
+		int ret1;
 		ol = &jdev_top->active_links[link_idx];
-		ret = link_op(jdev, link_idx, &ol->link);
+		ret1 = link_op(jdev, link_idx, &ol->link);
+		if (ret1 < 0)
+			return ret1;
+		if (ret1 != JESD204_STATE_CHANGE_DONE)
+			ret = ret1;
+	}
+
+	/* For the top-level device, we need to run the post-hook if all links are DONE */
+	if (ret == JESD204_STATE_CHANGE_DONE)
+		it->post_hook_refcount[jdev->id] = 0;
+
+run_post_hook:
+	/* run post transition hook if any */
+	if (ret == JESD204_STATE_CHANGE_DONE) {
+		ret = jesd204_fsm_table_entry_post_hook(jdev, it, fsm_data);
 		if (ret < 0)
 			return ret;
-		if (ret == JESD204_STATE_CHANGE_DEFER)
-			ret1 = JESD204_STATE_CHANGE_DEFER;
+		ret = JESD204_STATE_CHANGE_DONE;
 	}
 
-	return ret1;
+	return ret;
 }
 
 static int jesd204_fsm_table_entry_done(struct jesd204_dev *jdev,
@@ -944,16 +1049,6 @@ static int jesd204_fsm_table_entry_done(struct jesd204_dev *jdev,
 {
 	struct jesd204_fsm_table_entry_iter *it = fsm_data->cb_data;
 	const struct jesd204_fsm_table_entry *table = it->table;
-	jesd204_dev_cb op;
-	int ret;
-
-	if (jdev->state_ops &&
-	    jdev->state_ops[table[0].op].post_transition) {
-		op = jdev->state_ops[table[0].op].post_transition;
-		ret = op(jdev, fsm_data->link_idx);
-		if (ret < 0)
-			return jesd204_dev_set_error(jdev, NULL, NULL, ret);
-	}
 
 	if (table[0].last)
 		return 0;
@@ -969,36 +1064,45 @@ static int jesd204_fsm_table(struct jesd204_dev *jdev,
 			     bool handle_busy_flags)
 {
 	struct jesd204_fsm_table_entry_iter it;
-	jesd204_dev_cb op;
-	int ret;
+	int ret, cnt;
 
 	it.table = table;
+	cnt = jesd204_device_count_get();
 
-	if (jdev->state_ops &&
-	    jdev->state_ops[table[0].op].pre_transition) {
-		op = jdev->state_ops[table[0].op].pre_transition;
-		ret = op(jdev, link_idx);
-		if (ret < 0)
-			return jesd204_dev_set_error(jdev, NULL, NULL, ret);
+	it.post_hook_refcount = kcalloc(cnt, sizeof(int), GFP_KERNEL);
+	if (!it.post_hook_refcount)
+		return -ENOMEM;
+
+	cnt *= __JESD204_MAX_OPS;
+
+	it.pre_hook_ran = kcalloc(cnt, sizeof(bool), GFP_KERNEL);
+	if (!it.pre_hook_ran) {
+		kfree(it.post_hook_refcount);
+		return -ENOMEM;
 	}
 
-	return jesd204_fsm(jdev, link_idx,
-			   init_state, table[0].state,
-			   jesd204_fsm_table_entry_cb,
-			   &it,
-			   jesd204_fsm_table_entry_done,
-			   handle_busy_flags);
+	ret = jesd204_fsm(jdev, link_idx,
+			  init_state, table[0].state,
+			  jesd204_fsm_table_entry_cb,
+			  &it,
+			  jesd204_fsm_table_entry_done,
+			  handle_busy_flags);
+	kfree(it.post_hook_refcount);
+	kfree(it.pre_hook_ran);
+
+	return ret;
 }
 
-void jesd204_fsm_uninit_device(struct jesd204_dev *jdev)
+void jesd204_fsm_stop(struct jesd204_dev *jdev, unsigned int link_idx)
 {
 	if (!jdev->fsm_started)
 		return;
 
-	jesd204_fsm_table(jdev, JESD204_LINKS_ALL,
+	jesd204_fsm_table(jdev, link_idx,
 			  JESD204_STATE_DONT_CARE, jesd204_uninit_dev_states,
 			  false);
 }
+EXPORT_SYMBOL_GPL(jesd204_fsm_stop);
 
 int jesd204_fsm_link_change(struct jesd204_dev_top *jdev_top,
 			    unsigned int link_idx)

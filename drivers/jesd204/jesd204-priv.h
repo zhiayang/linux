@@ -197,6 +197,8 @@ struct jesd204_dev_top {
 	struct jesd204_link_opaque	*staged_links;
 };
 
+int jesd204_device_count_get(void);
+
 struct list_head *jesd204_topologies_get(void);
 
 static inline struct jesd204_dev_top *jesd204_dev_top_dev(
@@ -215,8 +217,6 @@ int jesd204_dev_init_link_data(struct jesd204_dev_top *jdev_top,
 int jesd204_init_topology(struct jesd204_dev_top *jdev_top);
 
 int jesd204_fsm_probe(struct jesd204_dev *jdev);
-
-void jesd204_fsm_uninit_device(struct jesd204_dev *jdev);
 
 int jesd204_fsm_link_change(struct jesd204_dev_top *jdev_top,
 			    unsigned int link_idx);

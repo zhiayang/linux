@@ -1037,7 +1037,7 @@ static int axi_jesd204_rx_probe(struct platform_device *pdev)
 	device_create_file(&pdev->dev, &dev_attr_status);
 	device_create_file(&pdev->dev, &dev_attr_encoder);
 
-	ret = jesd204_start_fsm_from_probe(jesd->jdev);
+	ret = jesd204_fsm_start(jesd->jdev, JESD204_LINKS_ALL);
 	if (ret)
 		goto err_disable_device_clk;
 
