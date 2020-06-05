@@ -5523,6 +5523,16 @@ static irqreturn_t adrv9009_irq_handler(int irq, void *p)
 	return IRQ_HANDLED;
 }
 
+struct adrv9009_jesd204_link {
+	unsigned int source_id;
+	bool is_framer;
+};
+
+struct adrv9009_jesd204_priv {
+	struct adrv9009_rf_phy *phy;
+	struct adrv9009_jesd204_link link[3];
+};
+
 static int adrv9009_jesd204_link_init(struct jesd204_dev *jdev,
 		unsigned int link_num,
 		struct jesd204_link *lnk)
@@ -5533,20 +5543,29 @@ static int adrv9009_jesd204_link_init(struct jesd204_dev *jdev,
 	taliseJesd204bFramerConfig_t *framer = NULL;
 	taliseJesd204bDeframerConfig_t *deframer = NULL;
 
+	struct adrv9009_jesd204_priv *priv = jesd204_dev_priv(jdev);
+
 	dev_dbg(dev, "%s:%d link_num %u\n", __func__, __LINE__, link_num);
+
+	priv->phy = phy;
 
 	switch (link_num) {
 	case 0:
 		deframer = &phy->talInit.jesd204Settings.deframerA;
 		lnk->sample_rate = phy->talInit.tx.txProfile.txInputRate_kHz * 1000;
+		priv->link[0].source_id = TAL_DEFRAMER_A;
 		break;
 	case 1:
 		framer = &phy->talInit.jesd204Settings.framerA;
 		lnk->sample_rate = phy->talInit.rx.rxProfile.rxOutputRate_kHz * 1000;
+		priv->link[1].source_id = TAL_FRAMER_A;
+		priv->link[1].is_framer = true;
 		break;
 	case 2:
 		framer = &phy->talInit.jesd204Settings.framerB;
 		lnk->sample_rate = phy->talInit.obsRx.orxProfile.orxOutputRate_kHz * 1000;
+		priv->link[2].source_id = TAL_FRAMER_B;
+		priv->link[2].is_framer = true;
 		break;
 	default:
 		return -EINVAL;
@@ -5590,55 +5609,41 @@ static int adrv9009_jesd204_clks_enable(struct jesd204_dev *jdev,
 		struct jesd204_link *lnk)
 {
 	struct device *dev = jesd204_dev_to_device(jdev);
-	struct spi_device *spi = to_spi_device(dev);
-	struct adrv9009_rf_phy *phy = adrv9009_spi_to_phy(spi);
-	int ret, framer = -1, deframer = -1;
+	struct adrv9009_jesd204_priv *priv = jesd204_dev_priv(jdev);
+	struct adrv9009_rf_phy *phy = priv->phy;
+	int ret;
 
 	dev_dbg(dev, "%s:%d link_num %u\n", __func__, __LINE__, link_num);
 
 	if (!lnk->num_converters)
 		return JESD204_STATE_CHANGE_DONE;
 
-	switch (link_num) {
-	case 0:
-		deframer = TAL_DEFRAMER_A;
-		break;
-	case 1:
-		framer = TAL_FRAMER_A;
-		break;
-	case 2:
-		framer = TAL_FRAMER_B;
-		break;
-	default:
-		return -EINVAL;
-	}
 
-
-	if (framer >= 0) {
-			ret = TALISE_enableSysrefToFramer(phy->talDevice, framer, 0);
+	if (priv->link[link_num].is_framer) {
+			ret = TALISE_enableSysrefToFramer(phy->talDevice, priv->link[link_num].source_id, 0);
 			if (ret != TALACT_NO_ACTION) {
 				dev_err(&phy->spi->dev, "%s:%d (ret %d)", __func__, __LINE__, ret);
 				ret = -EFAULT;
 			}
 
-			ret = TALISE_enableFramerLink(phy->talDevice, framer, 0);
+			ret = TALISE_enableFramerLink(phy->talDevice, priv->link[link_num].source_id, 0);
 			if (ret != TALACT_NO_ACTION) {
 				dev_err(&phy->spi->dev, "%s:%d (ret %d)", __func__, __LINE__, ret);
 				ret = -EFAULT;
 			}
-	} else if (deframer >= 0) {
+	} else {
 			// u8 phy_ctrl;
 			// phy_ctrl = adrv9009_spi_read(phy->spi, TALISE_ADDR_DES_PHY_GENERAL_CTL_1);
 			// adrv9009_spi_write(phy->spi, TALISE_ADDR_DES_PHY_GENERAL_CTL_1, phy_ctrl & ~BIT(7));
 			// adrv9009_spi_write(phy->spi, TALISE_ADDR_DES_PHY_GENERAL_CTL_1, phy_ctrl);
 
-			ret = TALISE_enableSysrefToDeframer(phy->talDevice, deframer, 0);
+			ret = TALISE_enableSysrefToDeframer(phy->talDevice, priv->link[link_num].source_id, 0);
 			if (ret != TALACT_NO_ACTION) {
 				dev_err(&phy->spi->dev, "%s:%d (ret %d)", __func__, __LINE__, ret);
 				ret = -EFAULT;
 			}
 
-			ret = TALISE_enableDeframerLink(phy->talDevice, deframer, 0);
+			ret = TALISE_enableDeframerLink(phy->talDevice, priv->link[link_num].source_id, 0);
 			if (ret != TALACT_NO_ACTION) {
 				dev_err(&phy->spi->dev, "%s:%d (ret %d)", __func__, __LINE__, ret);
 				ret = -EFAULT;
@@ -5677,31 +5682,17 @@ static int adrv9009_jesd204_link_enable(struct jesd204_dev *jdev,
 		struct jesd204_link *lnk)
 {
 	struct device *dev = jesd204_dev_to_device(jdev);
-	struct spi_device *spi = to_spi_device(dev);
-	struct adrv9009_rf_phy *phy = adrv9009_spi_to_phy(spi);
-	int ret, framer = -1, deframer = -1;
+	struct adrv9009_jesd204_priv *priv = jesd204_dev_priv(jdev);
+	struct adrv9009_rf_phy *phy = priv->phy;
+	int ret;
 
 	dev_dbg(dev, "%s:%d link_num %u\n", __func__, __LINE__, link_num);
 
 	if (!lnk->num_converters)
 		return JESD204_STATE_CHANGE_DONE;
 
-	switch (link_num) {
-	case 0:
-		deframer = TAL_DEFRAMER_A;
-		break;
-	case 1:
-		framer = TAL_FRAMER_A;
-		break;
-	case 2:
-		framer = TAL_FRAMER_B;
-		break;
-	default:
-		return -EINVAL;
-	}
-
-	if (framer >= 0) {
-			ret = TALISE_enableFramerLink(phy->talDevice, framer, 1);
+	if (priv->link[link_num].is_framer) {
+			ret = TALISE_enableFramerLink(phy->talDevice, priv->link[link_num].source_id, 1);
 			if (ret != TALACT_NO_ACTION) {
 				dev_err(&phy->spi->dev, "%s:%d (ret %d)", __func__, __LINE__, ret);
 				ret = -EFAULT;
@@ -5712,19 +5703,19 @@ static int adrv9009_jesd204_link_enable(struct jesd204_dev *jdev,
 			/*************************************************/
 			/*** < User: Make sure SYSREF is stopped/disabled > ***/
 
-			ret = TALISE_enableSysrefToFramer(phy->talDevice, framer, 1);
+			ret = TALISE_enableSysrefToFramer(phy->talDevice, priv->link[link_num].source_id, 1);
 			if (ret != TALACT_NO_ACTION) {
 				dev_err(&phy->spi->dev, "%s:%d (ret %d)", __func__, __LINE__, ret);
 				ret = -EFAULT;
 			}
-	} else if (deframer >= 0) {
+	} else {
 		u8 phy_ctrl;
 
 			phy_ctrl = adrv9009_spi_read(phy->spi, TALISE_ADDR_DES_PHY_GENERAL_CTL_1);
 			adrv9009_spi_write(phy->spi, TALISE_ADDR_DES_PHY_GENERAL_CTL_1, phy_ctrl & ~BIT(7));
 			adrv9009_spi_write(phy->spi, TALISE_ADDR_DES_PHY_GENERAL_CTL_1, phy_ctrl);
 
-			ret = TALISE_enableDeframerLink(phy->talDevice, deframer, 1);
+			ret = TALISE_enableDeframerLink(phy->talDevice, priv->link[link_num].source_id, 1);
 			if (ret != TALACT_NO_ACTION) {
 				dev_err(&phy->spi->dev, "%s:%d (ret %d)", __func__, __LINE__, ret);
 				ret = -EFAULT;
@@ -5733,7 +5724,7 @@ static int adrv9009_jesd204_link_enable(struct jesd204_dev *jdev,
 			/***************************************************/
 			/**** Enable SYSREF to Talise JESD204B Deframer ***/
 			/***************************************************/
-			ret = TALISE_enableSysrefToDeframer(phy->talDevice, deframer, 1);
+			ret = TALISE_enableSysrefToDeframer(phy->talDevice, priv->link[link_num].source_id, 1);
 			if (ret != TALACT_NO_ACTION) {
 				dev_err(&phy->spi->dev, "%s:%d (ret %d)", __func__, __LINE__, ret);
 				ret = -EFAULT;
@@ -5746,7 +5737,7 @@ static int adrv9009_jesd204_link_enable(struct jesd204_dev *jdev,
 
 	if (link_num == 2 && jesd204_dev_is_top(jdev)) {
 		jesd204_sysref_async(phy->jdev, 0, 1);
-		msleep(500);
+		//msleep(500);
 	}
 
 	return JESD204_STATE_CHANGE_DONE;
@@ -5757,9 +5748,9 @@ static int adrv9009_jesd204_link_running(struct jesd204_dev *jdev,
 		struct jesd204_link *lnk)
 {
 	struct device *dev = jesd204_dev_to_device(jdev);
-	struct spi_device *spi = to_spi_device(dev);
-	struct adrv9009_rf_phy *phy = adrv9009_spi_to_phy(spi);
-	int ret, framer = -1, deframer = -1;
+	struct adrv9009_jesd204_priv *priv = jesd204_dev_priv(jdev);
+	struct adrv9009_rf_phy *phy = priv->phy;
+	int ret;
 	uint16_t deframerStatus = 0;
 	uint8_t framerStatus = 0;
 
@@ -5768,23 +5759,8 @@ static int adrv9009_jesd204_link_running(struct jesd204_dev *jdev,
 	if (!lnk->num_converters)
 		return JESD204_STATE_CHANGE_DONE;
 
-	switch (link_num) {
-	case 0:
-		deframer = TAL_DEFRAMER_A;
-		break;
-	case 1:
-		framer = TAL_FRAMER_A;
-		break;
-	case 2:
-		framer = TAL_FRAMER_B;
-		break;
-	default:
-		return -EINVAL;
-	}
-
-	if (framer >= 0) {
-
-			ret = TALISE_readFramerStatus(phy->talDevice, framer, &framerStatus);
+	if (priv->link[link_num].is_framer) {
+			ret = TALISE_readFramerStatus(phy->talDevice, priv->link[link_num].source_id, &framerStatus);
 			if (ret != TALACT_NO_ACTION) {
 				dev_err(&phy->spi->dev, "%s:%d (ret %d)", __func__, __LINE__, ret);
 				ret = -EFAULT;
@@ -5792,8 +5768,10 @@ static int adrv9009_jesd204_link_running(struct jesd204_dev *jdev,
 
 			if ((framerStatus & 0x07) != 0x05)
 				dev_warn(&phy->spi->dev, "Link%u TAL_FRAMER_A framerStatus 0x%X", link_num, framerStatus);
-	} else if (deframer >= 0) {
-			ret = TALISE_readDeframerStatus(phy->talDevice, deframer,
+
+			jesd204_sysref_async(phy->jdev, 0, 1);
+	} else {
+			ret = TALISE_readDeframerStatus(phy->talDevice, priv->link[link_num].source_id,
 							&deframerStatus);
 			if (ret != TALACT_NO_ACTION) {
 				dev_err(&phy->spi->dev, "%s:%d (ret %d)", __func__, __LINE__, ret);
@@ -5836,13 +5814,31 @@ static int adrv9009_jesd204_link_running(struct jesd204_dev *jdev,
 	return JESD204_STATE_CHANGE_DONE;
 }
 
-static int adrv9009_jesd204_link_setup(struct jesd204_dev *jdev,
+static int adrv9009_jesd204_link_pre_setup(struct jesd204_dev *jdev,
+		unsigned int link_num)
+{
+	struct device *dev = jesd204_dev_to_device(jdev);
+	struct adrv9009_jesd204_priv *priv = jesd204_dev_priv(jdev);
+	struct adrv9009_rf_phy *phy = priv->phy;
+	int ret;
+
+	dev_dbg(dev, "%s:%d link_num %u\n", __func__, __LINE__, link_num);
+
+	ret = adrv9009_setup_stage1(phy);
+	if (ret < 0)
+		return ret;
+
+
+	return JESD204_STATE_CHANGE_DONE;
+}
+
+int adrv9009_jesd204_link_setup(struct jesd204_dev *jdev,
 		unsigned int link_num,
 		struct jesd204_link *lnk)
 {
 	struct device *dev = jesd204_dev_to_device(jdev);
-	struct spi_device *spi = to_spi_device(dev);
-	struct adrv9009_rf_phy *phy = adrv9009_spi_to_phy(spi);
+	struct adrv9009_jesd204_priv *priv = jesd204_dev_priv(jdev);
+	struct adrv9009_rf_phy *phy = priv->phy;
 	int ret;
 
 	dev_dbg(dev, "%s:%d link_num %u\n", __func__, __LINE__, link_num);
@@ -5857,12 +5853,28 @@ static int adrv9009_jesd204_link_setup(struct jesd204_dev *jdev,
 	return JESD204_STATE_CHANGE_DONE;
 }
 
+static int adrv9009_jesd204_sysref(struct jesd204_dev *jdev,
+		unsigned int link_num)
+{
+	struct device *dev = jesd204_dev_to_device(jdev);
+	struct adrv9009_jesd204_priv *priv = jesd204_dev_priv(jdev);
+	struct adrv9009_rf_phy *phy = priv->phy;
+
+	dev_dbg(dev, "%s:%d link_num %u\n", __func__, __LINE__, link_num);
+
+	if (jesd204_dev_is_top(jdev)) {
+		jesd204_sysref_async(phy->jdev, 0, 1);
+	}
+
+	return JESD204_STATE_CHANGE_DONE;
+}
+
 static int adrv9009_jesd204_setup_stage1(struct jesd204_dev *jdev,
 		unsigned int link_num)
 {
 	struct device *dev = jesd204_dev_to_device(jdev);
-	struct spi_device *spi = to_spi_device(dev);
-	struct adrv9009_rf_phy *phy = adrv9009_spi_to_phy(spi);
+	struct adrv9009_jesd204_priv *priv = jesd204_dev_priv(jdev);
+	struct adrv9009_rf_phy *phy = priv->phy;
 	int ret;
 	u8 mcsStatus;
 
@@ -5890,8 +5902,8 @@ static int adrv9009_jesd204_setup_stage2(struct jesd204_dev *jdev,
 		struct jesd204_link *lnk)
 {
 	struct device *dev = jesd204_dev_to_device(jdev);
-	struct spi_device *spi = to_spi_device(dev);
-	struct adrv9009_rf_phy *phy = adrv9009_spi_to_phy(spi);
+	struct adrv9009_jesd204_priv *priv = jesd204_dev_priv(jdev);
+	struct adrv9009_rf_phy *phy = priv->phy;
 	int ret;
 
 	dev_dbg(dev, "%s:%d link_num %u\n", __func__, __LINE__, link_num);
@@ -5913,8 +5925,8 @@ static int adrv9009_jesd204_setup_stage3(struct jesd204_dev *jdev,
 		struct jesd204_link *lnk)
 {
 	struct device *dev = jesd204_dev_to_device(jdev);
-	struct spi_device *spi = to_spi_device(dev);
-	struct adrv9009_rf_phy *phy = adrv9009_spi_to_phy(spi);
+	struct adrv9009_jesd204_priv *priv = jesd204_dev_priv(jdev);
+	struct adrv9009_rf_phy *phy = priv->phy;
 	int ret;
 
 	dev_dbg(dev, "%s:%d link_num %u\n", __func__, __LINE__, link_num);
@@ -5936,8 +5948,8 @@ static int adrv9009_jesd204_setup_stage4(struct jesd204_dev *jdev,
 		struct jesd204_link *lnk)
 {
 	struct device *dev = jesd204_dev_to_device(jdev);
-	struct spi_device *spi = to_spi_device(dev);
-	struct adrv9009_rf_phy *phy = adrv9009_spi_to_phy(spi);
+	struct adrv9009_jesd204_priv *priv = jesd204_dev_priv(jdev);
+	struct adrv9009_rf_phy *phy = priv->phy;
 	int ret;
 
 	dev_dbg(dev, "%s:%d link_num %u\n", __func__, __LINE__, link_num);
@@ -5958,8 +5970,8 @@ static int adrv9009_jesd204_setup_stage5(struct jesd204_dev *jdev,
 		struct jesd204_link *lnk)
 {
 	struct device *dev = jesd204_dev_to_device(jdev);
-	struct spi_device *spi = to_spi_device(dev);
-	struct adrv9009_rf_phy *phy = adrv9009_spi_to_phy(spi);
+	struct adrv9009_jesd204_priv *priv = jesd204_dev_priv(jdev);
+	struct adrv9009_rf_phy *phy = priv->phy;
 	int ret;
 
 	dev_dbg(dev, "%s:%d link_num %u\n", __func__, __LINE__, link_num);
@@ -5985,7 +5997,9 @@ static const struct jesd204_dev_data jesd204_adrv9009_init = {
 			.per_link = adrv9009_jesd204_clks_disable,
 		},
 		[JESD204_OP_LINK_SETUP] = {
+			//.pre_transition = adrv9009_jesd204_link_pre_setup,
 			.per_link = adrv9009_jesd204_link_setup,
+			//.post_transition = adrv9009_jesd204_sysref,
 		},
 		[JESD204_OP_LINK_DISABLE] = {
 			.per_link = adrv9009_jesd204_link_disable,
@@ -6015,6 +6029,7 @@ static const struct jesd204_dev_data jesd204_adrv9009_init = {
 	},
 
 	.num_links = 3,
+	.sizeof_priv = sizeof(struct adrv9009_jesd204_priv),
 };
 
 static int adrv9009_probe(struct spi_device *spi)

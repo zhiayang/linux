@@ -247,7 +247,7 @@ static inline bool has_tx(struct adrv9009_rf_phy *phy)
 static inline bool has_tx_and_en(struct adrv9009_rf_phy *phy)
 {
 	return has_tx(phy) && (phy->talInit.tx.txChannels != TAL_TXOFF) &&
-		(!IS_ERR_OR_NULL(phy->jesd_tx_clk) || !phy->jdev);
+		(!IS_ERR_OR_NULL(phy->jesd_tx_clk) || phy->jdev);
 }
 
 static inline bool has_obs_and_en(struct adrv9009_rf_phy *phy)
