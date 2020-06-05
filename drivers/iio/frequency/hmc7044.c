@@ -1642,7 +1642,7 @@ static int hmc7044_probe(struct spi_device *spi)
 				"Failed to create debugfs entry");
 	}
 
-	return jesd204_start_fsm_from_probe(hmc->jdev);
+	return jesd204_fsm_start(hmc->jdev, JESD204_LINKS_ALL);
 
 }
 

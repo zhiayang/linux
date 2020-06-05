@@ -886,7 +886,7 @@ static int jesd204_fsm_probe_done(struct jesd204_dev *jdev,
 				      JESD204_STATE_LINK_INIT);
 }
 
-int jesd204_start_fsm_from_probe(struct jesd204_dev *jdev)
+int jesd204_fsm_start(struct jesd204_dev *jdev, unsigned int link_idx)
 {
 	int ret;
 
@@ -898,7 +898,7 @@ int jesd204_start_fsm_from_probe(struct jesd204_dev *jdev)
 
 	jdev->fsm_started = true;
 
-	ret = jesd204_fsm(jdev, JESD204_LINKS_ALL,
+	ret = jesd204_fsm(jdev, link_idx,
 			  JESD204_STATE_INITIALIZED, JESD204_STATE_PROBED,
 			  jesd204_fsm_probed_cb, NULL,
 			  jesd204_fsm_probe_done, true);
@@ -908,7 +908,7 @@ int jesd204_start_fsm_from_probe(struct jesd204_dev *jdev)
 
 	return ret;
 }
-EXPORT_SYMBOL_GPL(jesd204_start_fsm_from_probe);
+EXPORT_SYMBOL_GPL(jesd204_fsm_start);
 
 static int jesd204_fsm_table_entry_pre_hook(struct jesd204_dev *jdev,
 					    struct jesd204_fsm_table_entry_iter *it,
@@ -1008,8 +1008,8 @@ static int jesd204_fsm_table_entry_cb(struct jesd204_dev *jdev,
 
 	/* From here-on it's assumed that this is called for the top-level device */
 
-	link_idx = fsm_data->link_idx;
 	jdev_top = fsm_data->jdev_top;
+	link_idx = fsm_data->link_idx;
 
 	if (link_idx != JESD204_LINKS_ALL) {
 		ol = &jdev_top->active_links[link_idx];
@@ -1093,15 +1093,16 @@ static int jesd204_fsm_table(struct jesd204_dev *jdev,
 	return ret;
 }
 
-void jesd204_fsm_uninit_device(struct jesd204_dev *jdev)
+void jesd204_fsm_stop(struct jesd204_dev *jdev, unsigned int link_idx)
 {
 	if (!jdev->fsm_started)
 		return;
 
-	jesd204_fsm_table(jdev, JESD204_LINKS_ALL,
+	jesd204_fsm_table(jdev, link_idx,
 			  JESD204_STATE_DONT_CARE, jesd204_uninit_dev_states,
 			  false);
 }
+EXPORT_SYMBOL_GPL(jesd204_fsm_stop);
 
 int jesd204_fsm_link_change(struct jesd204_dev_top *jdev_top,
 			    unsigned int link_idx)

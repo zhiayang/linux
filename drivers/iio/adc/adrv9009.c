@@ -6305,7 +6305,7 @@ static int adrv9009_probe(struct spi_device *spi)
 
 	}
 
-	ret = jesd204_start_fsm_from_probe(phy->jdev);
+	ret = jesd204_fsm_start(phy->jdev, JESD204_LINKS_ALL);
 	if (ret)
 		goto out_remove_sysfs_bin;
 

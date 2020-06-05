@@ -1566,7 +1566,7 @@ static int ad9523_probe(struct spi_device *spi)
 	if (ret)
 		goto error_disable_reg;
 
-	ret = jesd204_start_fsm_from_probe(st->jdev);
+	ret = jesd204_fsm_start(st->jdev, JESD204_LINKS_ALL);
 	if (ret)
 		goto err_unreg_iio;
 

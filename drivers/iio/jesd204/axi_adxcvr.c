@@ -718,7 +718,7 @@ static int adxcvr_probe(struct platform_device *pdev)
 
 	device_create_file(st->dev, &dev_attr_reg_access);
 
-	ret = jesd204_start_fsm_from_probe(st->jdev);
+	ret = jesd204_fsm_start(st->jdev, JESD204_LINKS_ALL);
 	if (ret)
 		goto disable_unprepare;
 

@@ -63,6 +63,7 @@ struct jesd204_sysref {
  * @num_converters		number of converters per link (M)
  * @octets_per_frame		number of octets per frame (F)
  * @frames_per_multiframe	number of frames per frame (K)
+ * @num_of_multiblocks_in_emb	number of multiblocks in extended multiblock (E) (JESD204C)
  * @bits_per_sample		number of bits per sample (N')
  * @converter_resolution	converter resolution (N)
  * @jesd_version		JESD204 version (A, B or C) (JESDV)
@@ -187,7 +188,8 @@ struct jesd204_dev_data {
 struct jesd204_dev *devm_jesd204_dev_register(struct device *dev,
 					      const struct jesd204_dev_data *i);
 
-int jesd204_start_fsm_from_probe(struct jesd204_dev *jdev);
+int jesd204_fsm_start(struct jesd204_dev *jdev, unsigned int link_idx);
+void jesd204_fsm_stop(struct jesd204_dev *jdev, unsigned int link_idx);
 
 struct device *jesd204_dev_to_device(struct jesd204_dev *jdev);
 struct jesd204_dev *jesd204_dev_from_device(struct device *dev);
@@ -215,10 +217,14 @@ static inline struct jesd204_dev *devm_jesd204_dev_register(
 	return NULL;
 }
 
-static inline int jesd204_start_fsm_from_probe(struct jesd204_dev *jdev)
+static inline int jesd204_fsm_start(struct jesd204_dev *jdev,
+				    unsigned int link_idx)
 {
 	return 0;
 }
+
+static inline void jesd204_fsm_stop(struct jesd204_dev *jdev,
+				    unsigned int link_idx) {}
 
 static inline struct device *jesd204_dev_to_device(struct jesd204_dev *jdev)
 {

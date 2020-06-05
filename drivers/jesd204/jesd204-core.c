@@ -223,7 +223,7 @@ void *jesd204_dev_priv(struct jesd204_dev *jdev)
 {
 	return jdev->priv;
 }
-EXPORT_SYMBOL(jesd204_dev_priv);
+EXPORT_SYMBOL_GPL(jesd204_dev_priv);
 
 struct jesd204_dev *jesd204_dev_from_device(struct device *dev)
 {
@@ -239,13 +239,13 @@ struct jesd204_dev *jesd204_dev_from_device(struct device *dev)
 
 	return NULL;
 }
-EXPORT_SYMBOL(jesd204_dev_from_device);
+EXPORT_SYMBOL_GPL(jesd204_dev_from_device);
 
 struct device *jesd204_dev_to_device(struct jesd204_dev *jdev)
 {
 	return jdev ? jdev->dev.parent : NULL;
 }
-EXPORT_SYMBOL(jesd204_dev_to_device);
+EXPORT_SYMBOL_GPL(jesd204_dev_to_device);
 
 static int jesd204_dev_alloc_links(struct jesd204_dev_top *jdev_top)
 {
@@ -348,7 +348,7 @@ static struct jesd204_dev *jesd204_dev_alloc(struct device_node *np)
 err_free_id:
 	ida_simple_remove(&jesd204_ida, id);
 
-	return ERR_PTR(ret);	
+	return ERR_PTR(ret);
 }
 
 static struct jesd204_dev *jesd204_dev_find_by_of_node(struct device_node *np)
@@ -519,7 +519,6 @@ static int jesd204_dev_init_link_lane_ids(struct jesd204_dev_top *jdev_top,
 	struct device *dev = jdev->dev.parent;
 	u8 id;
 
-	jlink->num_lanes = 1;
 	if (!jlink->num_lanes) {
 		dev_err(dev, "JESD204 link [%d] number of lanes is 0\n",
 			link_idx);
@@ -708,9 +707,6 @@ static struct jesd204_dev *jesd204_dev_register(struct device *dev,
 	struct jesd204_dev *jdev;
 	int ret;
 
-	if (!dev_is_jesd204_dev(dev))
-		return NULL;
-
 	if (!dev || !init) {
 		dev_err(dev, "Invalid register arguments\n");
 		return ERR_PTR(-EINVAL);
@@ -738,8 +734,8 @@ static struct jesd204_dev *jesd204_dev_register(struct device *dev,
 		goto err_free_id;
 #endif
 
-	//jdev->state_ops = init->state_ops;
-	jdev->state_ops = test_state_ops;
+	jdev->state_ops = init->state_ops;
+	//jdev->state_ops = test_state_ops;
 
 	jdev->dev.parent = dev;
 	jdev->dev.groups = jdev->groups;
@@ -824,7 +820,7 @@ static void jesd204_dev_unregister(struct jesd204_dev *jdev)
 	if (jdev->dev.parent)
 		device_del(&jdev->dev);
 
-	jesd204_fsm_uninit_device(jdev);
+	jesd204_fsm_stop(jdev, JESD204_LINKS_ALL);
 
 	if (jdev->dev.parent) {
 //		jesd204_dev_destroy_sysfs(jdev);

@@ -838,7 +838,7 @@ static int axi_jesd204_tx_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, jesd);
 
-	ret = jesd204_start_fsm_from_probe(jesd->jdev);
+	ret = jesd204_fsm_start(jesd->jdev, JESD204_LINKS_ALL);
 	if (ret)
 		goto err_disable_device_clk;
 
