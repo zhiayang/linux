@@ -1693,11 +1693,11 @@ static struct adi_adrv9001_RadioCtrlInit adrv9001_radio_ctrl_init = {
 };
 
 struct adi_adrv9001_PlatformFiles adrv9002_platform_files = {
-	.armImageFile = { "Navassa_EvaluationFw_0.10.1.22.bin" },
+	.armImageFile = { "Navassa_EvaluationFw.bin" },
 	.streamImageFile = { },
-	.rxGainTableFile = { "RxGainTable_0.2.1.csv" },
-	.orxGainTableFile = { "ORxGainTable_0.2.2.csv" },
-	.txAttenTableFile = { "TxAttenTable_0.1.0.csv" }
+	.rxGainTableFile = { "RxGainTable.csv" },
+	.orxGainTableFile = { "ORxGainTable.csv" },
+	.txAttenTableFile = { "TxAttenTable.csv" }
 };
 
 struct adi_adrv9001_SpiSettings *adrv9002_spi_settings_get(void)
