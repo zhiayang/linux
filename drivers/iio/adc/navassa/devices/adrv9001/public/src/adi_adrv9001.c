@@ -282,84 +282,6 @@ int32_t adi_adrv9001_InitAnalog(adi_adrv9001_Device_t *device,
     ADI_API_RETURN(device);
 }
 
-int32_t adi_adrv9001_InitDigital(adi_adrv9001_Device_t *device, adi_adrv9001_Init_t *init)
-{
-    uint8_t clkSel = 0;
-
-    static const uint8_t HS_DIG_CLK_ENABLE       = 0x40;
-
-    ADI_API_ENTRY_PTR_EXPECT(device, init);
-
-    if (device->devStateInfo.devState != ADI_ADRV9001_STATE_ANA_INITIALIZED)
-    {
-        ADI_ERROR_REPORT(&device->common,
-                         ADI_COMMON_ERRSRC_API,
-                         ADI_COMMON_ERR_INV_PARAM,
-                         ADI_COMMON_ACT_ERR_CHECK_PARAM,
-                         device->devStateInfo.devState,
-                         "Invalid State.  Expecting Analog Initialized state\n");
-        ADI_ERROR_RETURN(device->common.error.newAction);
-    }
-
-    ADI_EXPECT(adi_adrv9001_arm_Disable, device);
-    ADI_EXPECT(adi_adrv9001_arm_AhbSpiBridge_Disable, device);
-
-    /* Clk1105 High Speed clock selection */
-    /* 0: High Speed digital clock Divided by 2 */
-    /* 1: High Speed digital clock */
-    if (init->clocks.clk1105Div ==  ADI_ADRV9001_INTERNAL_CLOCK_DIV_2)
-    {
-        clkSel = 0;
-    }
-    else if (init->clocks.clk1105Div ==  ADI_ADRV9001_INTERNAL_CLOCK_DIV_1)
-    {
-        clkSel = 1;
-    }
-    else
-    {
-        ADI_ERROR_REPORT(&device->common,
-                         ADI_COMMON_ERRSRC_API,
-                         ADI_COMMON_ERR_INV_PARAM,
-                         ADI_COMMON_ACT_ERR_CHECK_PARAM,
-                         init->clocks.clk1105Div,
-                         "Invalid init->clocks.clk1105Div. Valid range (/1 or /2)\n");
-        ADI_ERROR_RETURN(device->common.error.newAction);
-    }
-
-    ADRV9001_SPIWRITEBYTE(device, "HS_CLK_DIV", ADRV9001_ADDR_HS_CLK_DIV, clkSel);
-
-    /* ARM Clock Divider Selection: */
-    /*         core_bf.arm_clk_sel = 1      */
-    /* Else    core_bf.arm_clk_sel = 2      */
-    if (init->clocks.armClkDiv ==  ADI_ADRV9001_INTERNAL_CLOCK_DIV_4)
-    {
-        clkSel = 1;
-    }
-    else if (init->clocks.armClkDiv ==  ADI_ADRV9001_INTERNAL_CLOCK_DIV_6)
-    {
-        clkSel = 2;
-    }
-    else
-    {
-        ADI_ERROR_REPORT(&device->common,
-                         ADI_COMMON_ERRSRC_API,
-                         ADI_COMMON_ERR_INV_PARAM,
-                         ADI_COMMON_ACT_ERR_CHECK_PARAM,
-                         init->clocks.armClkDiv,
-                         "Invalid init->clocks.armClkDiv. Valid range (/4 or /6)\n");
-        ADI_ERROR_RETURN(device->common.error.newAction);
-    }
-    ADRV9001_SPIWRITEBYTE(device, "ARM_CLOCK_CTRL", ADRV9001_ADDR_ARM_CLOCK_CTRL, clkSel);
-
-    /* High speed clock enable */
-    clkSel = HS_DIG_CLK_ENABLE;
-    ADRV9001_SPIWRITEBYTE(device, "TOP_CLOCK_CTRL", ADRV9001_ADDR_TOP_CLOCK_CTRL, clkSel);
-
-    ADI_EXPECT(adi_adrv9001_arm_AhbSpiBridge_Enable, device);
-
-    ADI_API_RETURN(device);
-}
-
 int32_t adi_adrv9001_Shutdown(adi_adrv9001_Device_t *device)
 {
     ADI_NULL_DEVICE_PTR_RETURN(device);
@@ -439,10 +361,8 @@ int32_t adi_adrv9001_spi_Configure(adi_adrv9001_Device_t *device, adi_adrv9001_S
  * Commenting this code snippet and related variables/constants used in this function for now
 */
 
-#if ADI_ADRV9001_DEVICE_NOT_CONNECTED == 0
 #if ADI_ADRV9001_PRE_MCS_BROADCAST_DISABLE > 0
     ADI_MSG_EXPECT("SPI Verify failed", adi_adrv9001_spi_Verify, device) ;
-#endif
 #endif
 
     ADI_API_RETURN(device);
@@ -514,13 +434,14 @@ int32_t adi_adrv9001_spi_Inspect(adi_adrv9001_Device_t *device, adi_adrv9001_Spi
 int32_t adi_adrv9001_spi_Verify(adi_adrv9001_Device_t *device)
 {
     uint8_t spiReg = 0;
+
+    ADI_API_ENTRY_EXPECT(device);
+
     static const uint8_t SCRATCH_PAD_1 = 0xB6; /* DATA 10110110 */
     static const uint8_t SCRATCH_PAD_2 = 0x49; /* DATA 01001001 */
     static const uint8_t SCRATCH_PAD_3 = 0xA5; /* DATA 10100101 */
     static const uint8_t VENDOR_ID_0   = 0x56;
     static const uint8_t VENDOR_ID_1   = 0x04;
-
-    ADI_API_ENTRY_EXPECT(device);
 
     /* Check SPI read - VENDOR_ID_0 */
     ADRV9001_SPIREADBYTE(device, "VENDOR_ID_0", ADRV9001_ADDR_VENDOR_ID_0, &spiReg);
@@ -686,27 +607,17 @@ static uint32_t adi_adrv9001_Number_Extract(const char *src, uint8_t *location)
 int32_t adi_adrv9001_ApiVersion_Get(adi_adrv9001_Device_t *device, adi_common_ApiVersion_t *apiVersion)
 {
     char *version = ADI_ADRV9001_CURRENT_VERSION;
-#ifdef __KERNEL__
-    uint8_t location = 0;
-#endif
 
     ADI_API_ENTRY_PTR_EXPECT(device, apiVersion);
 
 #ifdef ADI_FILESYSTEM_AVAILABLE
-    sscanf(version, "%u.%u.%u.%u", &apiVersion->major, &apiVersion->minor, &apiVersion->patch, &apiVersion->build);
+    sscanf(version, "%u.%u.%u", &apiVersion->major, &apiVersion->minor, &apiVersion->patch);
 #else
-#ifndef __KERNEL__
     uint8_t location = 0;
-#endif
     apiVersion->major = adi_adrv9001_Number_Extract(version, &location);
     apiVersion->minor = adi_adrv9001_Number_Extract(version, &location);
     apiVersion->patch = adi_adrv9001_Number_Extract(version, &location);
-    apiVersion->build = adi_adrv9001_Number_Extract(version, &location);
 #endif // ADI_FILESYSTEM_AVAILABLE
-
-#ifndef INTERNAL_BUILD
-    apiVersion->build = 0;
-#endif // INTERNAL_BUILD
 
     ADI_API_RETURN(device);
 }
@@ -734,8 +645,8 @@ int32_t adi_adrv9001_Profiles_Verify(adi_adrv9001_Device_t *device, adi_adrv9001
     ADI_API_RETURN(device);
 }
 
-static int32_t __maybe_unused adrv9001_TemperatureGetValidate(adi_adrv9001_Device_t *device,
-							      int16_t *temperature_C)
+static int32_t adrv9001_TemperatureGetValidate(adi_adrv9001_Device_t *device,
+                                               int16_t *temperature_C)
 {
     ADI_NULL_PTR_RETURN(&device->common, temperature_C);
 
@@ -767,8 +678,9 @@ int32_t adi_adrv9001_Temperature_Get(adi_adrv9001_Device_t *device, int16_t *tem
                                         ADI_ADRV9001_READ_TEMP_SENSOR_INTERVAL_US);
 
     /* read the ARM memory to get temperature */
+    /* TODO: Enable auto increment if it works with non multiples of 4 */
     ADI_EXPECT(adi_adrv9001_arm_Memory_Read, device, ADRV9001_ADDR_ARM_MAILBOX_GET, armReadBack,
-        sizeof(armReadBack), 0)
+        sizeof(armReadBack), false)
 
     /* Reconstruct temperature */
     *temperature_C = (int16_t)(((int16_t)armReadBack[0] << 0) |

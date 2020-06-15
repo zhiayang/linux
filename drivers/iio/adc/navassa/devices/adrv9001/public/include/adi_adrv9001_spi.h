@@ -18,12 +18,8 @@
 #include "adi_adrv9001_spi_types.h"
 #include "adi_platform.h"
 
-#ifdef __KERNEL__
-#include <linux/types.h>
-#else
 #include <stdint.h>
 #include <stddef.h>
-#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -139,6 +135,8 @@ int32_t adi_adrv9001_spi_Field_Write(adi_adrv9001_Device_t *adrv9001, uint16_t a
 * \returns A code indicating success (ADI_COMMON_ACT_NO_ACTION) or the required action to recover
 */
 int32_t adi_adrv9001_spi_Field_Read(adi_adrv9001_Device_t *adrv9001, uint16_t addr, uint8_t *fieldVal, uint8_t mask, uint8_t startBit);
+    
+    int32_t adi_adrv9001_spi_Mask_Write(adi_adrv9001_Device_t *adrv9001, uint16_t addr, uint8_t data, uint8_t mask);
 
 /**
 * \brief writes an array of bytes of data to the part.

@@ -26,65 +26,8 @@
 /* ADI specific header files */
 #include "adi_adrv9001_error.h"
 #include "adi_adrv9001_gpio.h"
-#include "adrv9001_bf_nvs_regmap_core.h"
 #include "adrv9001_init.h"
 #include "adrv9001_reg_addr_macros.h"
-
-/* Header files related to libraries */
-
-
-/* System header files */
-
-
-
-/*
-*********************************************************************************************************
-*                                             LOCAL DEFINES
-*********************************************************************************************************
-*/
-
-
-
-/*********************************************************************************************************/
-int32_t adrv9001_RxBitfieldAddressGet(adi_adrv9001_Device_t *device,
-                                      adi_common_ChannelNumber_e channel,
-                                      adrv9001_BfNvsRegmapRxbChanAddr_e *rxChannelBitfieldAddr)
-{
-    /* Check device pointer is not null */
-    ADI_API_PRIV_ENTRY_PTR_EXPECT(device, rxChannelBitfieldAddr);
-
-    if ((device->devStateInfo.initializedChannels & (uint32_t)channel) == 0)
-    {
-        ADI_ERROR_REPORT(&device->common,
-            ADI_COMMON_ERRSRC_API,
-            ADI_COMMON_ERR_INV_PARAM,
-            ADI_COMMON_ACT_ERR_CHECK_PARAM,
-            channel,
-            "Channel not in device initializedChannels for adrv9001_RxBitfieldAddressGet() function");
-        ADI_ERROR_RETURN(device->common.error.newAction);
-    }
-
-    switch (channel)
-    {
-        case ADI_CHANNEL_1 :
-            *rxChannelBitfieldAddr = ADRV9001_BF_RXB1_CORE;
-            break;
-
-        case ADI_CHANNEL_2 :
-            *rxChannelBitfieldAddr = ADRV9001_BF_RXB2_CORE;
-            break;
-
-        default:
-        {
-            ADI_ERROR_REPORT(&device->common, ADI_COMMON_ERRSRC_API, ADI_COMMON_ERR_INV_PARAM, ADI_COMMON_ACT_ERR_CHECK_PARAM, rxChannel,
-                         "Invalid rxChannel parameter for adrv9001_RxBitfieldAddressGet() function");
-            ADI_ERROR_RETURN(device->common.error.newAction);
-            break;
-        }
-    }
-
-    ADI_API_RETURN(device);
-}
 
 int32_t adrv9001_RxGainTableFormat(adi_adrv9001_Device_t *device,
                                    adi_adrv9001_RxGainTableRow_t *gainTablePtr,

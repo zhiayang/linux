@@ -19,6 +19,10 @@
 
 #include "adi_common.h"
 
+#define ADI_ADRV9001_NUM_TXRX_CHANNELS         0x4
+#define ADI_ADRV9001_NUM_RX_CHANNELS           0x2
+#define ADI_ADRV9001_NUM_TX_CHANNELS           0x2
+
 #define ADI_ADRV9001_TX_PROFILE_VALID		  0x01
 #define ADI_ADRV9001_RX_PROFILE_VALID		  0x02
 #define ADI_ADRV9001_ORX_PROFILE_VALID		  0x04
@@ -32,12 +36,11 @@
 /* TODO: Determine a reasonable value */
 #define ADI_ADRV9001_READY_FOR_MCS_DELAY_US 100U
 
-#ifndef CLIENT_IGNORE
 /* TODO: Evaluate if this can be removed */
 /**
  * \brief Enum of all ADRV9001 channels
  */
-typedef enum adi_adrv9001_Channel
+typedef enum adi_adrv9001_MailboxChannel
 {
     ADI_ADRV9001_RX1  = 0x0001,
     ADI_ADRV9001_RX2  = 0x0002,
@@ -49,8 +52,7 @@ typedef enum adi_adrv9001_Channel
     ADI_ADRV9001_ILB2 = 0x0080,
     ADI_ADRV9001_ELB1 = 0x0100,
     ADI_ADRV9001_ELB2 = 0x0200
-} adi_adrv9001_Channel_e;
-#endif // !CLIENT_IGNORE
+} adi_adrv9001_MailboxChannel_e;
 
 /**
 * \brief Possible device clock divisor values
@@ -123,17 +125,6 @@ typedef enum adi_adrv9001_FirGain
     ADRV9001_FIR_GAIN_POS_24_DB   = 24,  /*!< FIR gain 24 */
     ADRV9001_FIR_GAIN_POS_26_DB   = 26   /*!< FIR gain 26 */
 } adi_adrv9001_FirGain_e;
-
-/**
- * \brief Available types of PLLs
- */
-typedef enum adi_adrv9001_PllType
-{
-    ADI_ADRV9001_PLL_TYPE_CLK,
-    ADI_ADRV9001_PLL_TYPE_RF1,
-    ADI_ADRV9001_PLL_TYPE_RF2,
-    ADI_ADRV9001_PLL_TYPE_AUX
-} adi_adrv9001_PllType_e;
 
 /*
 *********************************************************************************************************
@@ -216,6 +207,7 @@ typedef struct adi_adrv9001_Info
     uint32_t  pfirProfileAddr;                                          /*!< Address to load PFIR coefficients */
     uint32_t txInputRate_kHz[ADI_ADRV9001_MAX_TXCHANNELS];				/*!< Tx Input sample rate from currently loaded profile */
     uint32_t rxOutputRate_kHz[ADI_ADRV9001_MAX_RXCHANNELS];				/*!< Rx Output sample rate from currently loaded profile */
+    uint32_t rx1InterfaceSampleRate_kHz;                                /*!< Rx1 Interface sample rate from currently loaded profile */
     adi_adrv9001_GainIndex_t gainIndexes;								/*!< Current device Rx min max gain index values */
     uint16_t chunkStreamImageSize[12];									/*!< Stream Image Size */
     uint16_t chunkStreamImageOffset[12];								/*!< Stream Image Offset */

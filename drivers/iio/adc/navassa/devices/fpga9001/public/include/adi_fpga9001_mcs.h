@@ -26,7 +26,7 @@ extern "C" {
  * \brief Initiate a sequence of MCS pulses
  *
  * \param[in] fpga9001              Context variable - Pointer to FPGA9001 device data structure
- * \param[in] numberOfPulses        Number of pulses to generate (valid values: 1 - 15)
+ * \param[in] numberOfPulses        Number of pulses to generate (valid values: 1 - 16)
  * \param[in] mcsPeriod             Number of device clock cycles between consecutive MCS pulses
  * \param[in] mcsPulseWidth         Width of the pulse, denoted in number of device clock cycles
  * \param[in] edge                  The device clock edge to which to align the pulse

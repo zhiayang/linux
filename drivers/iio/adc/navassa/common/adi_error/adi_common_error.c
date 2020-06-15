@@ -125,7 +125,7 @@ int32_t adi_common_ErrorClear(adi_common_Device_t *commonDev)
 {
     /* Check device pointer is not null */
     ADI_NULL_DEVICE_PTR_RETURN(commonDev);
-
+    
     commonDev->error.errormessage[0] = '\0';
     commonDev->error.errSource = 0;
     commonDev->error.errCode = 0;

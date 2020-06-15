@@ -134,12 +134,12 @@ do \
  * \param maximum the maximum allowable value in the range
  **/
 #ifdef ADI_COMMON_VERBOSE
-#define ADI_RANGE_CHECK(devicePtr, value, minimum, maximum) \
+#define ADI_RANGE_CHECK_X(devicePtr, value, minimum, maximum, formatSpecifier) \
 if ((value < minimum) || (value > maximum)) \
 { \
     snprintf(devicePtr->common.error.errormessage, \
         sizeof(devicePtr->common.error.errormessage), \
-        "Invalid parameter value. %s was %d, but must be between %d and %d, inclusive.", \
+        "Invalid parameter value. %s was " #formatSpecifier ", but must be between " #formatSpecifier " and " #formatSpecifier ", inclusive.", \
         #value, \
         value, \
         minimum, \
@@ -153,6 +153,9 @@ if ((value < minimum) || (value > maximum)) \
         devicePtr->common.error.errormessage); \
     ADI_ERROR_RETURN(devicePtr->common.error.newAction); \
 }
+
+/* Legacy - no format specifier defaults to %d */
+#define ADI_RANGE_CHECK(devicePtr, value, minimum, maximum) ADI_RANGE_CHECK_X(devicePtr, value, minimum, maximum, "%d")
 #else
 #define ADI_RANGE_CHECK(devicePtr, value, minimum, maximum) \
 if ((value < minimum) || (value > maximum)) \

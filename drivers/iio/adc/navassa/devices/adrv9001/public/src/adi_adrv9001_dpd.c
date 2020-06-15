@@ -18,9 +18,9 @@
 #include "adi_adrv9001_arm.h"
 #include "adrv9001_arm_macros.h"
 
-static int32_t __maybe_unused adi_adrv9001_dpd_Initial_Configure_Validate(adi_adrv9001_Device_t *adrv9001,
-									  adi_common_ChannelNumber_e channel,
-									  adi_adrv9001_DpdInitCfg_t *dpdConfig)
+static int32_t adi_adrv9001_dpd_Initial_Configure_Validate(adi_adrv9001_Device_t *adrv9001,
+                                                           adi_common_ChannelNumber_e channel,
+                                                           adi_adrv9001_DpdInitCfg_t *dpdConfig)
 {
     adi_adrv9001_RadioState_t state = { 0 };
     uint8_t port_index = 0;
@@ -107,9 +107,9 @@ int32_t adi_adrv9001_dpd_Initial_Configure(adi_adrv9001_Device_t *adrv9001,
     ADI_API_RETURN(adrv9001);
 }
 
-static int32_t __maybe_unused adi_adrv9001_dpd_Initial_Inspect_Validate(adi_adrv9001_Device_t *adrv9001,
-									adi_common_ChannelNumber_e channel,
-									adi_adrv9001_DpdInitCfg_t *dpdConfig)
+static int32_t adi_adrv9001_dpd_Initial_Inspect_Validate(adi_adrv9001_Device_t *adrv9001,
+                                                         adi_common_ChannelNumber_e channel,
+                                                         adi_adrv9001_DpdInitCfg_t *dpdConfig)
 {
     ADI_RANGE_CHECK(adrv9001, channel, ADI_CHANNEL_1, ADI_CHANNEL_2);
     ADI_NULL_PTR_RETURN(&adrv9001->common, dpdConfig);
@@ -147,7 +147,7 @@ int32_t adi_adrv9001_dpd_Initial_Inspect(adi_adrv9001_Device_t *adrv9001,
                                         ADI_ADRV9001_DEFAULT_INTERVAL_US);
 
     /* Read and parse the data */
-    ADI_EXPECT(adi_adrv9001_arm_Memory_Read, adrv9001, ADRV9001_ADDR_ARM_MAILBOX_GET, armData, sizeof(armData), ADRV9001_ARM_MEM_READ_AUTOINCR);
+    ADI_EXPECT(adi_adrv9001_arm_Memory_Read, adrv9001, ADRV9001_ADDR_ARM_MAILBOX_GET, armData, sizeof(armData), false);
     dpdConfig->enable = (bool)armData[offset++];
     dpdConfig->amplifierType = armData[offset++];
     dpdConfig->lutSize = armData[offset++];
@@ -162,9 +162,9 @@ int32_t adi_adrv9001_dpd_Initial_Inspect(adi_adrv9001_Device_t *adrv9001,
     ADI_API_RETURN(adrv9001);
 }
 
-static int32_t __maybe_unused adi_adrv9001_dpd_Configure_Validate(adi_adrv9001_Device_t *adrv9001,
-								  adi_common_ChannelNumber_e channel,
-								  adi_adrv9001_DpdCfg_t *dpdConfig)
+static int32_t adi_adrv9001_dpd_Configure_Validate(adi_adrv9001_Device_t *adrv9001,
+                                                   adi_common_ChannelNumber_e channel,
+                                                   adi_adrv9001_DpdCfg_t *dpdConfig)
 {
     static const uint32_t DPD_MAX_SAMPLES = 4096;
     static const uint32_t MAX_RX_TX_NORMALIZATION_THRESHOLD_U2D30 = 1 << 30;    // 1.0 in U2.30
@@ -241,9 +241,9 @@ int32_t adi_adrv9001_dpd_Configure(adi_adrv9001_Device_t *adrv9001,
     ADI_API_RETURN(adrv9001);
 }
 
-static int32_t __maybe_unused adi_adrv9001_dpd_Inspect_Validate(adi_adrv9001_Device_t *adrv9001,
-								adi_common_ChannelNumber_e channel,
-								adi_adrv9001_DpdCfg_t *dpdConfig)
+static int32_t adi_adrv9001_dpd_Inspect_Validate(adi_adrv9001_Device_t *adrv9001,
+                                                 adi_common_ChannelNumber_e channel,
+                                                 adi_adrv9001_DpdCfg_t *dpdConfig)
 {
     ADI_RANGE_CHECK(adrv9001, channel, ADI_CHANNEL_1, ADI_CHANNEL_2);
     ADI_NULL_PTR_RETURN(&adrv9001->common, dpdConfig);
@@ -281,7 +281,7 @@ int32_t adi_adrv9001_dpd_Inspect(adi_adrv9001_Device_t *adrv9001,
                                         ADI_ADRV9001_DEFAULT_INTERVAL_US);
 
     /* Read and parse the data */
-    ADI_EXPECT(adi_adrv9001_arm_Memory_Read, adrv9001, ADRV9001_ADDR_ARM_MAILBOX_GET, armData, sizeof(armData), ADRV9001_ARM_MEM_READ_AUTOINCR);
+    ADI_EXPECT(adi_adrv9001_arm_Memory_Read, adrv9001, ADRV9001_ADDR_ARM_MAILBOX_GET, armData, sizeof(armData), false);
     adrv9001_ParseFourBytes(&offset, armData, &dpdConfig->numberOfSamples);
 
     //adrv9001_ParseTwoBytes(&offset, armData, (uint16_t *)&dpdConfig->additionalDelayOffset);

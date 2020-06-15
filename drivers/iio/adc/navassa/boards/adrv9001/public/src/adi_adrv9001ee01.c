@@ -19,6 +19,7 @@
 
 #include "adrv9001ee01.h"
 
+#include "adi_fpga9001.h"
 #include "adi_fpga9001_ssi.h"
 #include "adi_fpga9001_mmcm.h"
 
@@ -99,6 +100,7 @@ int32_t adi_adrv9001Ee01_Create(adi_adrv9001Ee01_Board_t *adrv9001Ee01)
         printf("Board HwOpen failed. %s \n", adrv9001Ee01->fpga9001Device->common.error.errormessage);
         return recoveryAction;
     }
+    adi_fpga9001_SwitchBin(adrv9001Ee01->fpga9001Device, ADI_FPGA9001_CMOS);
 
     recoveryAction = adi_adrv9001_HwOpen(adrv9001Ee01->adrv9001Device, &spiSettings);
     if (recoveryAction != (int32_t)ADI_HAL_OK)
@@ -204,7 +206,6 @@ int32_t adi_adrv9001Ee01_Initialize(adi_adrv9001Ee01_Board_t *adrv9001Ee01,
     uint32_t i = 0;
     uint32_t txChannels[] = { ADI_ADRV9001_TX1, ADI_ADRV9001_TX2 };
     static const adi_common_ChannelNumber_e channels[] = { ADI_CHANNEL_1, ADI_CHANNEL_2 };
-    static const uint16_t DEFAULT_ATTENUATION_MDB = 10000;
 
     static const uint8_t ALL_RX_CHANNEL_MASK = ADI_ADRV9001_RX1 | ADI_ADRV9001_RX2 | ADI_ADRV9001_ORX1 | ADI_ADRV9001_ORX2;
 
@@ -236,11 +237,6 @@ int32_t adi_adrv9001Ee01_Initialize(adi_adrv9001Ee01_Board_t *adrv9001Ee01,
                adrv9001Init,
                radioCtrlInit->adrv9001DeviceClockOutputDivisor);
 
-#ifdef SI_REV_A0
-    ADI_EXPECT(adi_adrv9001_InitDigital, adrv9001Device, adrv9001Init);
-
-    ADI_EXPECT(adi_adrv9001_Mcs_DigitalInt_Set, adrv9001Device, 2);
-#endif
     ADI_EXPECT(adi_adrv9001_Utilities_Resources_Load, adrv9001Device, &adrv9001ResourceCfg);
 
     ADI_EXPECT(adi_fpga9001_Initialize, fpga9001Device, adrv9001Init, adrv9001DeviceClockOutDivisor);
@@ -256,12 +252,10 @@ int32_t adi_adrv9001Ee01_Initialize(adi_adrv9001Ee01_Board_t *adrv9001Ee01,
             /* For each tx channel enabled */
             if (ADRV9001_BF_EQUAL(adrv9001Init->tx.txInitChannelMask, txChannels[i]))
             {
-                ADI_EXPECT(adi_adrv9001_Tx_Attenuation_Configure,
+                ADI_EXPECT(adi_adrv9001_Tx_OutputPowerBoost_Set,
                            adrv9001Device,
                            channels[i],
-                           &radioCtrlInit->txAttenConfig);
-
-                ADI_EXPECT(adi_adrv9001_Tx_Attenuation_Set, adrv9001Device, channels[i], DEFAULT_ATTENUATION_MDB);
+                           radioCtrlInit->txOutputPowerBoostEnable[i]);
             }
         }
     }

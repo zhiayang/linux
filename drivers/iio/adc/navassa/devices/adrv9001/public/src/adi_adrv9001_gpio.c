@@ -32,12 +32,8 @@
 #include "adrv9001_arm.h"
 #include "adrv9001_arm_macros.h"
 #include "adrv9001_gpio.h"
-#include "adrv9001_radioctrl.h"
 #include "adrv9001_reg_addr_macros.h"
-#include "adrv9001_bf_analog_tx_mem_map.h"
-#include "adrv9001_bf_nvs_regmap_tx.h"
-#include "adrv9001_bf_nvs_regmap_core.h"
-#include "adrv9001_bf_nvs_regmap_core_2.h"
+#include "adrv9001_bf.h"
 
 /* Header files related to libraries */
 
@@ -53,22 +49,22 @@ int32_t adi_adrv9001_gpio_GpIntHandler(adi_adrv9001_Device_t *device, adi_adrv90
     ADI_API_ENTRY_PTR_EXPECT(device, gpIntStatus);
 
     /* retrieve the general purpose interrupt bitfield value */
-    recoveryAction = adrv9001_GpInterruptsMaskPinBfGet(device, ADRV9001_BF_CORE_1, &gpIntStatus->gpIntSaveIrqMask);
+    recoveryAction = adrv9001_GpInterruptsMaskPinBfGet(device, &gpIntStatus->gpIntSaveIrqMask);
     ADI_ERROR_REPORT(&device->common, ADI_COMMON_ERRSRC_API, device->common.error.errCode, recoveryAction, NULL, device->common.error.errormessage);
     ADI_ERROR_RETURN(device->common.error.newAction);
 
     /* mask all general purpose interrupt IRQs */
-    recoveryAction = adrv9001_GpInterruptsMaskPinBfSet(device, ADRV9001_BF_CORE_1, GPINT_MASK_ALL_INTERRUPTS);
+    recoveryAction = adrv9001_GpInterruptsMaskPinBfSet(device, GPINT_MASK_ALL_INTERRUPTS);
     ADI_ERROR_REPORT(&device->common, ADI_COMMON_ERRSRC_API, device->common.error.errCode, recoveryAction, NULL, device->common.error.errormessage);
     ADI_ERROR_RETURN(device->common.error.newAction);
 
     /* retrieve general purpose interrupt status word */
-    recoveryAction = adrv9001_GpInterruptsStatusWordBfGet(device, ADRV9001_BF_CORE_1, &gpIntStatus->gpIntStatus);
+    recoveryAction = adrv9001_GpInterruptsStatusWordBfGet(device, &gpIntStatus->gpIntStatus);
     ADI_ERROR_REPORT(&device->common, ADI_COMMON_ERRSRC_API, device->common.error.errCode, recoveryAction, NULL, device->common.error.errormessage);
     ADI_ERROR_RETURN(device->common.error.newAction);
 
     /* retrieve the general purpose interrupt IRQ mask */
-    recoveryAction = adrv9001_GpInterruptsMaskPinBfGet(device, ADRV9001_BF_CORE_1, &gpIntStatus->gpIntMask);
+    recoveryAction = adrv9001_GpInterruptsMaskPinBfGet(device, &gpIntStatus->gpIntMask);
     ADI_ERROR_REPORT(&device->common, ADI_COMMON_ERRSRC_API, device->common.error.errCode, recoveryAction, NULL, device->common.error.errormessage);
     ADI_ERROR_RETURN(device->common.error.newAction);
 
@@ -82,7 +78,7 @@ int32_t adi_adrv9001_gpio_GpIntHandler(adi_adrv9001_Device_t *device, adi_adrv90
 
     /* Reload the stored gpInt IRQ mask to its original value when this API was entered */
     /* mask all general purpose interrupt IRQs */
-    recoveryAction = adrv9001_GpInterruptsMaskPinBfSet(device, ADRV9001_BF_CORE_1, gpIntStatus->gpIntSaveIrqMask);
+    recoveryAction = adrv9001_GpInterruptsMaskPinBfSet(device, gpIntStatus->gpIntSaveIrqMask);
     ADI_ERROR_REPORT(&device->common, ADI_COMMON_ERRSRC_API, device->common.error.errCode, recoveryAction, NULL, device->common.error.errormessage);
     ADI_ERROR_RETURN(device->common.error.newAction);
 
@@ -111,14 +107,14 @@ int32_t adi_adrv9001_gpio_GpIntMask_Set(adi_adrv9001_Device_t *device, adi_adrv9
     }
 
     /* retrieve the general purpose interrupt Pin IRQ mask */
-    recoveryAction = adrv9001_GpInterruptsMaskPinBfSet(device, ADRV9001_BF_CORE_1, maskArray->gpIntMask);
+    recoveryAction = adrv9001_GpInterruptsMaskPinBfSet(device, maskArray->gpIntMask);
 
     ADI_ERROR_REPORT(&device->common,
                      ADI_COMMON_ERRSRC_API,
                      device->common.error.errCode,
                      recoveryAction,
                      maskArray,
-                    "Error while trying to set adrv9001_GpInterruptsMaskPinBfSet");
+                    "Error while trying to set adrv9001_GpInterruptsMaskPin_Set");
 
     ADI_ERROR_RETURN(device->common.error.newAction);
 
@@ -145,14 +141,14 @@ int32_t adi_adrv9001_gpio_GpIntMask_Get(adi_adrv9001_Device_t *device, adi_adrv9
     }
 
     /* retrieve the general purpose interrupt Pin IRQ mask */
-    recoveryAction = adrv9001_GpInterruptsMaskPinBfGet(device, ADRV9001_BF_CORE_1, &maskArray->gpIntMask);
+    recoveryAction = adrv9001_GpInterruptsMaskPinBfGet(device, &maskArray->gpIntMask);
 
     ADI_ERROR_REPORT(&device->common,
                      ADI_COMMON_ERRSRC_API,
                      device->common.error.errCode,
                      recoveryAction,
                      maskArray,
-                     "Error while trying to get adrv9001_GpInterruptsMaskPinBfGet");
+                     "Error while trying to get adrv9001_GpInterruptsMaskPin_Get");
 
     ADI_ERROR_RETURN(device->common.error.newAction);
 
@@ -166,7 +162,7 @@ int32_t adi_adrv9001_gpio_GpIntStatus_Get(adi_adrv9001_Device_t *device, uint32_
     ADI_API_ENTRY_PTR_EXPECT(device, gpIntStatus);
 
     /* retrieve the general purpose interrupt Pin IRQ mask */
-    recoveryAction = adrv9001_GpInterruptsStatusWordBfGet(device, ADRV9001_BF_CORE_1, gpIntStatus);
+    recoveryAction = adrv9001_GpInterruptsStatusWordBfGet(device, gpIntStatus);
 
     ADI_ERROR_REPORT(&device->common,
                      ADI_COMMON_ERRSRC_API,
@@ -191,7 +187,7 @@ int32_t adi_adrv9001_gpio_OutputPinLevel_Set(adi_adrv9001_Device_t *device,
 
     if (ADI_ADRV9001_GPIO_DIGITAL_00 <= pin && pin <= ADI_ADRV9001_GPIO_DIGITAL_15)
     {
-        ADI_EXPECT(adrv9001_NvsRegmapCoreNvsGpioSpiSourceBfGet, device, ADRV9001_BF_CORE, &gpioLevels);
+        ADI_EXPECT(adrv9001_NvsRegmapCore_NvsGpioSpiSource_Get, device, &gpioLevels);
 
         if (level == ADI_ADRV9001_GPIO_PIN_LEVEL_LOW)
         {
@@ -206,11 +202,11 @@ int32_t adi_adrv9001_gpio_OutputPinLevel_Set(adi_adrv9001_Device_t *device,
             ADI_SHOULD_NOT_EXECUTE(device);
         }
 
-        ADI_EXPECT(adrv9001_NvsRegmapCoreNvsGpioSpiSourceBfSet, device, ADRV9001_BF_CORE, gpioLevels);
+        ADI_EXPECT(adrv9001_NvsRegmapCore_NvsGpioSpiSource_Set, device, gpioLevels);
     }
     else if (ADI_ADRV9001_GPIO_ANALOG_00 <= pin && pin <= ADI_ADRV9001_GPIO_ANALOG_11)
     {
-        ADI_EXPECT(adrv9001_NvsRegmapCore1NvsGpioAnalogSpiSourceBfGet, device, ADRV9001_BF_CORE_1, &gpioLevels);
+        ADI_EXPECT(adrv9001_NvsRegmapCore1_NvsGpioAnalogSpiSource_Get, device, &gpioLevels);
 
         if (level == ADI_ADRV9001_GPIO_PIN_LEVEL_LOW)
         {
@@ -225,7 +221,7 @@ int32_t adi_adrv9001_gpio_OutputPinLevel_Set(adi_adrv9001_Device_t *device,
             ADI_SHOULD_NOT_EXECUTE(device);
         }
 
-        ADI_EXPECT(adrv9001_NvsRegmapCore1NvsGpioAnalogSpiSourceBfSet, device, ADRV9001_BF_CORE_1, gpioLevels);
+        ADI_EXPECT(adrv9001_NvsRegmapCore1_NvsGpioAnalogSpiSource_Set, device, gpioLevels);
     }
     else
     {
@@ -247,13 +243,13 @@ int32_t adi_adrv9001_gpio_OutputPinLevel_Get(adi_adrv9001_Device_t *device,
 
     if (ADI_ADRV9001_GPIO_DIGITAL_00 <= pin && pin <= ADI_ADRV9001_GPIO_DIGITAL_15)
     {
-        ADI_EXPECT(adrv9001_NvsRegmapCoreNvsGpioSpiSourceBfGet, device, ADRV9001_BF_CORE, &pinLevels);
+        ADI_EXPECT(adrv9001_NvsRegmapCore_NvsGpioSpiSource_Get, device, &pinLevels);
         pinLevelBitfield = pinLevels & (1 << (pin - 1));
         *gpioOutPinLevel = pinLevelBitfield >> (pin - 1);
     }
     else if (ADI_ADRV9001_GPIO_ANALOG_00 <= pin && pin <= ADI_ADRV9001_GPIO_ANALOG_11)
     {
-        ADI_EXPECT(adrv9001_NvsRegmapCore1NvsGpioAnalogSpiSourceBfGet, device, ADRV9001_BF_CORE_1, &pinLevels);
+        ADI_EXPECT(adrv9001_NvsRegmapCore1_NvsGpioAnalogSpiSource_Get, device, &pinLevels);
         pinLevelBitfield = pinLevels & (1 << (pin - ADI_ADRV9001_GPIO_ANALOG_00));
         *gpioOutPinLevel = pinLevelBitfield >> (pin - ADI_ADRV9001_GPIO_ANALOG_00);
     }
@@ -277,12 +273,12 @@ int32_t adi_adrv9001_gpio_InputPinLevel_Get(adi_adrv9001_Device_t *device,
 
     if (ADI_ADRV9001_GPIO_DIGITAL_00 <= pin && pin <= ADI_ADRV9001_GPIO_DIGITAL_15)
     {
-        ADI_EXPECT(adrv9001_NvsRegmapCoreNvsGpioSpiReadBfGet, device, ADRV9001_BF_CORE, &pinLevels);
+        ADI_EXPECT(adrv9001_NvsRegmapCore_NvsGpioSpiRead_Get, device, &pinLevels);
         *gpioInPinLevel = (pinLevels & (1 << (pin - 1))) >> (pin - 1);
     }
     else if (ADI_ADRV9001_GPIO_ANALOG_00 <= pin && pin <= ADI_ADRV9001_GPIO_ANALOG_11)
     {
-        ADI_EXPECT(adrv9001_NvsRegmapCore1NvsGpioAnalogSpiReadBfGet, device, ADRV9001_BF_CORE_1, &pinLevels);
+        ADI_EXPECT(adrv9001_NvsRegmapCore1_NvsGpioAnalogSpiRead_Get, device, &pinLevels);
         *gpioInPinLevel = (pinLevels & (1 << (pin - ADI_ADRV9001_GPIO_ANALOG_00))) >> (pin - ADI_ADRV9001_GPIO_ANALOG_00);
     }
     else
@@ -293,8 +289,8 @@ int32_t adi_adrv9001_gpio_InputPinLevel_Get(adi_adrv9001_Device_t *device,
     ADI_API_RETURN(device);
 }
 
-static int32_t __maybe_unused adi_adrv9001_gpio_ManualInput_Configure_Validate(adi_adrv9001_Device_t *device,
-									       adi_adrv9001_GpioPin_e pin)
+static int32_t adi_adrv9001_gpio_ManualInput_Configure_Validate(adi_adrv9001_Device_t *device,
+                                                                adi_adrv9001_GpioPin_e pin)
 {
     ADI_RANGE_CHECK(device, pin, ADI_ADRV9001_GPIO_DIGITAL_00, ADI_ADRV9001_GPIO_DIGITAL_15);
     ADI_API_RETURN(device);
@@ -306,15 +302,15 @@ int32_t adi_adrv9001_gpio_ManualInput_Configure(adi_adrv9001_Device_t *device, a
 
     ADI_PERFORM_VALIDATION(adi_adrv9001_gpio_ManualInput_Configure_Validate, device, pin);
 
-    ADI_EXPECT(adrv9001_NvsRegmapCoreNvsGpioDirectionControlOeBfGet, device, ADRV9001_BF_CORE, &gpioOutEn);
+    ADI_EXPECT(adrv9001_NvsRegmapCore_NvsGpioDirectionControlOe_Get, device, &gpioOutEn);
     gpioOutEn &= ~(1 << (pin - 1));
-    ADI_EXPECT(adrv9001_NvsRegmapCoreNvsGpioDirectionControlOeBfSet, device, ADRV9001_BF_CORE, gpioOutEn);
+    ADI_EXPECT(adrv9001_NvsRegmapCore_NvsGpioDirectionControlOe_Set, device, gpioOutEn);
 
     ADI_API_RETURN(device);
 }
 
-static int32_t __maybe_unused adi_adrv9001_gpio_ManualOutput_Configure_Validate(adi_adrv9001_Device_t *device,
-										adi_adrv9001_GpioPinCrumbSel_e crumb)
+static int32_t adi_adrv9001_gpio_ManualOutput_Configure_Validate(adi_adrv9001_Device_t *device,
+                                                                 adi_adrv9001_GpioPinCrumbSel_e crumb)
 {
     ADI_RANGE_CHECK(device, crumb, ADI_ADRV9001_GPIO_PIN_CRUMB_01_00, ADI_ADRV9001_GPIO_PIN_CRUMB_15_14);
     ADI_API_RETURN(device);
@@ -329,9 +325,9 @@ int32_t adi_adrv9001_gpio_ManualOutput_Configure(adi_adrv9001_Device_t *device, 
     ADI_PERFORM_VALIDATION(adi_adrv9001_gpio_ManualOutput_Configure_Validate, device, crumb);
 
     /* Configure pins as outputs */
-    ADI_EXPECT(adrv9001_NvsRegmapCoreNvsGpioDirectionControlOeBfGet, device, ADRV9001_BF_CORE, &gpioOutEn);
+    ADI_EXPECT(adrv9001_NvsRegmapCore_NvsGpioDirectionControlOe_Get, device, &gpioOutEn);
     gpioOutEn |= (1 << (crumb * 2 - 1)) | (1 << (crumb * 2 - 2));
-    ADI_EXPECT(adrv9001_NvsRegmapCoreNvsGpioDirectionControlOeBfSet, device, ADRV9001_BF_CORE, gpioOutEn);
+    ADI_EXPECT(adrv9001_NvsRegmapCore_NvsGpioDirectionControlOe_Set, device, gpioOutEn);
 
     /* Configure source */
     ADRV9001_SPIWRITEBYTE(device, "GPIO_SOURCE_SEL", (GPIO_SOURCE_SEL_ADDR + crumb - 1), crumb + CRUMB_SOURCE_OFFSET);
@@ -339,8 +335,8 @@ int32_t adi_adrv9001_gpio_ManualOutput_Configure(adi_adrv9001_Device_t *device, 
     ADI_API_RETURN(device);
 }
 
-static int32_t __maybe_unused adi_adrv9001_gpio_ManualAnalogInput_Configure_Validate(adi_adrv9001_Device_t *device,
-										     adi_adrv9001_GpioPin_e pin)
+static int32_t adi_adrv9001_gpio_ManualAnalogInput_Configure_Validate(adi_adrv9001_Device_t *device,
+                                                                      adi_adrv9001_GpioPin_e pin)
 {
     ADI_RANGE_CHECK(device, pin, ADI_ADRV9001_GPIO_ANALOG_00, ADI_ADRV9001_GPIO_ANALOG_11);
     ADI_API_RETURN(device);
@@ -353,11 +349,11 @@ int32_t adi_adrv9001_gpio_ManualAnalogInput_Configure(adi_adrv9001_Device_t *dev
 
     ADI_PERFORM_VALIDATION(adi_adrv9001_gpio_ManualAnalogInput_Configure_Validate, device, pin);
 
-    ADI_EXPECT(adrv9001_NvsRegmapCore1NvsGpioAnalogDirectionControlOeBfGet, device, ADRV9001_BF_CORE_1, &gpioOutEn);
+    ADI_EXPECT(adrv9001_NvsRegmapCore1_NvsGpioAnalogDirectionControlOe_Get, device, &gpioOutEn);
 
     gpioOutEn &= ~(1 << (pin - ADI_ADRV9001_GPIO_ANALOG_00));
 
-    ADI_EXPECT(adrv9001_NvsRegmapCore1NvsGpioAnalogDirectionControlOeBfSet, device, ADRV9001_BF_CORE_1, gpioOutEn);
+    ADI_EXPECT(adrv9001_NvsRegmapCore1_NvsGpioAnalogDirectionControlOe_Set, device, gpioOutEn);
 
     ADI_API_RETURN(device);
 }
@@ -371,9 +367,9 @@ int32_t adi_adrv9001_gpio_ManualAnalogOutput_Configure(adi_adrv9001_Device_t *de
     ADI_API_ENTRY_EXPECT(device);
 
     /* Configure pins as outputs */
-    ADI_EXPECT(adrv9001_NvsRegmapCore1NvsGpioAnalogDirectionControlOeBfGet, device, ADRV9001_BF_CORE_1, &gpioOutEn);
+    ADI_EXPECT(adrv9001_NvsRegmapCore1_NvsGpioAnalogDirectionControlOe_Get, device, &gpioOutEn);
     gpioOutEn |= (1 << (nibble * 4 - 1)) | (1 << (nibble * 4 - 2)) | (1 << (nibble * 4 - 3)) | (1 << (nibble * 4 - 4));
-    ADI_EXPECT(adrv9001_NvsRegmapCore1NvsGpioAnalogDirectionControlOeBfSet, device, ADRV9001_BF_CORE_1, gpioOutEn);
+    ADI_EXPECT(adrv9001_NvsRegmapCore1_NvsGpioAnalogDirectionControlOe_Set, device, gpioOutEn);
 
     /* Configure source */
     ADRV9001_SPIWRITEBYTE(device, "ANALOG_GPIO_SOURCE_SEL", (ANALOG_GPIO_SOURCE_SEL_ADDR + nibble - 1), nibble);
@@ -454,9 +450,9 @@ int32_t adi_adrv9001_gpio_ControlInit_Configure(adi_adrv9001_Device_t *adrv9001,
     ADI_API_RETURN(adrv9001);
 }
 
-static int32_t __maybe_unused adi_adrv9001_gpio_Configure_Validate(adi_adrv9001_Device_t *device,
-								   adi_adrv9001_GpioSignal_e signal,
-								   adi_adrv9001_GpioCfg_t *gpioConfig)
+static int32_t adi_adrv9001_gpio_Configure_Validate(adi_adrv9001_Device_t *device,
+                                                    adi_adrv9001_GpioSignal_e signal,
+                                                    adi_adrv9001_GpioCfg_t *gpioConfig)
 {
     /* Check device pointer is not null */
     ADI_API_PRIV_ENTRY_PTR_EXPECT(device, gpioConfig);
@@ -533,7 +529,7 @@ int32_t adi_adrv9001_gpio_Configure(adi_adrv9001_Device_t *device,
     ADI_ERROR_RETURN(device->common.error.newAction);
 
     /* Wait for command to finish executing */
-    recoveryAction = adi_adrv9001_arm_CmdStatus_Wait(device,
+    recoveryAction = adi_adrv9001_arm_CmdStatus_Wait(device, 
                                                      ADRV9001_ARM_SET_OPCODE,
                                                      &cmdStatusByte,
                                                      ADI_ADRV9001_SETARMGPIO_TIMEOUT_US,
@@ -553,9 +549,9 @@ int32_t adi_adrv9001_gpio_Configure(adi_adrv9001_Device_t *device,
     ADI_API_RETURN(device);
 }
 
-static int32_t __maybe_unused adi_adrv9001_gpio_Inspect_Validate(adi_adrv9001_Device_t *device,
-								 adi_adrv9001_GpioSignal_e gpioSignalSel,
-								 adi_adrv9001_GpioCfg_t *gpioConfig)
+static int32_t adi_adrv9001_gpio_Inspect_Validate(adi_adrv9001_Device_t *device,
+                                                  adi_adrv9001_GpioSignal_e gpioSignalSel,
+                                                  adi_adrv9001_GpioCfg_t *gpioConfig)
 {
     ADI_RANGE_CHECK(device, gpioSignalSel, 0x00, ADI_ADRV9001_GPIO_NUM_SIGNALS - 1);
     ADI_NULL_PTR_RETURN(&device->common, gpioConfig);
@@ -597,7 +593,7 @@ int32_t adi_adrv9001_gpio_Inspect(adi_adrv9001_Device_t *device,
                (uint32_t)ADRV9001_ADDR_ARM_MAILBOX_GET,
                &armData[0],
                sizeof(armData),
-               ADRV9001_ARM_MEM_READ_AUTOINCR);
+               false);
 
     /* Return the GPIO data read back from ARM mailbox */
     gpioConfig->pin = adrv9001_gpio_MailboxToPin_Convert(armData[0]);

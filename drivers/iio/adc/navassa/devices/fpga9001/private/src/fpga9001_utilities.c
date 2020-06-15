@@ -12,6 +12,7 @@
 */
 
 #include "fpga9001_utilities.h"
+#include "adi_fpga9001_datachain.h"
 
 int32_t fpga9001_Utilities_CalculateLcm(adi_fpga9001_Device_t *fpga9001,
                                         uint32_t number1,
@@ -68,3 +69,90 @@ int32_t fpga9001_Utilities_CalculateLcm(adi_fpga9001_Device_t *fpga9001,
     *lcm = num1 * num2;
     ADI_API_RETURN(fpga9001);
 }
+
+uint32_t fpga9001_SsiIdGet(adi_fpga9001_Device_t *device,
+                           adi_common_Port_e port,
+                           adi_common_ChannelNumber_e channel)
+{
+    char error_message[1024];
+
+    if ((port == ADI_RX)  && (channel == ADI_CHANNEL_1)) return(AXI_ADRV9001_SSI_RX0_ID);
+    if ((port == ADI_RX)  && (channel == ADI_CHANNEL_2)) return(AXI_ADRV9001_SSI_RX1_ID);
+    if ((port == ADI_TX)  && (channel == ADI_CHANNEL_1)) return(AXI_ADRV9001_SSI_TX0_ID);
+    if ((port == ADI_TX)  && (channel == ADI_CHANNEL_2)) return(AXI_ADRV9001_SSI_TX1_ID);
+
+    sprintf(error_message, "Invalid port (%d) or channel (%d) parameter.", (int) port, (int) channel);
+    ADI_ERROR_REPORT(&device->common, ADI_COMMON_ERRSRC_API, 0, 0, 0, error_message);
+    return((uint32_t) -1);
+}
+
+uint32_t fpga9001_TddIdGet(adi_fpga9001_Device_t *device,
+                           adi_common_Port_e port,
+                           adi_common_ChannelNumber_e channel)
+{
+    char error_message[1024];
+
+    if ((port == ADI_RX)  && (channel == ADI_CHANNEL_1)) return(AXI_ADRV9001_TDD_RX0_DEVICE_ID);
+    if ((port == ADI_RX)  && (channel == ADI_CHANNEL_2)) return(AXI_ADRV9001_TDD_RX1_DEVICE_ID);
+    if ((port == ADI_TX)  && (channel == ADI_CHANNEL_1)) return(AXI_ADRV9001_TDD_TX0_DEVICE_ID);
+    if ((port == ADI_TX)  && (channel == ADI_CHANNEL_2)) return(AXI_ADRV9001_TDD_TX1_DEVICE_ID);
+    if ((port == ADI_ORX) && (channel == ADI_CHANNEL_1)) return(AXI_ADRV9001_TDD_ORX0_DEVICE_ID);
+    if ((port == ADI_ORX) && (channel == ADI_CHANNEL_2)) return(AXI_ADRV9001_TDD_ORX1_DEVICE_ID);
+
+    sprintf(error_message, "Invalid port (%d) or channel (%d) parameter.", (int) port, (int) channel);
+    ADI_ERROR_REPORT(&device->common, ADI_COMMON_ERRSRC_API, 0, 0, 0, error_message);
+    return((uint32_t) -1);
+}
+
+uint32_t fpga9001_TddDmaIdGet(adi_fpga9001_Device_t *device,
+                              adi_common_Port_e port,
+                              adi_common_ChannelNumber_e channel)
+{
+    char error_message[1024];
+
+    if ((port == ADI_RX)  && (channel == ADI_CHANNEL_1)) return (AXI_ADRV9001_TDD_RX0_DMA_ID);
+    if ((port == ADI_RX)  && (channel == ADI_CHANNEL_2)) return (AXI_ADRV9001_TDD_RX1_DMA_ID);
+    if ((port == ADI_TX)  && (channel == ADI_CHANNEL_1)) return (AXI_ADRV9001_TDD_TX0_DMA_ID);
+    if ((port == ADI_TX)  && (channel == ADI_CHANNEL_2)) return (AXI_ADRV9001_TDD_TX1_DMA_ID);
+    if ((port == ADI_ORX) && (channel == ADI_CHANNEL_1)) return (AXI_ADRV9001_TDD_ORX0_DMA_ID);
+    if ((port == ADI_ORX) && (channel == ADI_CHANNEL_2)) return (AXI_ADRV9001_TDD_ORX1_DMA_ID);
+    
+
+    sprintf(error_message, "Invalid port (%d) or channel (%d) parameter.", (int) port, (int) channel);
+    ADI_ERROR_REPORT(&device->common, ADI_COMMON_ERRSRC_API, 0, 0, 0, error_message);
+    return ((uint32_t) - 1);
+}
+
+uint32_t fpga9001_DMAIdGet(adi_fpga9001_Device_t *device,
+                           adi_common_Port_e port,
+                           adi_common_ChannelNumber_e channel)
+{
+    char error_message[1024];
+
+    if ((port == ADI_RX)  && (channel == ADI_CHANNEL_1)) return(AXI_DMA_RX0_ID);
+    if ((port == ADI_RX)  && (channel == ADI_CHANNEL_2)) return(AXI_DMA_RX1_ID);
+    if ((port == ADI_TX)  && (channel == ADI_CHANNEL_1)) return(AXI_DMA_TX0_ID);
+    if ((port == ADI_TX)  && (channel == ADI_CHANNEL_2)) return(AXI_DMA_TX1_ID);
+    if ((port == ADI_ORX) && (channel == ADI_CHANNEL_1)) return(AXI_DMA_ORX0_ID);
+    if ((port == ADI_ORX) && (channel == ADI_CHANNEL_2)) return(AXI_DMA_ORX1_ID);
+
+    sprintf(error_message, "Invalid port (%d) or channel (%d) parameter.", (int) port, (int) channel);
+    ADI_ERROR_REPORT(&device->common, ADI_COMMON_ERRSRC_API, 0, 0, 0, error_message);
+    return((uint32_t) -1);
+}
+
+uint32_t fpga9001_BufBaseAddrGet(adi_common_Port_e port,
+                                 adi_common_ChannelNumber_e channel)
+{
+    if ((port == ADI_RX) && (channel == ADI_CHANNEL_1)) return(ADI_FPGA9001_RX1_ADDR_OFFSET);
+    if ((port == ADI_RX) && (channel == ADI_CHANNEL_2)) return(ADI_FPGA9001_RX2_ADDR_OFFSET);
+    if ((port == ADI_TX) && (channel == ADI_CHANNEL_1)) return(ADI_FPGA9001_TX1_ADDR_OFFSET);
+    if ((port == ADI_TX) && (channel == ADI_CHANNEL_2)) return(ADI_FPGA9001_TX2_ADDR_OFFSET);
+
+    if (channel == ADI_CHANNEL_1) return(ADI_FPGA9001_ORX1_ADDR_OFFSET);
+    if (channel == ADI_CHANNEL_2) return(ADI_FPGA9001_ORX2_ADDR_OFFSET);
+
+    return((uint32_t) -1);
+}
+
+

@@ -15,11 +15,7 @@
 #define _ADI_ADRV9001_STREAM_TYPES_H_
 
 /* System includes */
-#ifdef __KERNEL__
-#include <linux/types.h>
-#else
 #include <stdint.h>
-#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -29,7 +25,7 @@ extern "C" {
 
 /**
 * \brief Data structure to hold stream processor version information
-*/
+*/	
 typedef struct adi_adrv9001_StreamVersion
 {
     uint8_t majorVer;

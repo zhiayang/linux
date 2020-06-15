@@ -12,17 +12,12 @@
 #else
 #include <stdio.h>
 #include <stdint.h>
-#include "adi_fpga9001_types.h"
 #endif
+
+#include "adi_fpga9001_types.h"
 
 #define ADI_HAL_STRING_LENGTH 64
 #define ADI_HAL_MAX_LOG_LINE 1000
-
-#ifdef __KERNEL__
-struct spi_device;
-struct gpio_desc;
-struct adrv9002_rf_phy;
-#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -49,13 +44,13 @@ typedef enum adi_hal_Err
     ADI_HAL_BBICCTRL_FAIL,              /*!< BBIC control interface HAL function failure */
     ADI_HAL_NULL_PTR                    /*!< Function supplied with null pointer */
 } adi_hal_Err_e;
-
+    
 /**
  *  \brief An enumerated type in bit mask format to list the log message
  *         categories or groups.
  */
 /* In order to seperate trx_hal and the platform layer this enum is duplicated.
-   its sister enum is adi_common_LogLevel_e in adi_common_log_types.h which need to reflect
+   its sister enum is adi_common_LogLevel_e in adi_common_log_types.h which need to reflect 
    any changes to this enum.
 */
 typedef enum adi_hal_LogLevel
@@ -71,7 +66,7 @@ typedef enum adi_hal_LogLevel
     ADI_HAL_LOG_SPI  = 0x80, /*!< HAL Log enum to represent a spi transaction type*/
     ADI_HAL_LOG_ALL  = 0xFF  /*!< HAL Log enum to represent all types of log messages selected */
 } adi_hal_LogLevel_e;
-
+    
 /**
  * \brief Enum type for HAL platforms
  */
@@ -96,7 +91,7 @@ typedef enum adi_hal_Interfaces
     ADI_HAL_INTERFACE_TIMER     = 0x10, /* Device requires Timer interface from BBIC */
     ADI_HAL_INTERFACE_I2C       = 0x20  /* Device requires I2C interface from BBIC */
 } adi_hal_Interfaces_e;
-
+    
 /**
  * \brief Data structure for Logging facility
  */
@@ -135,8 +130,8 @@ typedef struct adi_hal_SpiCfg
     uint8_t interfaceEnabled;
     uint32_t resetPinIndex;
 } adi_hal_HwResetCfg_t;
-
-
+    
+    
 /**
  * \brief Data structure for I2C configuration
  */
@@ -146,7 +141,7 @@ typedef struct adi_hal_I2cCfg
     int fd;
     char drvName[ADI_HAL_STRING_LENGTH];
 } adi_hal_I2cCfg_t;
-
+    
 /**
  * \brief Data structure for memory Fpga Driver configuration
  */
@@ -177,12 +172,12 @@ typedef struct adi_hal_TimerCfg
     uint8_t interfaceEnabled;
     /* Platform does not require any instance members per device */
 } adi_hal_TimerCfg_t;
-
-
+    
+        
 /**
  * \brief Data structure to hold platform Hardware layer
  *        settings for all system/platform related features.
-
+ 
  * If the system has multiple ADI transceivers/devices, the user should create one of
  * theses structures per device to specify the HAL settings
  * per transceiver device.
@@ -196,14 +191,7 @@ typedef struct adi_hal_Cfg
     adi_hal_HwResetCfg_t hwResetCfg;
     adi_hal_I2cCfg_t i2cCfg;
     adi_hal_TimerCfg_t timerCfg;
-#ifndef __KERNEL__
     adi_fpga9001_Device_t *fpga9001;
-#else
-    struct spi_device *spi;
-    struct gpio_desc *reset_gpio;
-    struct gpio_desc *int_gpio;
-    struct adrv9002_rf_phy *phy;
-#endif
 } adi_hal_Cfg_t;
 
 #ifdef __cplusplus

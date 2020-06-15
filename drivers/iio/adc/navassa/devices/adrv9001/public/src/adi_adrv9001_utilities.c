@@ -53,9 +53,7 @@
 #include "adi_adrv9001_gpio.h"
 #include "adi_adrv9001_gpio_types.h"
 
-#include "adrv9001_bf_nvs_regmap_core_2.h"
-#include "adrv9001_bf_nvs_regmap_rx.h"
-#include "adrv9001_bf_nvs_regmap_txb.h"
+#include "adrv9001_bf.h"
 #include "adi_adrv9001_ssi.h"
 
 #ifdef ADI_DYNAMIC_PROFILE_LOAD
@@ -587,9 +585,7 @@ int32_t adi_adrv9001_Utilities_Resources_Load(adi_adrv9001_Device_t *device, adi
     /* Load PFIR coefficients */
     ADI_EXPECT(adi_adrv9001_arm_PfirProfiles_Write, device, init);
 
-#ifdef SI_REV_B0
     ADI_EXPECT(adi_adrv9001_Utilities_Tables_Load, device, resourceCfg);
-#endif // SI_REV_B0
 
     /* ARM Bootup */
     ADI_EXPECT(adrv9001_ArmStart, device, init);
@@ -1466,9 +1462,6 @@ int32_t adi_adrv9001_Utilities_InitRadio_Load(adi_adrv9001_Device_t *device,
                                               adi_adrv9001_ResourceCfg_t *initConfig,
                                               uint8_t channelMask)
 {
-#ifdef SI_REV_A0
-    adi_adrv9001_ArmClock_t armClock = { 0x0F, true, ADI_ADRV9001_ARMCLOCK_DATAPATH };
-#endif // SI_REV_A0
     adi_adrv9001_SsiType_e ssiType = ADI_ADRV9001_SSI_TYPE_DISABLE;
 
     /* Check device pointer is not null */
@@ -1481,33 +1474,8 @@ int32_t adi_adrv9001_Utilities_InitRadio_Load(adi_adrv9001_Device_t *device,
         initConfig->adrv9001Init->tx.txProfile[0].txSsiConfig.ssiType |
         initConfig->adrv9001Init->tx.txProfile[1].txSsiConfig.ssiType;
 
-#ifdef SI_REV_A0
-    ADI_EXPECT(adi_adrv9001_arm_Disable, device);
-
-    ADI_EXPECT(adi_adrv9001_Mcs_Digital_Reset, device);
-    ADI_EXPECT(adi_adrv9001_Mcs_DigitalInt_Set, device, 2);
-
-    ADI_EXPECT(adi_adrv9001_arm_Enable, device);
-
-    ADI_EXPECT(adi_adrv9001_arm_Clocks_Program, device, &armClock);
-
-    ADI_EXPECT(adi_adrv9001_Utilities_Tables_Load, device, initConfig);
-    
-    armClock.clockEnable = false;
-    ADI_EXPECT(adi_adrv9001_arm_Clocks_Program, device, &armClock);
-#endif // SI_REV_A0
-    
     /* LVDS forced mode */
     ADI_MSG_EXPECT("Error programming SSI delay configuration", adi_adrv9001_Ssi_Delay_Configure, device, ssiType, &(initConfig->radioCtrlInit->ssiConfig));
-
-#ifdef SI_REV_A0
-    ADI_EXPECT(adi_adrv9001_arm_Disable, device);
-
-    ADI_EXPECT(adi_adrv9001_Mcs_Digital_Reset, device);
-    ADI_EXPECT(adi_adrv9001_Mcs_DigitalInt_Set, device, 2);
-
-    ADI_EXPECT(adi_adrv9001_arm_Enable, device);
-#endif // SI_REV_A0
 
     ADI_EXPECT(adi_adrv9001_gpio_ControlInit_Configure, device, &initConfig->radioCtrlInit->gpioCtrlInitCfg);
 

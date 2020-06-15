@@ -49,22 +49,6 @@ typedef enum adi_common_hal_Err
     ADI_COMMON_HAL_FPGA_FAIL /*!< FPGA hal function failure */
 } adi_common_hal_Err_e;
 
-/**
-* \brief Data structure to hold cache device settings
-*/
-typedef struct adi_common_Cache
-{
-    uint16_t wrCacheIdx;            /*!<used to store the tx spi caching index  */
-    uint16_t rdCacheIdx;            /*!<used to store the rx spi caching index  */
-    uint8_t HW_RMW_Enabled;         /*!<used to indicate if the Hardware Read Modify Write is enabled in the stream processor */
-    uint8_t wrCacheState;           /*!<used to store the tx spi caching state, one of Off, BitField, Global, merging */
-    uint8_t rdCacheState;           /*!<used to store the rx spi caching state, one of Off, BitField, Global */
-    uint8_t mergingDistance;
-    uint8_t wrFlushEn;
-    uint8_t wrByteOnly;             /*!<used to write fields as complete bytes without read modify write */
-    uint32_t wrCache[1024];         /*!<used to store the tx spi caching one element per byte */
-    uint32_t rdCache[1024];         /*!<used to store the rx spi caching one element per byte */
-} adi_common_Cache_t;
 
 #ifdef __cplusplus
 }

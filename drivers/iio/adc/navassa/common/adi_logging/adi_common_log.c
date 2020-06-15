@@ -4,7 +4,7 @@
 * \brief Contains ADI Transceiver Logging functions
 *        Analog Devices maintains and provides updates to this code layer.
 *        The end user should not modify this file or any code in this directory.
-*
+*        
 * ADI common lib Version: $ADI_COMMON_LIB_VERSION$
 */
 
@@ -22,28 +22,6 @@
 #include "adi_adrv9001_user.h"
 
 
-#if ADI_ADRV9001_DEVICE_NOT_CONNECTED
-void adi_common_LogWrite(adi_common_Device_t *commonDev, adi_common_LogLevel_e logLevel, const char* comment, ...)
-{
-
-}
-void adi_common_LogLevelSet(adi_common_Device_t *commonDev, int32_t halLogLevel)
-{
-
-}
-void adi_common_LogLevelGet(adi_common_Device_t *commonDev, int32_t *halLogLevel)
-{
-
-}
-int32_t adi_common_LogFileOpen(adi_common_Device_t *commonDev, char* fileName)
-{
-    return 0;
-}
-int32_t adi_common_LogFileClose(adi_common_Device_t *commonDev)
-{
-    return 0;
-}
-#else
 void adi_common_LogWrite(adi_common_Device_t *commonDev, adi_common_LogLevel_e logLevel, const char* comment, ...)
 {
     int32_t halError = (int32_t)ADI_COMMON_HAL_OK;
@@ -61,18 +39,17 @@ void adi_common_LogWrite(adi_common_Device_t *commonDev, adi_common_LogLevel_e l
 
     if (halError != (int32_t)ADI_COMMON_HAL_OK)
     {
-        /* reentrant function call, ADI_ERROR_REPORT calls adi_common_LogWrite
+        /* reentrant function call, ADI_ERROR_REPORT calls adi_common_LogWrite 
          * At this point we should disable logging as it is not available, but keep reporting errors/warnings
-         *
+         * 
          * Todo:
          * LogLevel should be set to NONE
          * LogLevel should be reset to the aprticular level once the HAL lyer is reseted or fixed
-         *
+         * 
          * Figure out when to re-enable commonDev->error.logEnable
-         *
+         * 
          * Read state of log enable and restore it
          */
-	pr_info("Disable logging?!!!");
         commonDev->error.logEnable = false;
         ADI_ERROR_REPORT(commonDev,
                          ADI_COMMON_SRC_LOG,
@@ -95,7 +72,7 @@ void adi_common_LogLevelSet(adi_common_Device_t *commonDev, int32_t halLogLevel)
     {
         recoveryAction = adi_hal_LogLevelSet(commonDev->devHalInfo, halLogLevel);
     }
-
+    
     if (recoveryAction != (int32_t)ADI_COMMON_ACT_NO_ACTION)
     {
         ADI_ERROR_REPORT(commonDev,
@@ -119,7 +96,7 @@ void adi_common_LogLevelGet(adi_common_Device_t *commonDev, int32_t *halLogLevel
     {
         halError = adi_hal_LogLevelGet(commonDev->devHalInfo, halLogLevel);
     }
-
+    
     if (halError != (int32_t)ADI_COMMON_HAL_OK)
     {
         ADI_ERROR_REPORT(commonDev,
@@ -143,7 +120,7 @@ int32_t adi_common_LogFileOpen(adi_common_Device_t *commonDev, char* fileName)
     {
         halError = adi_hal_LogFileOpen(commonDev->devHalInfo, fileName);
     }
-
+    
     if (halError != (int32_t)ADI_COMMON_HAL_OK)
     {
         ADI_ERROR_REPORT(commonDev,
@@ -153,7 +130,7 @@ int32_t adi_common_LogFileOpen(adi_common_Device_t *commonDev, char* fileName)
                          NULL,
                          "Log file Open error");
     }
-
+    
     return commonDev->error.newAction;
 }
 
@@ -169,7 +146,7 @@ int32_t adi_common_LogFileClose(adi_common_Device_t *commonDev)
     {
         halError = adi_hal_LogFileClose(commonDev->devHalInfo);
     }
-
+    
     if (halError != (int32_t)ADI_COMMON_HAL_OK)
     {
         ADI_ERROR_REPORT(commonDev,
@@ -179,7 +156,6 @@ int32_t adi_common_LogFileClose(adi_common_Device_t *commonDev)
                          NULL,
                          "Log file Close error");
     }
-
+    
     return commonDev->error.newAction;
 }
-#endif

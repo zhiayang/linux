@@ -8,9 +8,7 @@
 #ifndef _ADI_ADRV9001_TXSETTINGS_TYPES_H_
 #define _ADI_ADRV9001_TXSETTINGS_TYPES_H_
 
-#ifndef __KERNEL__
 #include <stdint.h>
-#endif
 
 #include "adi_adrv9001_rxSettings_types.h"
 
@@ -173,7 +171,7 @@ typedef struct adi_adrv9001_TxProfile
     uint32_t txPrePdRealPole_kHz;				  /*!< TX Pre-distortion pole */
 
     uint32_t txPostPdRealPole_kHz;				  /*!< Post-distorter (i.e. interstage) filter Fc  */
-    uint8_t  txBbfPowerMode;                      /*!< TXBBF  filter power mode */
+    adi_adrv9001_ComponentPowerLevel_e txBbfPower; /*!< Tx baseband filter power mode */
     uint8_t  txExtLoopBackType;					  /*!< 0: No external loopback connect,
                                                    *   1: loopback before PA,
                                                    *   2: loopback after PA. */

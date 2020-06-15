@@ -20,13 +20,9 @@
 extern "C" {
 #endif
 
-#ifdef __KERNEL__
-#include <linux/types.h>
-#else
 #include <stdint.h>
 #include <stdbool.h>
-#endif
-
+    
 /**
 *  \brief Rx gain table SRAM base addresses
 */
@@ -166,6 +162,18 @@ typedef struct adi_adrv9001_AdcSwitchCfg
     adi_adrv9001_AdcTypeSwitchMode_e adcSwitchMode;
     adi_adrv9001_GpioCfg_t adcSwitchGpio;
 } adi_adrv9001_AdcSwitchCfg_t;
+
+/**
+ * \brief Structure which holds the DGPIO pin selection to route gain index
+ *        4 pairs of DGPIO pins - ADI_ADRV9001_GPIO_PIN_CRUMB_XX_YY to route 8 bits of gain index
+ */
+typedef struct adi_adrv9001_GainIndexPinCfg
+{
+    adi_adrv9001_GpioPinCrumbSel_e gainIndex_01_00;
+    adi_adrv9001_GpioPinCrumbSel_e gainIndex_03_02;
+    adi_adrv9001_GpioPinCrumbSel_e gainIndex_05_04;
+    adi_adrv9001_GpioPinCrumbSel_e gainIndex_07_06;
+} adi_adrv9001_GainIndexPinCfg_t;
 
 #ifdef __cplusplus
 }

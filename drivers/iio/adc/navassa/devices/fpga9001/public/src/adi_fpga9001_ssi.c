@@ -18,34 +18,34 @@
 #include "adrv9001_reg_addr_macros.h"
 #include "adi_fpga9001_ssi.h"
 #include "adi_fpga9001_hal.h"
-#include "fpga9001_ssi.h"
-#include "fpga9001_bf_axi_tdd_frame.h"
-#include "fpga9001_bf_axi_tdd_enable.h"
-#include "fpga9001_bf_axi_adrv9001_rx.h"
-#include "fpga9001_bf_axi_adrv9001_tx.h"
-#include "fpga9001_bf_axi_adrv9001.h"
+#include "axi_adrv9001.h"
+#include "axi_adrv9001_regs.h"
+#include "fpga9001_utilities.h"
 
-static int32_t SsiFormatToBitfieldValue_Convert(adi_fpga9001_Device_t *device, adi_fpga9001_SsiFormat_e format, uint8_t *bfVal)
+static uint32_t fpga9001_SsiFormat2NumOfBits(adi_fpga9001_Device_t *device, adi_fpga9001_SsiFormat_e format)
 {
-    switch (format)
-    {
-    case ADI_FPGA9001_SSI_FORMAT_2_BIT_SYMBOL_DATA:
-        *bfVal = 0b11;
-        break;
-    case ADI_FPGA9001_SSI_FORMAT_8_BIT_SYMBOL_DATA:
-        *bfVal = 0b10;
-        break;
-    case ADI_FPGA9001_SSI_FORMAT_16_BIT_SYMBOL_DATA:    /* Falls through */
-    case ADI_FPGA9001_SSI_FORMAT_12_BIT_I_Q_DATA:
-        *bfVal = 0b01;
-        break;
-    case ADI_FPGA9001_SSI_FORMAT_16_BIT_I_Q_DATA:
-        *bfVal = 0b00;
-        break;
-    default:
-        return -2;
-    }
-    return 0;
+    if (format == ADI_FPGA9001_SSI_FORMAT_2_BIT_SYMBOL_DATA) return(AXI_ADRV9001_SSI_NUM_OF_BITS_02);
+    if (format == ADI_FPGA9001_SSI_FORMAT_8_BIT_SYMBOL_DATA) return(AXI_ADRV9001_SSI_NUM_OF_BITS_08);
+    if (format == ADI_FPGA9001_SSI_FORMAT_16_BIT_SYMBOL_DATA) return(AXI_ADRV9001_SSI_NUM_OF_BITS_16);
+    if (format == ADI_FPGA9001_SSI_FORMAT_12_BIT_I_Q_DATA) return(AXI_ADRV9001_SSI_NUM_OF_BITS_24);
+    if (format == ADI_FPGA9001_SSI_FORMAT_16_BIT_I_Q_DATA) return(AXI_ADRV9001_SSI_NUM_OF_BITS_32);
+
+    ADI_ERROR_REPORT(&device->common, ADI_COMMON_ERRSRC_API, ADI_COMMON_ERR_INV_PARAM,
+        ADI_COMMON_ACT_ERR_CHECK_PARAM, format, "Invalid parameter value, format.");
+    return((uint32_t) -1);
+}
+
+static uint32_t fpga9001_NumOfBits2SsiFormat(adi_fpga9001_Device_t *device, uint32_t regVal)
+{
+    if (regVal == AXI_ADRV9001_SSI_NUM_OF_BITS_02) return(ADI_FPGA9001_SSI_FORMAT_2_BIT_SYMBOL_DATA);
+    if (regVal == AXI_ADRV9001_SSI_NUM_OF_BITS_08) return(ADI_FPGA9001_SSI_FORMAT_8_BIT_SYMBOL_DATA);
+    if (regVal == AXI_ADRV9001_SSI_NUM_OF_BITS_16) return(ADI_FPGA9001_SSI_FORMAT_16_BIT_SYMBOL_DATA);
+    if (regVal == AXI_ADRV9001_SSI_NUM_OF_BITS_24) return(ADI_FPGA9001_SSI_FORMAT_12_BIT_I_Q_DATA);
+    if (regVal == AXI_ADRV9001_SSI_NUM_OF_BITS_32) return(ADI_FPGA9001_SSI_FORMAT_16_BIT_I_Q_DATA);
+
+    ADI_ERROR_REPORT(&device->common, ADI_COMMON_ERRSRC_API, ADI_COMMON_ERR_INV_PARAM,
+        ADI_COMMON_ACT_ERR_CHECK_PARAM, regVal, "Invalid register settings, SSI number of bits.");
+    return((uint32_t) -1);
 }
 
 static int32_t adi_fpga9001_ssi_Mode_Set_Validate(adi_fpga9001_Device_t *device,
@@ -61,6 +61,9 @@ static int32_t adi_fpga9001_ssi_Mode_Set_Validate(adi_fpga9001_Device_t *device,
     ADI_API_RETURN(device);
 }
 
+/* this is a disaster function, there aren't enough information to call driver directly */
+/* for now, override driver and set register directly. */
+
 int32_t adi_fpga9001_ssi_Mode_Set(adi_fpga9001_Device_t *device,
                                   adi_common_Port_e port,
                                   adi_common_ChannelNumber_e channel,
@@ -68,61 +71,45 @@ int32_t adi_fpga9001_ssi_Mode_Set(adi_fpga9001_Device_t *device,
                                   bool multiLane,
                                   adi_fpga9001_SsiFormat_e format)
 {
-    uint32_t baseAddr = 0;
-    uint32_t regVal = 0;
-    uint8_t numBitsField = 0;
-    static const uint32_t SDR1_DDR0 = 0x40;
-    static const uint32_t MLANE1_SLANE0 = 0x20;
-    static const uint8_t SSI_CONFIG_OFFSET = 0x04;
-    static const uint8_t SSI_RESET_OFFSET = 0x0C;
-    static const uint8_t TX_IO_CONTROL_OFFSET = 0x08;
+    uint32_t ssi_id;
+    uint32_t read_data;
+    uint32_t num_of_bits;
+    adi_common_Port_e port_hack;
 
     ADI_PERFORM_VALIDATION(adi_fpga9001_ssi_Mode_Set_Validate, device, port, channel, sdrEnable, multiLane, format);
 
-    baseAddr = fpga9001_BfSsiChanAddrGet(device, port, channel);
-    
-    ADI_EXPECT(SsiFormatToBitfieldValue_Convert, device, format, &numBitsField);
-    regVal = (sdrEnable ? SDR1_DDR0 : 0) | (multiLane ? MLANE1_SLANE0 : 0) | (numBitsField << 2);
+    /* hack to keep some tests to happy. */
 
-    ADI_EXPECT(fpga9001_AxiTddFrameTddframecountersresetBfSet, device, FPGA9001_BF_AXI_ADRV9001_TDD_FRAME_0, 0x1);
+    port_hack = port;
 
-    ADI_EXPECT(adi_fpga9001_hal_Register_Write, device, (baseAddr + SSI_CONFIG_OFFSET), regVal);
-    ADI_EXPECT(adi_fpga9001_hal_Register_Write, device, (baseAddr + SSI_RESET_OFFSET), 0x01);
-
-    if (ADI_TX == port)
-    {
-        ADI_EXPECT(adi_fpga9001_hal_Register_Write, device, (baseAddr + TX_IO_CONTROL_OFFSET), 0x01);
+    if ((port == ADI_ORX) || (port == ADI_ILB) || (port == ADI_ELB)) {
+        port_hack = ADI_RX;
     }
 
+    ssi_id = fpga9001_SsiIdGet(device, port_hack, channel);
+    if (ssi_id == (uint32_t) -1) return(-1);
+
+    num_of_bits = fpga9001_SsiFormat2NumOfBits(device, format);
+    if (num_of_bits == (uint32_t) -1) return(-1);
+
+    axi_reg_write((void *)device, AXI_ADRV9001_ID, (ssi_id + AXI_ADRV9001_SSI_CONTROL_ADDR),
+        (AXI_ADRV9001_SSI_CLK_RATE_SET(0) |
+        AXI_ADRV9001_SSI_NUM_OF_BITS_SET(num_of_bits) |
+        AXI_ADRV9001_SSI_LSTRB1_PSTRB0_SET(0) |
+        AXI_ADRV9001_SSI_MLANE1_SLANE0_SET(((multiLane) ? 1 : 0)) |
+        AXI_ADRV9001_SSI_SDR1_DDR0_SET(((sdrEnable) ? 1 : 0)) |
+        AXI_ADRV9001_SSI_LSB1_MSB0_SET(0) |
+        AXI_ADRV9001_SSI_Q1_I0_SET(0) |
+        AXI_ADRV9001_SSI_FALL1_RISE0_SET(0)));
+
+    axi_reg_write((void *)device, AXI_ADRV9001_ID, (ssi_id + AXI_ADRV9001_SSI_INIT_ADDR), 0x1);
+    axi_reg_write((void *)device, AXI_ADRV9001_ID, AXI_ADRV9001_TDD_SWRESET_ADDR, 0x1);
+    read_data = axi_reg_read((void *)device, AXI_ADRV9001_ID, (ssi_id + AXI_ADRV9001_SSI_IO_CONTROL_ADDR));
+    axi_reg_write((void *)device, AXI_ADRV9001_ID, (ssi_id + AXI_ADRV9001_SSI_IO_CONTROL_ADDR),
+        (read_data | AXI_ADRV9001_SSI_BUF_ENABLE_SET(0x1)));
     ADI_API_RETURN(device);
 }
 
-static int32_t RegisterValueToSsiFormat_Convert(adi_fpga9001_Device_t *device, uint32_t regVal, adi_fpga9001_SsiFormat_e *format)
-{
-    static const uint32_t CMOS1_LVDS0 = 0x400;
-    static const uint32_t NUM_BITS = 0x0C;
-    bool cmos = ADRV9001_BF_EQUAL(regVal, CMOS1_LVDS0);
-    uint8_t numBits = (regVal & NUM_BITS) >> 2;
-    
-    switch (numBits)
-    {
-    case 0b00:
-        *format = ADI_FPGA9001_SSI_FORMAT_16_BIT_I_Q_DATA;
-        break;
-    case 0b01:
-        *format = cmos ? ADI_FPGA9001_SSI_FORMAT_16_BIT_SYMBOL_DATA : ADI_FPGA9001_SSI_FORMAT_12_BIT_I_Q_DATA;
-        break;
-    case 0b10:
-        *format = ADI_FPGA9001_SSI_FORMAT_8_BIT_SYMBOL_DATA;
-        break;
-    case 0b11:
-        *format = ADI_FPGA9001_SSI_FORMAT_2_BIT_SYMBOL_DATA;
-        break;
-    default:
-        return -2;
-    }
-    return 0;
-}
 
 static int32_t adi_fpga9001_ssi_Mode_Get_Validate(adi_fpga9001_Device_t *device,
                                                   adi_common_Port_e port,
@@ -146,28 +133,33 @@ int32_t adi_fpga9001_ssi_Mode_Get(adi_fpga9001_Device_t *device,
                                   bool *multiLane,
                                   adi_fpga9001_SsiFormat_e *format)
 {
-    uint32_t baseAddr = 0;
-    uint32_t regVal = 0;
-    static const uint8_t CMOS_SSI_CONFIG_OFFSET = 0x4;
-    static const uint32_t SDR1_DDR0 = 0x40;
-    static const uint32_t MLANE1_SLANE0 = 0x20;
-    
-    ADI_PERFORM_VALIDATION(adi_fpga9001_ssi_Mode_Get_Validate, device, port, channel, sdrEnabled, multiLane, format);
-    
-    baseAddr = fpga9001_BfSsiChanAddrGet(device, port, channel);
+    uint32_t ssi_id;
+    uint32_t read_data;
+    adi_common_Port_e port_hack;
 
-    ADI_EXPECT(adi_fpga9001_hal_Register_Read, device, baseAddr + CMOS_SSI_CONFIG_OFFSET, &regVal);
-    *sdrEnabled = ADRV9001_BF_EQUAL(regVal, SDR1_DDR0);
-    *multiLane = ADRV9001_BF_EQUAL(regVal, MLANE1_SLANE0);
-    ADI_EXPECT(RegisterValueToSsiFormat_Convert, device, regVal, format);
-    
+    ADI_PERFORM_VALIDATION(adi_fpga9001_ssi_Mode_Get_Validate, device, port, channel, sdrEnabled, multiLane, format);
+
+    /* hack to keep some tests to happy. */
+
+    port_hack = port;
+
+    if ((port == ADI_ORX) || (port == ADI_ILB) || (port == ADI_ELB)) {
+        port_hack = ADI_RX;
+    }
+
+    ssi_id = fpga9001_SsiIdGet(device, port_hack, channel);
+    if (ssi_id == (uint32_t) -1) return(-1);
+
+    read_data = axi_reg_read((void *)device, AXI_ADRV9001_ID, (ssi_id + AXI_ADRV9001_SSI_CONTROL_ADDR));
+    *multiLane = (AXI_ADRV9001_SSI_MLANE1_SLANE0_GET(read_data) == 1) ? true : false;
+    *sdrEnabled = (AXI_ADRV9001_SSI_SDR1_DDR0_GET(read_data) == 1) ? true : false;
+    *format = fpga9001_NumOfBits2SsiFormat(device, AXI_ADRV9001_SSI_NUM_OF_BITS_GET(read_data));
     ADI_API_RETURN(device);
 }
 
 static int32_t adi_fpga9001_ssi_BytesPerSample_GetValidate(adi_fpga9001_Device_t *device, uint8_t *bytesPerSample)
 {
     ADI_NULL_PTR_RETURN(&device->common, bytesPerSample);
-
     ADI_API_RETURN(device);
 }
 
@@ -206,20 +198,27 @@ int32_t adi_fpga9001_ssi_BytesPerSample_Get(adi_fpga9001_Device_t *device,
     ADI_API_RETURN(device);
 }
 
-int32_t adi_fpga9001_ssi_Reset(adi_fpga9001_Device_t *fpga9001Device)
+int32_t adi_fpga9001_ssi_Reset(adi_fpga9001_Device_t *device)
 {
-    static const uint32_t SSI_CONFIG_TX1_FPGA_BYTE1_ADDR = 0x4305600c;
-    static const uint32_t SSI_CONFIG_TX2_FPGA_BYTE1_ADDR = 0x4305700c;
-    static const uint32_t SSI_CONFIG_RX1_FPGA_BYTE1_ADDR = 0x4305400c;
-    static const uint32_t SSI_CONFIG_RX2_FPGA_BYTE1_ADDR = 0x4305500c;
-    static const uint16_t SSI_CONFIG_SERDES_RESET = 0x1;
+    axi_reg_write((void *)device, AXI_ADRV9001_ID, (AXI_ADRV9001_SSI_RX0_ID + AXI_ADRV9001_SSI_INIT_ADDR), 0x1);
+    axi_reg_write((void *)device, AXI_ADRV9001_ID, (AXI_ADRV9001_SSI_RX1_ID + AXI_ADRV9001_SSI_INIT_ADDR), 0x1);
+    axi_reg_write((void *)device, AXI_ADRV9001_ID, (AXI_ADRV9001_SSI_TX0_ID + AXI_ADRV9001_SSI_INIT_ADDR), 0x1);
+    axi_reg_write((void *)device, AXI_ADRV9001_ID, (AXI_ADRV9001_SSI_TX1_ID + AXI_ADRV9001_SSI_INIT_ADDR), 0x1);
+    ADI_API_RETURN(device);
+}
 
-    ADI_EXPECT(adi_fpga9001_hal_Register_Write, fpga9001Device, SSI_CONFIG_TX1_FPGA_BYTE1_ADDR, SSI_CONFIG_SERDES_RESET);
-    ADI_EXPECT(adi_fpga9001_hal_Register_Write, fpga9001Device, SSI_CONFIG_TX2_FPGA_BYTE1_ADDR, SSI_CONFIG_SERDES_RESET);
-    ADI_EXPECT(adi_fpga9001_hal_Register_Write, fpga9001Device, SSI_CONFIG_RX1_FPGA_BYTE1_ADDR, SSI_CONFIG_SERDES_RESET);
-    ADI_EXPECT(adi_fpga9001_hal_Register_Write, fpga9001Device, SSI_CONFIG_RX2_FPGA_BYTE1_ADDR, SSI_CONFIG_SERDES_RESET);
+static uint32_t fpga9001_SsiDataSelGet(adi_fpga9001_Device_t *device,
+                                       adi_fpga9001_SsiTestModeData_e sel)
+{
+    if (sel == ADI_FPGA9001_SSI_TESTMODE_DATA_NORMAL) return(AXI_ADRV9001_SSI_DATA_SEL_DMA);
+    if (sel == ADI_FPGA9001_SSI_TESTMODE_DATA_FIXED_PATTERN) return(AXI_ADRV9001_SSI_DATA_SEL_PATTERN);
+    if (sel == ADI_FPGA9001_SSI_TESTMODE_DATA_RAMP_NIBBLE) return(AXI_ADRV9001_SSI_DATA_SEL_NIBBLE_RAMP);
+    if (sel == ADI_FPGA9001_SSI_TESTMODE_DATA_RAMP_16_BIT) return(AXI_ADRV9001_SSI_DATA_SEL_RAMP);
+    if (sel == ADI_FPGA9001_SSI_TESTMODE_DATA_PRBS15) return(AXI_ADRV9001_SSI_DATA_SEL_PRBS15);
+    if (sel == ADI_FPGA9001_SSI_TESTMODE_DATA_PRBS7) return(AXI_ADRV9001_SSI_DATA_SEL_PRBS7);
 
-    ADI_API_RETURN(fpga9001Device);
+    ADI_ERROR_REPORT(&device->common, ADI_COMMON_ERRSRC_API, 0, 0, sel, "Invalid SSI data select.");
+    return((uint32_t) -1);
 }
 
 static int32_t adi_fpga9001_ssi_Rx_TestMode_Configure_Validate(adi_fpga9001_Device_t *device,
@@ -236,38 +235,21 @@ int32_t adi_fpga9001_ssi_Rx_TestMode_Configure(adi_fpga9001_Device_t *device,
                                                adi_common_ChannelNumber_e channel,
                                                adi_fpga9001_RxSsiTestModeCfg_t *ssiTestModeConfig)
 {
-    uint8_t testMode = 0;
-    uint8_t dataPattern[5] = { 3, 4, 5, 6, 7};
-    fpga9001_BfAxiAdrv9001RxChanAddr_e baseAddress = FPGA9001_BF_AXI_ADRV9001_RX_0;
-    uint32_t timerValue = 1000;
+    uint32_t ssi_id;
+    uint32_t pattern[2];
 
     ADI_PERFORM_VALIDATION(adi_fpga9001_ssi_Rx_TestMode_Configure_Validate, device, channel, ssiTestModeConfig);
 
-    if (channel == ADI_CHANNEL_2)
-    {
-        baseAddress = FPGA9001_BF_AXI_ADRV9001_RX_1;
-    }
+    ssi_id = fpga9001_SsiIdGet(device, ADI_RX, channel);
+    if (ssi_id == (uint32_t) -1) return(-1);
 
-    if (ssiTestModeConfig->testData != ADI_FPGA9001_SSI_TESTMODE_DATA_NORMAL)
-    {
-        testMode = (uint8_t)ssiTestModeConfig->testData - 1;
-    }
+    pattern[0] = ssiTestModeConfig->fixedDataPatternToCheck;
+    pattern[1] = 0;
 
-    ADI_EXPECT(fpga9001_AxiAdrv9001RxRxDataSelBfSet, device, baseAddress, dataPattern[testMode]);
-
-    if (ADI_FPGA9001_SSI_TESTMODE_DATA_FIXED_PATTERN == ssiTestModeConfig->testData)
-    {
-        ADI_EXPECT(fpga9001_AxiAdrv9001RxRxDataPatBfSet, device, baseAddress, ssiTestModeConfig->fixedDataPatternToCheck);
-    }
-    
-    /* Delay 10us. 10ns is the approximate LSB delay */
-    ADI_EXPECT(fpga9001_AxiAdrv9001TimerBfSet, device, FPGA9001_BF_AXI_ADRV9001_TOP, timerValue);
-    while (timerValue != 0)
-    {
-        ADI_EXPECT(fpga9001_AxiAdrv9001TimerBfGet, device, FPGA9001_BF_AXI_ADRV9001_TOP, &timerValue);
-    }
-    ADI_EXPECT(adi_fpga9001_hal_Register_Write, device, (baseAddress + 0x08), 0x0F);    /* Write to clear error bits */
-
+    axi_adrv9001_ssi_data_pattern_set((void *)device, AXI_ADRV9001_ID, ssi_id, &pattern[0]);
+    axi_adrv9001_ssi_data_sel_set((void *)device, AXI_ADRV9001_ID, ssi_id, fpga9001_SsiDataSelGet(device, ssiTestModeConfig->testData));
+    axi_adrv9001_delay_us((void *)device, AXI_ADRV9001_ID, 1);
+    axi_adrv9001_ssi_status_clear((void *)device, AXI_ADRV9001_ID, ssi_id);
     ADI_API_RETURN(device);
 }
 
@@ -284,20 +266,14 @@ int32_t adi_fpga9001_ssi_Rx_TestMode_Inspect(adi_fpga9001_Device_t *device,
                                              adi_common_ChannelNumber_e channel,
                                              bool *dataError)
 {
-    uint32_t rxStatus = 0;
-    fpga9001_BfAxiAdrv9001RxChanAddr_e baseAddress = FPGA9001_BF_AXI_ADRV9001_RX_0;
+    uint32_t ssi_id;
 
     ADI_PERFORM_VALIDATION(adi_fpga9001_ssi_Rx_TestMode_Inspect_Validate, device, channel, dataError);
 
-    if (channel == ADI_CHANNEL_2)
-    {
-        baseAddress = FPGA9001_BF_AXI_ADRV9001_RX_1;
-    }
+    ssi_id = fpga9001_SsiIdGet(device, ADI_RX, channel);
+    if (ssi_id == (uint32_t) -1) return(-1);
 
-    ADI_EXPECT(adi_fpga9001_hal_Register_Read, device, (baseAddress + 0x08), &rxStatus);
-
-    *dataError = ((rxStatus & 0xF) != 0) ? true : false;
-
+    *dataError = (axi_adrv9001_ssi_status_get((void *)device, AXI_ADRV9001_ID, ssi_id) == 0) ? false : true;
     ADI_API_RETURN(device);
 }
 
@@ -314,30 +290,20 @@ int32_t adi_fpga9001_ssi_Tx_TestMode_Configure(adi_fpga9001_Device_t *device,
                                                adi_common_ChannelNumber_e channel,
                                                adi_fpga9001_TxSsiTestModeCfg_t *ssiTestModeConfig)
 {
-    uint8_t testMode = 0;
-    uint8_t dataPattern[5] = { 3, 4, 5, 6, 7 };
-
-    fpga9001_BfAxiAdrv9001TxChanAddr_e baseAddress = FPGA9001_BF_AXI_ADRV9001_TX_0;
+    uint32_t ssi_id;
+    uint32_t pattern[2];
 
     ADI_PERFORM_VALIDATION(adi_fpga9001_ssi_Tx_TestMode_Configure_Validate, device, channel, ssiTestModeConfig);
 
-    if (channel == ADI_CHANNEL_2)
-    {
-        baseAddress = FPGA9001_BF_AXI_ADRV9001_TX_1;
-    }
+    ssi_id = fpga9001_SsiIdGet(device, ADI_RX, channel);
+    if (ssi_id == (uint32_t) -1) return(-1);
 
-    if (ssiTestModeConfig->testData != ADI_FPGA9001_SSI_TESTMODE_DATA_NORMAL)
-    {
-        testMode = (uint8_t)ssiTestModeConfig->testData - 1;
-    }
+    pattern[0] = ssiTestModeConfig->fixedDataPatternToTransmit;
+    pattern[1] = 0;
 
-    ADI_EXPECT(fpga9001_AxiAdrv9001TxTxDataSelBfSet, device, baseAddress, dataPattern[testMode]);
-
-    if (ADI_FPGA9001_SSI_TESTMODE_DATA_FIXED_PATTERN == ssiTestModeConfig->testData)
-    {
-        ADI_EXPECT(fpga9001_AxiAdrv9001TxTxDataPatBfSet, device, baseAddress, ssiTestModeConfig->fixedDataPatternToTransmit);
-    }
-
+    axi_adrv9001_ssi_data_pattern_set((void *)device, AXI_ADRV9001_ID, ssi_id, &pattern[0]);
+    axi_adrv9001_ssi_data_sel_set((void *)device, AXI_ADRV9001_ID, ssi_id, fpga9001_SsiDataSelGet(device, ssiTestModeConfig->testData));
+    axi_adrv9001_delay_us((void *)device, AXI_ADRV9001_ID, 1);
     ADI_API_RETURN(device);
 }
 
@@ -369,80 +335,71 @@ static int32_t adi_fpga9001_Ssi_Delay_Configure_Validate(adi_fpga9001_Device_t *
     ADI_API_RETURN(device);
 }
 
-static int32_t adi_fpga9001_Ssi_LvdsDelayConfigSet(adi_fpga9001_Device_t *device,
-                                                   adi_fpga9001_SsiCalibrationCfg_t *ssiCalibration)
+/* we have a very badly thought out structure here, parameters must be grouped within interface */
+/* if we grouped them by interface, all the things below could have been just a single function */
+
+static void fpga9001_SsiDelaySet_1(adi_fpga9001_Device_t *device,
+                                      adi_common_Port_e port,
+                                      adi_common_ChannelNumber_e channel,
+                                      uint32_t *data)
 {
-    /* Rx1 */
-    ADI_EXPECT(fpga9001_AxiAdrv9001RxRxWrdelay0BfSet, device, FPGA9001_BF_AXI_ADRV9001_RX_0, ssiCalibration->rxIDataDelay[0]);
-    ADI_EXPECT(fpga9001_AxiAdrv9001RxRxWrdelay1BfSet, device, FPGA9001_BF_AXI_ADRV9001_RX_0, ssiCalibration->rxQDataDelay[0]);
-    ADI_EXPECT(fpga9001_AxiAdrv9001RxRxWrdelaySBfSet, device, FPGA9001_BF_AXI_ADRV9001_RX_0, ssiCalibration->rxStrobeDelay[0]);
-    /* Unused for LVDS */
-    ADI_EXPECT(fpga9001_AxiAdrv9001RxRxWrdelay2BfSet, device, FPGA9001_BF_AXI_ADRV9001_RX_0, 0);
-    ADI_EXPECT(fpga9001_AxiAdrv9001RxRxWrdelay3BfSet, device, FPGA9001_BF_AXI_ADRV9001_RX_0, 0);
+    int32_t i;
 
-    /* Rx2 */
-    ADI_EXPECT(fpga9001_AxiAdrv9001RxRxWrdelay0BfSet, device, FPGA9001_BF_AXI_ADRV9001_RX_1, ssiCalibration->rxIDataDelay[1]);
-    ADI_EXPECT(fpga9001_AxiAdrv9001RxRxWrdelay1BfSet, device, FPGA9001_BF_AXI_ADRV9001_RX_1, ssiCalibration->rxQDataDelay[1]);
-    ADI_EXPECT(fpga9001_AxiAdrv9001RxRxWrdelaySBfSet, device, FPGA9001_BF_AXI_ADRV9001_RX_1, ssiCalibration->rxStrobeDelay[1]);
-    /* Unused for LVDS */
-    ADI_EXPECT(fpga9001_AxiAdrv9001RxRxWrdelay2BfSet, device, FPGA9001_BF_AXI_ADRV9001_RX_1, 0);
-    ADI_EXPECT(fpga9001_AxiAdrv9001RxRxWrdelay3BfSet, device, FPGA9001_BF_AXI_ADRV9001_RX_1, 0);
-
-    /* Tx1 */
-    ADI_EXPECT(fpga9001_AxiAdrv9001TxTxWrdelay0BfSet, device, FPGA9001_BF_AXI_ADRV9001_TX_0, ssiCalibration->txIDataDelay[0]);
-    ADI_EXPECT(fpga9001_AxiAdrv9001TxTxWrdelay1BfSet, device, FPGA9001_BF_AXI_ADRV9001_TX_0, ssiCalibration->txQDataDelay[0]);
-    ADI_EXPECT(fpga9001_AxiAdrv9001TxTxWrdelaySBfSet, device, FPGA9001_BF_AXI_ADRV9001_TX_0, ssiCalibration->txStrobeDelay[0]);
-    ADI_EXPECT(fpga9001_AxiAdrv9001TxTxWrdelayCBfSet, device, FPGA9001_BF_AXI_ADRV9001_TX_0, ssiCalibration->txClkDelay[0]);
-    /* Unused for LVDS */
-    ADI_EXPECT(fpga9001_AxiAdrv9001TxTxWrdelay2BfSet, device, FPGA9001_BF_AXI_ADRV9001_TX_0, 0);
-    ADI_EXPECT(fpga9001_AxiAdrv9001TxTxWrdelay3BfSet, device, FPGA9001_BF_AXI_ADRV9001_TX_0, 0);
-
-    /* Tx2 */
-    ADI_EXPECT(fpga9001_AxiAdrv9001TxTxWrdelay0BfSet, device, FPGA9001_BF_AXI_ADRV9001_TX_1, ssiCalibration->txIDataDelay[1]);
-    ADI_EXPECT(fpga9001_AxiAdrv9001TxTxWrdelay1BfSet, device, FPGA9001_BF_AXI_ADRV9001_TX_1, ssiCalibration->txQDataDelay[1]);
-    ADI_EXPECT(fpga9001_AxiAdrv9001TxTxWrdelaySBfSet, device, FPGA9001_BF_AXI_ADRV9001_TX_1, ssiCalibration->txStrobeDelay[1]);
-    ADI_EXPECT(fpga9001_AxiAdrv9001TxTxWrdelayCBfSet, device, FPGA9001_BF_AXI_ADRV9001_TX_1, ssiCalibration->txClkDelay[1]);
-    /* Unused for LVDS */
-    ADI_EXPECT(fpga9001_AxiAdrv9001TxTxWrdelay2BfSet, device, FPGA9001_BF_AXI_ADRV9001_TX_1, 0);
-    ADI_EXPECT(fpga9001_AxiAdrv9001TxTxWrdelay3BfSet, device, FPGA9001_BF_AXI_ADRV9001_TX_1, 0);
-
-    ADI_API_RETURN(device);
+    for (i = 0; i < 6; i++) {
+        axi_reg_write((void*)device, AXI_ADRV9001_ID, (fpga9001_SsiIdGet(device, port, channel) +
+            AXI_ADRV9001_SSI_DELAY_CONTROL_ADDR + (i * 0x04)), *(data + i));
+    }
 }
 
-static int32_t adi_fpga9001_Ssi_CmosDelayConfigSet(adi_fpga9001_Device_t *device,
-                                                   adi_fpga9001_SsiCalibrationCfg_t *ssiCalibration)
+static void fpga9001_SsiDelaySet(adi_fpga9001_Device_t *device,
+                                 adi_fpga9001_SsiType_e ssiType,
+                                 adi_fpga9001_SsiCalibrationCfg_t *ssiCalibration)
 {
-    /* Rx1 */
-    ADI_EXPECT(fpga9001_AxiAdrv9001RxRxWrdelay0BfSet, device, FPGA9001_BF_AXI_ADRV9001_RX_0, ssiCalibration->rxIDataDelay[0]);
-    ADI_EXPECT(fpga9001_AxiAdrv9001RxRxWrdelay1BfSet, device, FPGA9001_BF_AXI_ADRV9001_RX_0, ssiCalibration->rxIDataDelay[0]);
-    ADI_EXPECT(fpga9001_AxiAdrv9001RxRxWrdelay2BfSet, device, FPGA9001_BF_AXI_ADRV9001_RX_0, ssiCalibration->rxQDataDelay[0]);
-    ADI_EXPECT(fpga9001_AxiAdrv9001RxRxWrdelay3BfSet, device, FPGA9001_BF_AXI_ADRV9001_RX_0, ssiCalibration->rxQDataDelay[0]);
-    ADI_EXPECT(fpga9001_AxiAdrv9001RxRxWrdelaySBfSet, device, FPGA9001_BF_AXI_ADRV9001_RX_0, ssiCalibration->rxStrobeDelay[0]);
+    uint32_t ssiDelay[6];
 
-    /* Rx2 */
-    ADI_EXPECT(fpga9001_AxiAdrv9001RxRxWrdelay0BfSet, device, FPGA9001_BF_AXI_ADRV9001_RX_1, ssiCalibration->rxIDataDelay[1]);
-    ADI_EXPECT(fpga9001_AxiAdrv9001RxRxWrdelay1BfSet, device, FPGA9001_BF_AXI_ADRV9001_RX_1, ssiCalibration->rxIDataDelay[1]);
-    ADI_EXPECT(fpga9001_AxiAdrv9001RxRxWrdelay2BfSet, device, FPGA9001_BF_AXI_ADRV9001_RX_1, ssiCalibration->rxQDataDelay[1]);
-    ADI_EXPECT(fpga9001_AxiAdrv9001RxRxWrdelay3BfSet, device, FPGA9001_BF_AXI_ADRV9001_RX_1, ssiCalibration->rxQDataDelay[1]);
-    ADI_EXPECT(fpga9001_AxiAdrv9001RxRxWrdelaySBfSet, device, FPGA9001_BF_AXI_ADRV9001_RX_1, ssiCalibration->rxStrobeDelay[1]);
+    ssiDelay[0] = ssiCalibration->rxIDataDelay[0];
+    if (ssiType == ADI_FPGA9001_SSI_TYPE_LVDS) 
+        ssiDelay[1] = ssiCalibration->rxQDataDelay[0];
+    else
+        ssiDelay[1] = ssiCalibration->rxIDataDelay[0];
+    ssiDelay[2] = ssiCalibration->rxQDataDelay[0];
+    ssiDelay[3] = ssiCalibration->rxQDataDelay[0];
+    ssiDelay[4] = ssiCalibration->rxStrobeDelay[0];
+    ssiDelay[5] = 0;
+    fpga9001_SsiDelaySet_1(device, ADI_RX, ADI_CHANNEL_1, &ssiDelay[0]);
 
-    /* Tx1 */
-    ADI_EXPECT(fpga9001_AxiAdrv9001TxTxWrdelay0BfSet, device, FPGA9001_BF_AXI_ADRV9001_TX_0, ssiCalibration->txIDataDelay[0]);
-    ADI_EXPECT(fpga9001_AxiAdrv9001TxTxWrdelay1BfSet, device, FPGA9001_BF_AXI_ADRV9001_TX_0, ssiCalibration->txIDataDelay[0]);
-    ADI_EXPECT(fpga9001_AxiAdrv9001TxTxWrdelay2BfSet, device, FPGA9001_BF_AXI_ADRV9001_TX_0, ssiCalibration->txQDataDelay[0]);
-    ADI_EXPECT(fpga9001_AxiAdrv9001TxTxWrdelay3BfSet, device, FPGA9001_BF_AXI_ADRV9001_TX_0, ssiCalibration->txQDataDelay[0]);
-    ADI_EXPECT(fpga9001_AxiAdrv9001TxTxWrdelaySBfSet, device, FPGA9001_BF_AXI_ADRV9001_TX_0, ssiCalibration->txStrobeDelay[0]);
-    ADI_EXPECT(fpga9001_AxiAdrv9001TxTxWrdelayCBfSet, device, FPGA9001_BF_AXI_ADRV9001_TX_0, ssiCalibration->txClkDelay[0]);
+    ssiDelay[0] = ssiCalibration->rxIDataDelay[1];
+    if (ssiType == ADI_FPGA9001_SSI_TYPE_LVDS) 
+        ssiDelay[1] = ssiCalibration->rxQDataDelay[1];
+    else
+        ssiDelay[1] = ssiCalibration->rxIDataDelay[1];
+    ssiDelay[2] = ssiCalibration->rxQDataDelay[1];
+    ssiDelay[3] = ssiCalibration->rxQDataDelay[1];
+    ssiDelay[4] = ssiCalibration->rxStrobeDelay[1];
+    ssiDelay[5] = 0;
+    fpga9001_SsiDelaySet_1(device, ADI_RX, ADI_CHANNEL_2, &ssiDelay[0]);
 
-    /* Tx2 */
-    ADI_EXPECT(fpga9001_AxiAdrv9001TxTxWrdelay0BfSet, device, FPGA9001_BF_AXI_ADRV9001_TX_1, ssiCalibration->txIDataDelay[1]);
-    ADI_EXPECT(fpga9001_AxiAdrv9001TxTxWrdelay1BfSet, device, FPGA9001_BF_AXI_ADRV9001_TX_1, ssiCalibration->txIDataDelay[1]);
-    ADI_EXPECT(fpga9001_AxiAdrv9001TxTxWrdelay2BfSet, device, FPGA9001_BF_AXI_ADRV9001_TX_1, ssiCalibration->txQDataDelay[1]);
-    ADI_EXPECT(fpga9001_AxiAdrv9001TxTxWrdelay3BfSet, device, FPGA9001_BF_AXI_ADRV9001_TX_1, ssiCalibration->txQDataDelay[1]);
-    ADI_EXPECT(fpga9001_AxiAdrv9001TxTxWrdelaySBfSet, device, FPGA9001_BF_AXI_ADRV9001_TX_1, ssiCalibration->txStrobeDelay[1]);
-    ADI_EXPECT(fpga9001_AxiAdrv9001TxTxWrdelayCBfSet, device, FPGA9001_BF_AXI_ADRV9001_TX_1, ssiCalibration->txClkDelay[1]);
+    ssiDelay[0] = ssiCalibration->txIDataDelay[0];
+    if (ssiType == ADI_FPGA9001_SSI_TYPE_LVDS) 
+        ssiDelay[1] = ssiCalibration->txQDataDelay[0];
+    else
+        ssiDelay[1] = ssiCalibration->txIDataDelay[0];
+    ssiDelay[2] = ssiCalibration->txQDataDelay[0];
+    ssiDelay[3] = ssiCalibration->txQDataDelay[0];
+    ssiDelay[4] = ssiCalibration->txStrobeDelay[0];
+    ssiDelay[5] = ssiCalibration->txClkDelay[0];
+    fpga9001_SsiDelaySet_1(device, ADI_TX, ADI_CHANNEL_1, &ssiDelay[0]);
 
-    ADI_API_RETURN(device);
+    ssiDelay[0] = ssiCalibration->txIDataDelay[1];
+    if (ssiType == ADI_FPGA9001_SSI_TYPE_LVDS) 
+        ssiDelay[1] = ssiCalibration->txQDataDelay[1];
+    else
+        ssiDelay[1] = ssiCalibration->txIDataDelay[1];
+    ssiDelay[2] = ssiCalibration->txQDataDelay[1];
+    ssiDelay[3] = ssiCalibration->txQDataDelay[1];
+    ssiDelay[4] = ssiCalibration->txStrobeDelay[1];
+    ssiDelay[5] = ssiCalibration->txClkDelay[1];
+    fpga9001_SsiDelaySet_1(device, ADI_TX, ADI_CHANNEL_2, &ssiDelay[0]);
 }
 
 int32_t adi_fpga9001_Ssi_Delay_Configure(adi_fpga9001_Device_t *device,
@@ -450,73 +407,62 @@ int32_t adi_fpga9001_Ssi_Delay_Configure(adi_fpga9001_Device_t *device,
                                          adi_fpga9001_SsiCalibrationCfg_t *ssiCalibration)
 {
     ADI_PERFORM_VALIDATION(adi_fpga9001_Ssi_Delay_Configure_Validate, device, ssiType, ssiCalibration);
+    fpga9001_SsiDelaySet(device, ssiType, ssiCalibration);
+    ADI_API_RETURN(device);
+}
 
-    if (ADI_FPGA9001_SSI_TYPE_LVDS == ssiType)
-    {
-        ADI_EXPECT(adi_fpga9001_Ssi_LvdsDelayConfigSet, device, ssiCalibration);
+static void fpga9001_SsiDelayGet_1(adi_fpga9001_Device_t *device,
+                                      adi_common_Port_e port,
+                                      adi_common_ChannelNumber_e channel,
+                                      uint32_t *data)
+{
+    int32_t i;
+
+    for (i = 0; i < 6; i++) {
+        *(data + i) = axi_reg_read((void*)device, AXI_ADRV9001_ID, (fpga9001_SsiIdGet(device, port, channel) +
+            AXI_ADRV9001_SSI_DELAY_CONTROL_ADDR + (i * 0x04))) & 0xff;
     }
+}
+
+static void fpga9001_SsiDelayGet(adi_fpga9001_Device_t *device,
+                                 adi_fpga9001_SsiType_e ssiType,
+                                 adi_fpga9001_SsiCalibrationCfg_t *ssiCalibration)
+{
+    uint32_t ssiDelay[6];
+
+    fpga9001_SsiDelayGet_1(device, ADI_RX, ADI_CHANNEL_1, &ssiDelay[0]);
+    ssiCalibration->rxIDataDelay[0] = ssiDelay[0];
+    if (ssiType == ADI_FPGA9001_SSI_TYPE_LVDS) 
+        ssiCalibration->rxQDataDelay[0] = ssiDelay[1];
     else
-    {
-        ADI_EXPECT(adi_fpga9001_Ssi_CmosDelayConfigSet, device, ssiCalibration);
-    }
+        ssiCalibration->rxQDataDelay[0] = ssiDelay[2];
+    ssiCalibration->rxStrobeDelay[0] = ssiDelay[4];
 
-    ADI_API_RETURN(device);
-}
+    fpga9001_SsiDelayGet_1(device, ADI_RX, ADI_CHANNEL_2, &ssiDelay[0]);
+    ssiCalibration->rxIDataDelay[1] = ssiDelay[0];
+    if (ssiType == ADI_FPGA9001_SSI_TYPE_LVDS) 
+        ssiCalibration->rxQDataDelay[1] = ssiDelay[1];
+    else
+        ssiCalibration->rxQDataDelay[1] = ssiDelay[2];
+    ssiCalibration->rxStrobeDelay[1] = ssiDelay[4];
 
-static int32_t adi_fpga9001_Ssi_CmosDelayConfigGet(adi_fpga9001_Device_t *device,
-                                                   adi_fpga9001_SsiCalibrationCfg_t *ssiCalibration)
-{
-    /* Rx1 */
-    ADI_EXPECT(fpga9001_AxiAdrv9001RxRxWrdelay0BfGet, device, FPGA9001_BF_AXI_ADRV9001_RX_0, &ssiCalibration->rxIDataDelay[0]);
-    ADI_EXPECT(fpga9001_AxiAdrv9001RxRxWrdelay2BfGet, device, FPGA9001_BF_AXI_ADRV9001_RX_0, &ssiCalibration->rxQDataDelay[0]);
-    ADI_EXPECT(fpga9001_AxiAdrv9001RxRxWrdelaySBfGet, device, FPGA9001_BF_AXI_ADRV9001_RX_0, &ssiCalibration->rxStrobeDelay[0]);
+    fpga9001_SsiDelayGet_1(device, ADI_TX, ADI_CHANNEL_1, &ssiDelay[0]);
+    ssiCalibration->txIDataDelay[0] = ssiDelay[0];
+    if (ssiType == ADI_FPGA9001_SSI_TYPE_LVDS) 
+        ssiCalibration->txQDataDelay[0] = ssiDelay[1];
+    else
+        ssiCalibration->txQDataDelay[0] = ssiDelay[2];
+    ssiCalibration->txStrobeDelay[0] = ssiDelay[4];
+    ssiCalibration->txClkDelay[0] = ssiDelay[5];
 
-    /* Rx2 */
-    ADI_EXPECT(fpga9001_AxiAdrv9001RxRxWrdelay0BfGet, device, FPGA9001_BF_AXI_ADRV9001_RX_1, &ssiCalibration->rxIDataDelay[1]);
-    ADI_EXPECT(fpga9001_AxiAdrv9001RxRxWrdelay2BfGet, device, FPGA9001_BF_AXI_ADRV9001_RX_1, &ssiCalibration->rxQDataDelay[1]);
-    ADI_EXPECT(fpga9001_AxiAdrv9001RxRxWrdelaySBfGet, device, FPGA9001_BF_AXI_ADRV9001_RX_1, &ssiCalibration->rxStrobeDelay[1]);
-
-    /* Tx1 */
-    ADI_EXPECT(fpga9001_AxiAdrv9001TxTxWrdelay0BfGet, device, FPGA9001_BF_AXI_ADRV9001_TX_0, &ssiCalibration->txIDataDelay[0]);
-    ADI_EXPECT(fpga9001_AxiAdrv9001TxTxWrdelay2BfGet, device, FPGA9001_BF_AXI_ADRV9001_TX_0, &ssiCalibration->txQDataDelay[0]);
-    ADI_EXPECT(fpga9001_AxiAdrv9001TxTxWrdelaySBfGet, device, FPGA9001_BF_AXI_ADRV9001_TX_0, &ssiCalibration->txStrobeDelay[0]);
-    ADI_EXPECT(fpga9001_AxiAdrv9001TxTxWrdelayCBfGet, device, FPGA9001_BF_AXI_ADRV9001_TX_0, &ssiCalibration->txClkDelay[0]);
-
-    /* Tx2 */
-    ADI_EXPECT(fpga9001_AxiAdrv9001TxTxWrdelay0BfGet, device, FPGA9001_BF_AXI_ADRV9001_TX_1, &ssiCalibration->txIDataDelay[1]);
-    ADI_EXPECT(fpga9001_AxiAdrv9001TxTxWrdelay2BfGet, device, FPGA9001_BF_AXI_ADRV9001_TX_1, &ssiCalibration->txQDataDelay[1]);
-    ADI_EXPECT(fpga9001_AxiAdrv9001TxTxWrdelaySBfGet, device, FPGA9001_BF_AXI_ADRV9001_TX_1, &ssiCalibration->txStrobeDelay[1]);
-    ADI_EXPECT(fpga9001_AxiAdrv9001TxTxWrdelayCBfGet, device, FPGA9001_BF_AXI_ADRV9001_TX_1, &ssiCalibration->txClkDelay[1]);
-
-    ADI_API_RETURN(device);
-}
-
-static int32_t adi_fpga9001_Ssi_LvdsDelayConfigGet(adi_fpga9001_Device_t *device,
-                                                   adi_fpga9001_SsiCalibrationCfg_t *ssiCalibration)
-{
-    /* Rx1 */
-    ADI_EXPECT(fpga9001_AxiAdrv9001RxRxWrdelay0BfGet, device, FPGA9001_BF_AXI_ADRV9001_RX_0, &ssiCalibration->rxIDataDelay[0]);
-    ADI_EXPECT(fpga9001_AxiAdrv9001RxRxWrdelay1BfGet, device, FPGA9001_BF_AXI_ADRV9001_RX_0, &ssiCalibration->rxQDataDelay[0]);
-    ADI_EXPECT(fpga9001_AxiAdrv9001RxRxWrdelaySBfGet, device, FPGA9001_BF_AXI_ADRV9001_RX_0, &ssiCalibration->rxStrobeDelay[0]);
-
-    /* Rx2 */
-    ADI_EXPECT(fpga9001_AxiAdrv9001RxRxWrdelay0BfGet, device, FPGA9001_BF_AXI_ADRV9001_RX_1, &ssiCalibration->rxIDataDelay[1]);
-    ADI_EXPECT(fpga9001_AxiAdrv9001RxRxWrdelay1BfGet, device, FPGA9001_BF_AXI_ADRV9001_RX_1, &ssiCalibration->rxQDataDelay[1]);
-    ADI_EXPECT(fpga9001_AxiAdrv9001RxRxWrdelaySBfGet, device, FPGA9001_BF_AXI_ADRV9001_RX_1, &ssiCalibration->rxStrobeDelay[1]);
-
-    /* Tx1 */
-    ADI_EXPECT(fpga9001_AxiAdrv9001TxTxWrdelay0BfGet, device, FPGA9001_BF_AXI_ADRV9001_TX_0, &ssiCalibration->txIDataDelay[0]);
-    ADI_EXPECT(fpga9001_AxiAdrv9001TxTxWrdelay1BfGet, device, FPGA9001_BF_AXI_ADRV9001_TX_0, &ssiCalibration->txQDataDelay[0]);
-    ADI_EXPECT(fpga9001_AxiAdrv9001TxTxWrdelaySBfGet, device, FPGA9001_BF_AXI_ADRV9001_TX_0, &ssiCalibration->txStrobeDelay[0]);
-    ADI_EXPECT(fpga9001_AxiAdrv9001TxTxWrdelayCBfGet, device, FPGA9001_BF_AXI_ADRV9001_TX_0, &ssiCalibration->txClkDelay[0]);
-
-    /* Tx2 */
-    ADI_EXPECT(fpga9001_AxiAdrv9001TxTxWrdelay0BfGet, device, FPGA9001_BF_AXI_ADRV9001_TX_1, &ssiCalibration->txIDataDelay[1]);
-    ADI_EXPECT(fpga9001_AxiAdrv9001TxTxWrdelay1BfGet, device, FPGA9001_BF_AXI_ADRV9001_TX_1, &ssiCalibration->txQDataDelay[1]);
-    ADI_EXPECT(fpga9001_AxiAdrv9001TxTxWrdelaySBfGet, device, FPGA9001_BF_AXI_ADRV9001_TX_1, &ssiCalibration->txStrobeDelay[1]);
-    ADI_EXPECT(fpga9001_AxiAdrv9001TxTxWrdelayCBfGet, device, FPGA9001_BF_AXI_ADRV9001_TX_1, &ssiCalibration->txClkDelay[1]);
-
-    ADI_API_RETURN(device);
+    fpga9001_SsiDelayGet_1(device, ADI_TX, ADI_CHANNEL_2, &ssiDelay[0]);
+    ssiCalibration->txIDataDelay[1] = ssiDelay[0];
+    if (ssiType == ADI_FPGA9001_SSI_TYPE_LVDS) 
+        ssiCalibration->txQDataDelay[1] = ssiDelay[1];
+    else
+        ssiCalibration->txQDataDelay[1] = ssiDelay[2];
+    ssiCalibration->txStrobeDelay[1] = ssiDelay[4];
+    ssiCalibration->txClkDelay[1] = ssiDelay[5];
 }
 
 static int32_t adi_fpga9001_Ssi_Delay_Inspect_Validate(adi_fpga9001_Device_t *device,
@@ -533,15 +479,6 @@ int32_t adi_fpga9001_Ssi_Delay_Inspect(adi_fpga9001_Device_t *device,
                                        adi_fpga9001_SsiCalibrationCfg_t *ssiCalibration)
 {
     ADI_PERFORM_VALIDATION(adi_fpga9001_Ssi_Delay_Inspect_Validate, device, ssiType, ssiCalibration);
-
-    if (ADI_FPGA9001_SSI_TYPE_LVDS == ssiType)
-    {
-        ADI_EXPECT(adi_fpga9001_Ssi_LvdsDelayConfigGet, device, ssiCalibration);
-    }
-    else
-    {
-        ADI_EXPECT(adi_fpga9001_Ssi_CmosDelayConfigGet, device, ssiCalibration);
-    }
-
+    fpga9001_SsiDelayGet(device, ssiType, ssiCalibration);
     ADI_API_RETURN(device);
 }

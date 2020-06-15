@@ -11,264 +11,174 @@
  * see the "LICENSE.txt" file in this zip file.
  */
 
-#include <stdbool.h>
-#include "adi_adrv9001_user.h"
-#include "adi_common_error.h"
-#include "adi_common_macros.h"
-#include "adi_fpga9001_user.h"
+#include "fpga9001_utilities.h"
 #include "adi_fpga9001_tdd.h"
-#include "adi_fpga9001.h"
 
-#include "fpga9001_bf_tdd_dp_ctrl.h"
-#include "fpga9001_bf_axi_tdd_enable.h"
-#include "fpga9001_bf_axi_tdd_frame.h"
-#include "fpga9001_decode_bf_enum.h"
+/* TDD framing registers */
 
-static int32_t adi_fpga9001_Channel_Validate(adi_fpga9001_Device_t *device,
-                                             adi_common_ChannelNumber_e channel)
+static int32_t fpga9001_Tdd_Frame_Set(adi_fpga9001_Device_t *device,
+                                        adi_fpga9001_TddFraming_t *framing,
+                                        uint32_t frameSwitchNum)
 {
-    ADI_RANGE_CHECK(device, channel, ADI_CHANNEL_1, ADI_CHANNEL_2);
+    struct axi_adrv9001_tdd_frame_params tdd_params;
+
+    tdd_params.period = framing->framePeriod;
+    tdd_params.num_of_frames = framing->numberFrames;
+
+    /* api-dll is setting this only if numberFrames > 0, this needs to be fixed */
+     
+    tdd_params.continous = 1;
+
+    /* A TDD frame consists of framePeriod clock cycles. The frames, can be shortened (prematurely terminated) */
+    /* using the frame switch registers below. The frame is prematurely terminated, if the frame-switch-enable */
+    /* bit is set, frame count matches the frame-switch-num and clock count matches the frame-switch-period. */
+
+    /* for now ignore these, it seems the labview is confused about it */
+
+    tdd_params.frame_switch_period = 0;
+    tdd_params.frame_switch_num = 0;
+    tdd_params.frame_switch_enable = 0;
+
+    tdd_params.trigger_mode[0] = (framing->enableSyncExtTrig) ? AXI_ADRV9001_TDD_TRIGGER_RISING_EDGE :
+      AXI_ADRV9001_TDD_TRIGGER_DISABLED;
+    tdd_params.trigger_mode[1] = AXI_ADRV9001_TDD_TRIGGER_DISABLED;
+    tdd_params.trigger_mode[2] = AXI_ADRV9001_TDD_TRIGGER_DISABLED;
+    tdd_params.trigger_mode[3] = AXI_ADRV9001_TDD_TRIGGER_DISABLED;
+    axi_adrv9001_tdd_frame_config_set((void *)device, AXI_ADRV9001_ID, &tdd_params);
+	
     ADI_API_RETURN(device);
 }
 
-static int32_t adi_fpga9001_Port_Validate(adi_fpga9001_Device_t *device,
-                                          adi_common_Port_e port)
+static int32_t fpga9001_Tdd_Frame_Get(adi_fpga9001_Device_t *device,
+                                        adi_fpga9001_TddFraming_t *framing,
+                                        uint32_t *frameSwitchNum)
 {
-    ADI_RANGE_CHECK(device, port, ADI_RX, ADI_ELB);
+    struct axi_adrv9001_tdd_frame_params tdd_params;
+
+    axi_adrv9001_tdd_frame_config_get((void *)device, AXI_ADRV9001_ID, &tdd_params);
+    framing->framePeriod = tdd_params.period;
+    framing->numberFrames = tdd_params.num_of_frames;
+    framing->repeatFrameSequence = tdd_params.continous;
+    framing->frameSwitchTime = tdd_params.frame_switch_period;
+    *frameSwitchNum = tdd_params.frame_switch_num;
+
+    framing->enableSyncExtTrig = (tdd_params.trigger_mode[0] == AXI_ADRV9001_TDD_TRIGGER_RISING_EDGE) ? true : false;
     ADI_API_RETURN(device);
 }
 
-static int32_t adi_fpga9001_ManualEnable_Set_Validate(adi_fpga9001_Device_t *device,
-                                                      adi_common_Port_e port,
-                                                      adi_common_ChannelNumber_e channel)
+/* TDD Enable registers */
+
+static int32_t fpga9001_Tdd_Enable_Set(adi_fpga9001_Device_t *device,
+                                       uint32_t fpga9001_Tdd_Id,
+                                       adi_fpga9001_TddTiming_t *timing,
+                                       adi_fpga9001_TddSequence_t *sequence,
+									   bool enable)
 {
-    ADI_EXPECT(adi_fpga9001_Channel_Validate, device, channel);
-    ADI_EXPECT(adi_fpga9001_Port_Validate, device, port);
+
+    struct axi_adrv9001_tdd_enable_params tdd_params;
+
+    tdd_params.primary_assert = timing->primaryAssert;
+    tdd_params.primary_deassert = timing->primaryDeassert;
+    tdd_params.secondary_assert = timing->secondaryAssert;
+    tdd_params.secondary_deassert = timing->secondaryDeassert;
+    tdd_params.primary_frame_assert = sequence->primaryFrameAssert;
+    tdd_params.primary_frame_deassert = sequence->primaryFrameDeassert;
+    tdd_params.secondary_frame_assert = sequence->secondaryFrameAssert;
+    tdd_params.secondary_frame_deassert = sequence->secondaryFrameDeassert;
+    axi_adrv9001_tdd_enable_config_set((void *)device, AXI_ADRV9001_ID, fpga9001_Tdd_Id, &tdd_params);
+	if (enable == true)
+	{
+		axi_adrv9001_tdd_enable_mode_set((void *)device, AXI_ADRV9001_ID, fpga9001_Tdd_Id, AXI_ADRV9001_TDD_ENABLE_AUTO);	
+	}
+	else
+	{
+		axi_adrv9001_tdd_enable_mode_set((void *)device, AXI_ADRV9001_ID, fpga9001_Tdd_Id, AXI_ADRV9001_TDD_ENABLE_LOW);
+	}
     
     ADI_API_RETURN(device);
 }
 
-int32_t adi_fpga9001_Tdd_ManualEnable_Set(adi_fpga9001_Device_t *device,
-                                         adi_common_Port_e port,
-                                         adi_common_ChannelNumber_e channel,
-                                         bool enable)
+static int32_t fpga9001_Tdd_Enable_Get(adi_fpga9001_Device_t *device,
+                                       uint32_t fpga9001_Tdd_Id,
+                                       adi_fpga9001_TddTiming_t *timing,
+                                       adi_fpga9001_TddSequence_t *sequence,
+									   bool *enable)
 {
-    fpga9001_BfAxiTddEnableChanAddr_e baseAddr = FPGA9001_BF_AXI_ADRV9001_TDD_ENABLE_TX_0;
-    fpga9001_BfTddDpCtrlChanAddr_e dpBaseAddr = FPGA9001_BF_RX_DP_CTRL_00;
 
-    ADI_PERFORM_VALIDATION(adi_fpga9001_ManualEnable_Set_Validate, device, port, channel);
+    struct axi_adrv9001_tdd_enable_params tdd_params;
 
-    if ((port == ADI_ORX) ||
-        (port == ADI_ILB) ||
-        (port == ADI_ELB))
+    axi_adrv9001_tdd_enable_config_get((void *)device, AXI_ADRV9001_ID, fpga9001_Tdd_Id, &tdd_params);
+    timing->primaryAssert = tdd_params.primary_assert;
+    timing->primaryDeassert = tdd_params.primary_deassert;
+    timing->secondaryAssert = tdd_params.secondary_assert;
+    timing->secondaryDeassert = tdd_params.secondary_deassert;
+    sequence->primaryFrameAssert = tdd_params.primary_frame_assert;
+    sequence->primaryFrameDeassert = tdd_params.primary_frame_deassert;
+    sequence->secondaryFrameAssert = tdd_params.secondary_frame_assert;
+    sequence->secondaryFrameDeassert = tdd_params.secondary_frame_deassert;
+	uint32_t enableRead = 0;
+	enableRead = axi_adrv9001_tdd_enable_mode_get((void *)device, AXI_ADRV9001_ID, fpga9001_Tdd_Id);
+	if (enableRead == AXI_ADRV9001_TDD_ENABLE_AUTO)
+	{
+		*enable = true;
+	}
+	else
+	{
+		*enable = false;
+	}
+    ADI_API_RETURN(device);
+}
+
+static int32_t fpga9001_Tdd_Enable_Validate(adi_fpga9001_Device_t *device,
+                                            adi_fpga9001_TddTiming_t *timing,
+                                            adi_fpga9001_TddSequence_t *sequence,
+                                            uint32_t framePeriod,
+                                            uint32_t numberFrames)
+{
+    ADI_RANGE_CHECK(device, timing->primaryAssert, 1, (framePeriod - 1));
+    ADI_RANGE_CHECK(device, timing->primaryDeassert, 1, (framePeriod - 1));
+
+    /* This is not an error, this means signal is disabled */
+
+    if (timing->primaryAssert == timing->primaryDeassert)
     {
-        port = ADI_ORX;
-    }
-
-    baseAddr = fpga9001_TddEnableChanAddr_Get(port, channel);
-    dpBaseAddr = fpga9001_TddDpCtrlChanAddr_Get(baseAddr);
-    
-    ADI_EXPECT(fpga9001_AxiTddEnablePinprimaryenableBfSet, device, baseAddr, false);
-    ADI_EXPECT(fpga9001_AxiTddEnablePinsecondaryenableBfSet, device, baseAddr, false);
-    ADI_EXPECT(fpga9001_AxiTddEnablePinmanualassertBfSet, device, baseAddr, enable);
-    ADI_EXPECT(fpga9001_AxiTddEnableDmamanualassertBfSet, device, baseAddr, enable);
-    ADI_EXPECT(fpga9001_TddDpCtrlManualAssertBfSet, device, dpBaseAddr, enable);
-
-    ADI_API_RETURN(device);
-}
-
-static int32_t adi_fpga9001_ManualEnable_Get_Validate(adi_fpga9001_Device_t *device,
-                                                      adi_common_Port_e port,
-                                                      adi_common_ChannelNumber_e channel,
-                                                      bool *enable)
-{
-    ADI_EXPECT(adi_fpga9001_Channel_Validate, device, channel);
-    ADI_EXPECT(adi_fpga9001_Port_Validate, device, port);
-    
-    ADI_NULL_PTR_RETURN(&device->common, enable);
-    
-    ADI_API_RETURN(device);
-}
-
-int32_t adi_fpga9001_Tdd_ManualEnable_Get(adi_fpga9001_Device_t *device,
-                                         adi_common_Port_e port,
-                                         adi_common_ChannelNumber_e channel,
-                                         bool *enable)
-{
-    fpga9001_BfAxiTddEnableChanAddr_e baseAddr = FPGA9001_BF_AXI_ADRV9001_TDD_ENABLE_TX_0;
-    
-    ADI_PERFORM_VALIDATION(adi_fpga9001_ManualEnable_Get_Validate, device, port, channel, enable);
-
-    if ((port == ADI_ORX) ||
-        (port == ADI_ILB) ||
-        (port == ADI_ELB))
-    {
-        port = ADI_ORX;
-    }
-
-    baseAddr = fpga9001_TddEnableChanAddr_Get(port, channel);
-    
-    ADI_EXPECT(fpga9001_AxiTddEnablePinmanualassertBfGet, device, baseAddr, (uint8_t*)enable);
-    
-    ADI_API_RETURN(device);
-}
-
-static int32_t fpga9001_TddFraming_Set(adi_fpga9001_Device_t *device, adi_fpga9001_TddFraming_t *framing)
-{
-    fpga9001_BfAxiTddFrameChanAddr_e baseAddr = FPGA9001_BF_AXI_ADRV9001_TDD_FRAME_0;
-
-    ADI_EXPECT(fpga9001_AxiTddFrameTddframeperiodenableBfSet, device, baseAddr, false);
-    ADI_EXPECT(fpga9001_AxiTddFrameTddnumberframesenableBfSet, device, baseAddr, false);
-    
-    ADI_EXPECT(fpga9001_AxiTddFrameTddtriggerenableBfSet, device, baseAddr, framing->enableSyncExtTrig);
-    ADI_EXPECT(fpga9001_AxiTddFrameTddframesequencerepeatBfSet, device, baseAddr, framing->repeatFrameSequence);
-    ADI_EXPECT(fpga9001_AxiTddFrameTddframeswitchtimechannelBfSet, device, baseAddr, framing->frameSwitchTimeChannel);
-    ADI_EXPECT(fpga9001_AxiTddFrameTddframeswitchtimeBfSet, device, baseAddr, framing->frameSwitchTime);
-    ADI_EXPECT(fpga9001_AxiTddFrameTddframeperiodBfSet, device, baseAddr, framing->framePeriod);
-    ADI_EXPECT(fpga9001_AxiTddFrameTddnumberframesBfSet, device, baseAddr, framing->numberFrames);
-        
-    ADI_API_RETURN(device);
-}
-
-static int32_t fpga9001_TddFraming_Get(adi_fpga9001_Device_t *device, adi_fpga9001_TddFraming_t *framing)
-{
-    uint8_t bfVal = 0;
-    fpga9001_BfAxiTddFrameChanAddr_e baseAddr = FPGA9001_BF_AXI_ADRV9001_TDD_FRAME_0;
-
-    ADI_EXPECT(fpga9001_AxiTddFrameTddframeperiodenableBfGet, device, baseAddr, false);
-    ADI_EXPECT(fpga9001_AxiTddFrameTddnumberframesenableBfGet, device, baseAddr, false);
-    
-    ADI_EXPECT(fpga9001_AxiTddFrameTddtriggerenableBfGet, device, baseAddr, &bfVal);
-    framing->enableSyncExtTrig = (bool)bfVal;
-    ADI_EXPECT(fpga9001_AxiTddFrameTddframesequencerepeatBfGet, device, baseAddr, &bfVal);
-    framing->repeatFrameSequence = (bool)bfVal;
-    ADI_EXPECT(fpga9001_AxiTddFrameTddframeswitchtimechannelBfGet, device, baseAddr, &framing->frameSwitchTimeChannel);
-    ADI_EXPECT(fpga9001_AxiTddFrameTddframeswitchtimeBfGet, device, baseAddr, &framing->frameSwitchTime);
-    ADI_EXPECT(fpga9001_AxiTddFrameTddframeperiodBfGet, device, baseAddr, &framing->framePeriod);
-    ADI_EXPECT(fpga9001_AxiTddFrameTddnumberframesBfGet, device, baseAddr, &framing->numberFrames);
-    
-    ADI_API_RETURN(device);
-}
-
-static int32_t fpga9001_TddTiming_Set_Validate(adi_fpga9001_Device_t *device,
-                                               fpga9001_BfAxiTddEnableChanAddr_e baseAddr,
-                                               adi_fpga9001_TddTiming_t *tddTiming,
-                                               uint32_t framePeriod)
-{
-    ADI_RANGE_CHECK(device, tddTiming->primaryAssert, 1, (framePeriod - 1));
-    ADI_RANGE_CHECK(device, tddTiming->primaryDeassert, 1, (framePeriod - 1));
-    if (tddTiming->primaryAssert == tddTiming->primaryDeassert)
-    {
-        ADI_ERROR_REPORT(&device->common,
-                         ADI_COMMON_ERRSRC_API,
-                         ADI_COMMON_ERR_INV_PARAM,
-                         ADI_COMMON_ACT_ERR_CHECK_PARAM,
-                         tddTiming->primaryDeassert,
-                         "Invalid parameter value. tddTiming->primaryDeassert must not equal tddTiming->primaryAssert");
+        ADI_ERROR_REPORT(&device->common, ADI_COMMON_ERRSRC_API, ADI_COMMON_ERR_INV_PARAM,
+            ADI_COMMON_ACT_ERR_CHECK_PARAM, timing->primaryDeassert,
+            "Invalid parameter value, timing->primaryDeassert must not equal timing->primaryAssert");
     }
         
     /* Secondary event is optional */
-    if (tddTiming->secondaryAssert > 0)
+
+    if (timing->secondaryAssert > 0)
     {
         /* Primary event cannot cross frame boundary if there is a secondary event */
-        ADI_RANGE_CHECK(device, tddTiming->primaryDeassert, (tddTiming->primaryAssert + 1), (framePeriod - 1));
+        ADI_RANGE_CHECK(device, timing->primaryDeassert, (timing->primaryAssert + 1), (framePeriod - 1));
         
         /* Secondary event cannot overlap primary event */
-        ADI_RANGE_CHECK(device, tddTiming->secondaryAssert, (tddTiming->primaryDeassert + 1), (framePeriod - 1));
-        ADI_RANGE_CHECK(device, tddTiming->secondaryDeassert, 1, (framePeriod - 1));
+        ADI_RANGE_CHECK(device, timing->secondaryAssert, (timing->primaryDeassert + 1), (framePeriod - 1));
+        ADI_RANGE_CHECK(device, timing->secondaryDeassert, 1, (framePeriod - 1));
         
-        if (tddTiming->secondaryAssert == tddTiming->secondaryDeassert)
+        if (timing->secondaryAssert == timing->secondaryDeassert)
         {
-            ADI_ERROR_REPORT(&device->common,
-                             ADI_COMMON_ERRSRC_API,
-                             ADI_COMMON_ERR_INV_PARAM,
-                             ADI_COMMON_ACT_ERR_CHECK_PARAM,
-                             tddTiming->secondaryDeassert,
-                             "Invalid parameter value. tddTiming->secondaryDeassert must not equal tddTiming->secondaryAssert");
+            ADI_ERROR_REPORT(&device->common, ADI_COMMON_ERRSRC_API, ADI_COMMON_ERR_INV_PARAM,
+                ADI_COMMON_ACT_ERR_CHECK_PARAM, timing->secondaryDeassert,
+                "Invalid parameter value. timing->secondaryDeassert must not equal timing->secondaryAssert");
         }
         
         /* If secondary event crosses frame boundary */
-        if (tddTiming->secondaryDeassert < tddTiming->secondaryAssert)
+        if (timing->secondaryDeassert < timing->secondaryAssert)
         {
             /* Secondary event cannot overlap primary event */
-            if (tddTiming->secondaryDeassert >= tddTiming->primaryAssert)
+            if (timing->secondaryDeassert >= timing->primaryAssert)
             {
-                ADI_ERROR_REPORT(&device->common,
-                                 ADI_COMMON_ERRSRC_API,
-                                 ADI_COMMON_ERR_INV_PARAM,
-                                 ADI_COMMON_ACT_ERR_CHECK_PARAM,
-                                 tddTiming->secondaryDeassert,
-                                 "Invalid parameter value. Secondary event cannot overlap primary event, tddTiming->secondaryDeassert must be less than tddTiming->primaryAssert");
+                ADI_ERROR_REPORT(&device->common, ADI_COMMON_ERRSRC_API, ADI_COMMON_ERR_INV_PARAM,
+                    ADI_COMMON_ACT_ERR_CHECK_PARAM, timing->secondaryDeassert,
+                    "Invalid parameter value. Secondary event cannot overlap primary event, "
+                    "timing->secondaryDeassert must be less than timing->primaryAssert");
             }
         }
     }
     
-    ADI_API_RETURN(device);
-}
-
-static int32_t fpga9001_TddPinTiming_Set(adi_fpga9001_Device_t *device,
-                                         fpga9001_BfAxiTddEnableChanAddr_e baseAddr,
-                                         adi_fpga9001_TddTiming_t *timing,
-                                         bool channelEnabled)
-{
-    ADI_EXPECT(fpga9001_AxiTddEnablePinprimaryenableBfSet, device, baseAddr, channelEnabled);
-    ADI_EXPECT(fpga9001_AxiTddEnablePinprimaryassertBfSet, device, baseAddr, timing->primaryAssert);
-    ADI_EXPECT(fpga9001_AxiTddEnablePinprimarydeassertBfSet, device, baseAddr, timing->primaryDeassert);
-    
-    ADI_EXPECT(fpga9001_AxiTddEnablePinsecondaryenableBfSet, device, baseAddr, channelEnabled);
-    ADI_EXPECT(fpga9001_AxiTddEnablePinsecondaryassertBfSet, device, baseAddr, timing->secondaryAssert);
-    ADI_EXPECT(fpga9001_AxiTddEnablePinsecondarydeassertBfSet, device, baseAddr, timing->secondaryDeassert);
-    
-    ADI_API_RETURN(device);
-}
-
-static int32_t fpga9001_TddPinTiming_Get(adi_fpga9001_Device_t *device,
-                                         fpga9001_BfAxiTddEnableChanAddr_e baseAddr,
-                                         adi_fpga9001_TddTiming_t *timing)
-{
-    ADI_EXPECT(fpga9001_AxiTddEnablePinprimaryassertBfGet, device, baseAddr, &timing->primaryAssert);
-    ADI_EXPECT(fpga9001_AxiTddEnablePinprimarydeassertBfGet, device, baseAddr, &timing->primaryDeassert);
-    
-    ADI_EXPECT(fpga9001_AxiTddEnablePinsecondaryassertBfGet, device, baseAddr, &timing->secondaryAssert);
-    ADI_EXPECT(fpga9001_AxiTddEnablePinsecondarydeassertBfGet, device, baseAddr, &timing->secondaryDeassert);
-    
-    ADI_API_RETURN(device);
-}
-
-static int32_t fpga9001_TddTollgateTiming_Set(adi_fpga9001_Device_t *device,
-                                              fpga9001_BfTddDpCtrlChanAddr_e baseAddr,
-                                              adi_fpga9001_TddTiming_t *timing,
-                                              bool channelEnabled)
-{
-    ADI_EXPECT(fpga9001_TddDpCtrlPrimaryEnableBfSet, device, baseAddr, channelEnabled);
-    ADI_EXPECT(fpga9001_TddDpCtrlPrimaryAssertBfSet, device, baseAddr, timing->primaryAssert);
-    ADI_EXPECT(fpga9001_TddDpCtrlPrimaryDeassertBfSet, device, baseAddr, timing->primaryDeassert);
-    
-    ADI_EXPECT(fpga9001_TddDpCtrlSecondaryEnableBfSet, device, baseAddr, channelEnabled);
-    ADI_EXPECT(fpga9001_TddDpCtrlSecondaryAssertBfSet, device, baseAddr, timing->secondaryAssert);
-    ADI_EXPECT(fpga9001_TddDpCtrlSecondaryDeassertBfSet, device, baseAddr, timing->secondaryDeassert);
-      
-    ADI_API_RETURN(device);
-}
-
-static int32_t fpga9001_TddTollgateTiming_Get(adi_fpga9001_Device_t *device,
-                                         fpga9001_BfTddDpCtrlChanAddr_e baseAddr,
-                                         adi_fpga9001_TddTiming_t *timing)
-{
-    ADI_EXPECT(fpga9001_TddDpCtrlPrimaryAssertBfGet, device, baseAddr, &timing->primaryAssert);
-    ADI_EXPECT(fpga9001_TddDpCtrlPrimaryDeassertBfGet, device, baseAddr, &timing->primaryDeassert);
-    
-    ADI_EXPECT(fpga9001_TddDpCtrlSecondaryAssertBfGet, device, baseAddr, &timing->secondaryAssert);
-    ADI_EXPECT(fpga9001_TddDpCtrlSecondaryDeassertBfGet, device, baseAddr, &timing->secondaryDeassert);
-      
-    ADI_API_RETURN(device);
-}
-
-static int32_t fpga9001_TddSequence_Set_Validate(adi_fpga9001_Device_t *device,
-                                                 fpga9001_BfAxiTddEnableChanAddr_e baseAddr,
-                                                 adi_fpga9001_TddSequence_t *sequence,
-                                                 uint32_t numberFrames)
-{
     /* Only applies for a non-zero numberFrames */
     if (numberFrames > 0)
     {
@@ -292,131 +202,81 @@ static int32_t fpga9001_TddSequence_Set_Validate(adi_fpga9001_Device_t *device,
     ADI_API_RETURN(device);
 }
 
-static int32_t fpga9001_TddPinSequence_Set(adi_fpga9001_Device_t *device,
-                                           fpga9001_BfAxiTddEnableChanAddr_e baseAddr,
-                                           adi_fpga9001_TddSequence_t *sequence)
+static int32_t adi_fpga9001_Tdd_ManualEnable_Validate(adi_fpga9001_Device_t *device,
+                                                          adi_common_Port_e port,
+                                                          adi_common_ChannelNumber_e channel)
 {
-    ADI_EXPECT(fpga9001_AxiTddEnablePinframeprimaryassertBfSet, device, baseAddr, sequence->primaryFrameAssert);
-    ADI_EXPECT(fpga9001_AxiTddEnablePinframeprimarydeassertBfSet, device, baseAddr, sequence->primaryFrameDeassert);
+    ADI_RANGE_CHECK(device, port, ADI_RX, ADI_ELB);
+    ADI_RANGE_CHECK(device, channel, ADI_CHANNEL_1, ADI_CHANNEL_2);
+    ADI_API_RETURN(device);
+}
+
+/* External user functions */
+
+/* If enable == true; pin is asserted high, else asserted low. */
+/* This function also disables hardware control of TDD state machine. */
+
+int32_t adi_fpga9001_Tdd_ManualEnable_Set(adi_fpga9001_Device_t *device,
+                                          adi_common_Port_e port,
+                                          adi_common_ChannelNumber_e channel,
+                                          bool enable)
+{
+    uint32_t tdd_mode;
+    uint32_t tdd_id;
     
-    ADI_EXPECT(fpga9001_AxiTddEnablePinframesecondaryassertBfSet, device, baseAddr, sequence->secondaryFrameAssert);
-    ADI_EXPECT(fpga9001_AxiTddEnablePinframesecondarydeassertBfSet, device, baseAddr, sequence->secondaryFrameDeassert);
+    ADI_PERFORM_VALIDATION(adi_fpga9001_Tdd_ManualEnable_Validate, device, port, channel);
+
+    tdd_id = fpga9001_TddIdGet(device, port, channel);
+    if (tdd_id == (uint32_t) -1) return(-1);
+
+    tdd_mode = (enable) ? AXI_ADRV9001_TDD_ENABLE_HIGH : AXI_ADRV9001_TDD_ENABLE_LOW;
+    axi_adrv9001_tdd_enable_mode_set((void *)device, AXI_ADRV9001_ID, tdd_id, tdd_mode);
+    
+    tdd_id = fpga9001_TddDmaIdGet(device, port, channel);
+    if (tdd_id == (uint32_t) - 1) return (-1);
+    axi_adrv9001_tdd_enable_mode_set((void *)device, AXI_ADRV9001_ID, tdd_id, tdd_mode);
     
     ADI_API_RETURN(device);
 }
 
-static int32_t fpga9001_TddPinSequence_Get(adi_fpga9001_Device_t *device,
-                                           fpga9001_BfAxiTddEnableChanAddr_e baseAddr,
-                                           adi_fpga9001_TddSequence_t *sequence)
+static int32_t adi_fpga9001_Tdd_ManualEnable_Get_Validate(adi_fpga9001_Device_t *device,
+                                                          adi_common_Port_e port,
+                                                          adi_common_ChannelNumber_e channel,
+                                                          bool *enable)
 {
-    ADI_EXPECT(fpga9001_AxiTddEnablePinframeprimaryassertBfGet, device, baseAddr, &sequence->primaryFrameAssert);
-    ADI_EXPECT(fpga9001_AxiTddEnablePinframeprimarydeassertBfGet, device, baseAddr, &sequence->primaryFrameDeassert);
-    
-    ADI_EXPECT(fpga9001_AxiTddEnablePinframesecondaryassertBfGet, device, baseAddr, &sequence->secondaryFrameAssert);
-    ADI_EXPECT(fpga9001_AxiTddEnablePinframesecondarydeassertBfGet, device, baseAddr, &sequence->secondaryFrameDeassert);
-    
+    ADI_EXPECT(adi_fpga9001_Tdd_ManualEnable_Validate, device, port, channel);
+    ADI_NULL_PTR_RETURN(&device->common, enable);
     ADI_API_RETURN(device);
 }
 
-static int32_t fpga9001_TddTollgateSequence_Set(adi_fpga9001_Device_t *device,
-                                                fpga9001_BfTddDpCtrlChanAddr_e baseAddr,
-                                                adi_fpga9001_TddSequence_t *sequence)
+/* This function is probably useless, what is it supposed to return if enable is in auto mode? */
+int32_t adi_fpga9001_Tdd_ManualEnable_Get(adi_fpga9001_Device_t *device,
+                                          adi_common_Port_e port,
+                                          adi_common_ChannelNumber_e channel,
+                                          bool *enable)
 {
-    ADI_EXPECT(fpga9001_TddDpCtrlFramePrimaryAssertBfSet, device, baseAddr, sequence->primaryFrameAssert);
-    ADI_EXPECT(fpga9001_TddDpCtrlFramePrimaryDeassertBfSet, device, baseAddr, sequence->primaryFrameDeassert);
-    
-    ADI_EXPECT(fpga9001_TddDpCtrlFrameSecondaryAssertBfSet, device, baseAddr, sequence->secondaryFrameAssert);
-    ADI_EXPECT(fpga9001_TddDpCtrlFrameSecondaryDeassertBfSet, device, baseAddr, sequence->secondaryFrameDeassert);
-    
-    ADI_API_RETURN(device);
-}
+    uint32_t tdd_mode;
+    uint32_t tdd_id;
 
-static int32_t fpga9001_TddTollgateSequence_Get(adi_fpga9001_Device_t *device,
-                                                fpga9001_BfTddDpCtrlChanAddr_e baseAddr,
-                                                adi_fpga9001_TddSequence_t *sequence)
-{
-    ADI_EXPECT(fpga9001_TddDpCtrlFramePrimaryAssertBfGet, device, baseAddr, &sequence->primaryFrameAssert);
-    ADI_EXPECT(fpga9001_TddDpCtrlFramePrimaryDeassertBfGet, device, baseAddr, &sequence->primaryFrameDeassert);
-    
-    ADI_EXPECT(fpga9001_TddDpCtrlFrameSecondaryAssertBfGet, device, baseAddr, &sequence->secondaryFrameAssert);
-    ADI_EXPECT(fpga9001_TddDpCtrlFrameSecondaryDeassertBfGet, device, baseAddr, &sequence->secondaryFrameDeassert);
-    
-    ADI_API_RETURN(device);
-}
+    ADI_PERFORM_VALIDATION(adi_fpga9001_Tdd_ManualEnable_Get_Validate, device, port, channel, enable);
 
-static int32_t fpga9001_TddChannel_Configure_Validate(adi_fpga9001_Device_t *device,
-                                                      fpga9001_BfAxiTddEnableChanAddr_e baseAddr,
-                                                      adi_fpga9001_TddChannel_t *tddChannel)
-{
-    uint32_t framePeriod = 0;
-    uint32_t numberFrames = 0;
-    
-    ADI_EXPECT(fpga9001_AxiTddFrameTddframeperiodBfGet, device, FPGA9001_BF_AXI_ADRV9001_TDD_FRAME_0, &framePeriod);
-    ADI_EXPECT(fpga9001_AxiTddFrameTddnumberframesBfGet, device, FPGA9001_BF_AXI_ADRV9001_TDD_FRAME_0, &numberFrames);
-    
-    ADI_EXPECT(fpga9001_TddTiming_Set_Validate, device, baseAddr, &tddChannel->pinTiming, framePeriod);
-    ADI_EXPECT(fpga9001_TddSequence_Set_Validate, device, baseAddr, &tddChannel->pinSequence, numberFrames);
+    tdd_id = fpga9001_TddIdGet(device, port, channel);
+    if (tdd_id == (uint32_t) -1) return(-1);
 
-    /* Ignore DMA for GPIO baseAddr */
-    if (baseAddr != FPGA9001_BF_AXI_ADRV9001_TDD_ENABLE_AUX_0 &&
-        baseAddr != FPGA9001_BF_AXI_ADRV9001_TDD_ENABLE_AUX_1)
+    tdd_mode = axi_adrv9001_tdd_enable_mode_get((void *)device, AXI_ADRV9001_ID, tdd_id);
+    if (tdd_mode == AXI_ADRV9001_TDD_ENABLE_AUTO)
     {
-        ADI_EXPECT(fpga9001_TddTiming_Set_Validate, device, baseAddr, &tddChannel->tollgateTiming, framePeriod);
-        ADI_EXPECT(fpga9001_TddSequence_Set_Validate, device, baseAddr, &tddChannel->tollgateSequence, numberFrames);    
+        ADI_ERROR_REPORT(&device->common, ADI_COMMON_ERRSRC_API, ADI_COMMON_ERR_OK, ADI_COMMON_ACT_NO_ACTION, 0,
+            "Incapacitated function, TDD Enable is in HW Mode!");
+        return(-1);
     }
-        
+
+    *enable = (tdd_mode == AXI_ADRV9001_TDD_ENABLE_HIGH) ? true : false;
     ADI_API_RETURN(device);
 }
 
-static int32_t fpga9001_TddChannel_Configure(adi_fpga9001_Device_t *device,
-                                             fpga9001_BfAxiTddEnableChanAddr_e baseAddr,
-                                             adi_fpga9001_TddChannel_t *tddChannel)
-{
-    fpga9001_BfTddDpCtrlChanAddr_e dpCtrlAddr = FPGA9001_BF_RX_DP_CTRL_00;
-    
-    ADI_PERFORM_VALIDATION(fpga9001_TddChannel_Configure_Validate, device, baseAddr, tddChannel);
-    
-    dpCtrlAddr = fpga9001_TddDpCtrlChanAddr_Get(baseAddr);
-    
-    ADI_EXPECT(fpga9001_TddPinTiming_Set, device, baseAddr, &tddChannel->pinTiming, tddChannel->enable);
-    ADI_EXPECT(fpga9001_TddPinSequence_Set, device, baseAddr, &tddChannel->pinSequence);
-
-    /* AUX (txGpioControls) has no associated DMA/datapath */
-    if ((baseAddr != FPGA9001_BF_AXI_ADRV9001_TDD_ENABLE_AUX_0) &&
-        (baseAddr != FPGA9001_BF_AXI_ADRV9001_TDD_ENABLE_AUX_1) &&
-        (baseAddr != FPGA9001_BF_AXI_ADRV9001_TDD_ENABLE_CTL0_CONTROL1) &&
-        (baseAddr != FPGA9001_BF_AXI_ADRV9001_TDD_ENABLE_CTL0_CONTROL2) &&
-        (baseAddr != FPGA9001_BF_AXI_ADRV9001_TDD_ENABLE_CTL1_CONTROL1) &&
-        (baseAddr != FPGA9001_BF_AXI_ADRV9001_TDD_ENABLE_CTL1_CONTROL2))
-    {
-        ADI_EXPECT(fpga9001_TddTollgateTiming_Set, device, dpCtrlAddr, &tddChannel->tollgateTiming, tddChannel->enable);
-        ADI_EXPECT(fpga9001_TddTollgateSequence_Set, device, dpCtrlAddr, &tddChannel->tollgateSequence);
-    }
-    
-    ADI_EXPECT(fpga9001_AxiTddEnableDmamanualassertBfSet, device, baseAddr, tddChannel->enable);
-    
-    ADI_API_RETURN(device);
-}
-
-static int32_t fpga9001_TddChannel_Inspect(adi_fpga9001_Device_t *device,
-                                           fpga9001_BfAxiTddEnableChanAddr_e baseAddr,
-                                           adi_fpga9001_TddChannel_t *tddChannel)
-{
-    fpga9001_BfTddDpCtrlChanAddr_e dpCtrlAddr = fpga9001_TddDpCtrlChanAddr_Get(baseAddr);
-
-    ADI_EXPECT(fpga9001_TddPinTiming_Get, device, baseAddr, &tddChannel->pinTiming);
-    ADI_EXPECT(fpga9001_TddPinSequence_Get, device, baseAddr, &tddChannel->pinSequence);
-
-    /* AUX (txGpioControls) has no associated DMA/datapath */
-    if (baseAddr != FPGA9001_BF_AXI_ADRV9001_TDD_ENABLE_AUX_0 &&
-        baseAddr != FPGA9001_BF_AXI_ADRV9001_TDD_ENABLE_AUX_1)
-    {
-        ADI_EXPECT(fpga9001_TddTollgateTiming_Get, device, dpCtrlAddr, &tddChannel->tollgateTiming);
-        ADI_EXPECT(fpga9001_TddTollgateSequence_Get, device, dpCtrlAddr, &tddChannel->tollgateSequence);
-    }
-    
-    ADI_API_RETURN(device);
-}
+/* Why this is validating just the framing but not the enables? */
+/* Also not necessarily required, and even if so, can be done by the calling party. */
 
 static int32_t adi_fpga9001_Tdd_Configure_Validate(adi_fpga9001_Device_t *device,
                                                    adi_fpga9001_TddConfig_t *tddConfig)
@@ -425,113 +285,365 @@ static int32_t adi_fpga9001_Tdd_Configure_Validate(adi_fpga9001_Device_t *device
     
     if (tddConfig->framing.framePeriod == 0)
     {
-        ADI_ERROR_REPORT(&device->common, 
-                         ADI_COMMON_ERRSRC_API, 
-                         ADI_COMMON_ERR_INV_PARAM, 
-                         ADI_COMMON_ACT_ERR_CHECK_PARAM, 
-                         tddConfig->framing.framePeriod,
-                         "Invalid parameter value. tddConfig->framing.framePeriod must be greater than 0");
+        ADI_ERROR_REPORT(&device->common, ADI_COMMON_ERRSRC_API, ADI_COMMON_ERR_INV_PARAM, 
+            ADI_COMMON_ACT_ERR_CHECK_PARAM, tddConfig->framing.framePeriod,
+            "Invalid parameter value, tddConfig->framing.framePeriod must be greater than 0.");
     }
     
     ADI_RANGE_CHECK(device, tddConfig->framing.frameSwitchTime, 0, tddConfig->framing.framePeriod);
     
-    if ((0 == tddConfig->framing.numberFrames) &&
-        (true == tddConfig->framing.repeatFrameSequence))
+    if ((tddConfig->framing.numberFrames == 0) && (tddConfig->framing.repeatFrameSequence))
     {
-        ADI_ERROR_REPORT(&device->common,
-                         ADI_COMMON_ERRSRC_API,
-                         ADI_COMMON_ERR_INV_PARAM,
-                         ADI_COMMON_ACT_ERR_CHECK_PARAM,
-                         tddConfig->framing.repeatFrameSequence,
-                         "Invalid parameter value. tddConfig->framing.repeatFrameSequence cannot be true when numberFrames is 0");
+        ADI_ERROR_REPORT(&device->common, ADI_COMMON_ERRSRC_API, ADI_COMMON_ERR_INV_PARAM,
+            ADI_COMMON_ACT_ERR_CHECK_PARAM, tddConfig->framing.repeatFrameSequence,
+            "Invalid parameter value, tddConfig->framing.numberFrames must be greater than 0, if repeat sequence is set.");
     }
+
+    /* Also validate individual enables. */
     
-    /* TODO: MMCM must be locked */
-    
+    fpga9001_Tdd_Enable_Validate(device,
+        &tddConfig->rxControls[0].pinTiming,
+        &tddConfig->rxControls[0].pinSequence,
+        tddConfig->framing.framePeriod,
+        tddConfig->framing.numberFrames);
+    fpga9001_Tdd_Enable_Validate(device,
+        &tddConfig->txControls[0].pinTiming,
+        &tddConfig->txControls[0].pinSequence,
+        tddConfig->framing.framePeriod,
+        tddConfig->framing.numberFrames);
+    fpga9001_Tdd_Enable_Validate(device,
+        &tddConfig->rxControls[1].pinTiming,
+        &tddConfig->rxControls[1].pinSequence,
+        tddConfig->framing.framePeriod,
+        tddConfig->framing.numberFrames);
+    fpga9001_Tdd_Enable_Validate(device,
+        &tddConfig->txControls[1].pinTiming,
+        &tddConfig->txControls[1].pinSequence,
+        tddConfig->framing.framePeriod,
+        tddConfig->framing.numberFrames);
+    fpga9001_Tdd_Enable_Validate(device,
+        &tddConfig->orxControls[0].pinTiming,
+        &tddConfig->orxControls[0].pinSequence,
+        tddConfig->framing.framePeriod,
+        tddConfig->framing.numberFrames);
+    fpga9001_Tdd_Enable_Validate(device,
+        &tddConfig->orxControls[1].pinTiming,
+        &tddConfig->orxControls[1].pinSequence,
+        tddConfig->framing.framePeriod,
+        tddConfig->framing.numberFrames);
+    fpga9001_Tdd_Enable_Validate(device,
+        &tddConfig->txGpioControls[0].pinTiming,
+        &tddConfig->txGpioControls[0].pinSequence,
+        tddConfig->framing.framePeriod,
+        tddConfig->framing.numberFrames);
+    fpga9001_Tdd_Enable_Validate(device,
+        &tddConfig->txGpioControls[1].pinTiming,
+        &tddConfig->txGpioControls[1].pinSequence,
+        tddConfig->framing.framePeriod,
+        tddConfig->framing.numberFrames);
+    fpga9001_Tdd_Enable_Validate(device,
+        &tddConfig->interFrameControlSignal1[0].pinTiming,
+        &tddConfig->interFrameControlSignal1[0].pinSequence,
+        tddConfig->framing.framePeriod,
+        tddConfig->framing.numberFrames);
+    fpga9001_Tdd_Enable_Validate(device,
+        &tddConfig->interFrameControlSignal1[1].pinTiming,
+        &tddConfig->interFrameControlSignal1[1].pinSequence,
+        tddConfig->framing.framePeriod,
+        tddConfig->framing.numberFrames);
+    fpga9001_Tdd_Enable_Validate(device,
+        &tddConfig->interFrameControlSignal2[0].pinTiming,
+        &tddConfig->interFrameControlSignal2[0].pinSequence,
+        tddConfig->framing.framePeriod,
+        tddConfig->framing.numberFrames);
+    fpga9001_Tdd_Enable_Validate(device,
+        &tddConfig->interFrameControlSignal2[1].pinTiming,
+        &tddConfig->interFrameControlSignal2[1].pinSequence,
+        tddConfig->framing.framePeriod,
+        tddConfig->framing.numberFrames);
+
+    fpga9001_Tdd_Enable_Validate(device,
+        &tddConfig->rxControls[0].tollgateTiming,
+        &tddConfig->rxControls[0].tollgateSequence,
+        tddConfig->framing.framePeriod,
+        tddConfig->framing.numberFrames);
+    fpga9001_Tdd_Enable_Validate(device,
+        &tddConfig->txControls[0].tollgateTiming,
+        &tddConfig->txControls[0].tollgateSequence,
+        tddConfig->framing.framePeriod,
+        tddConfig->framing.numberFrames);
+    fpga9001_Tdd_Enable_Validate(device,
+        &tddConfig->rxControls[1].tollgateTiming,
+        &tddConfig->rxControls[1].tollgateSequence,
+        tddConfig->framing.framePeriod,
+        tddConfig->framing.numberFrames);
+    fpga9001_Tdd_Enable_Validate(device,
+        &tddConfig->txControls[1].tollgateTiming,
+        &tddConfig->txControls[1].tollgateSequence,
+        tddConfig->framing.framePeriod,
+        tddConfig->framing.numberFrames);
+    fpga9001_Tdd_Enable_Validate(device,
+        &tddConfig->orxControls[0].tollgateTiming,
+        &tddConfig->orxControls[0].tollgateSequence,
+        tddConfig->framing.framePeriod,
+        tddConfig->framing.numberFrames);
+    fpga9001_Tdd_Enable_Validate(device,
+        &tddConfig->orxControls[1].tollgateTiming,
+        &tddConfig->orxControls[1].tollgateSequence,
+        tddConfig->framing.framePeriod,
+        tddConfig->framing.numberFrames);
+
     ADI_API_RETURN(device);
 }
 
+/* Set all TDD hardware mode registers. */
+
 int32_t adi_fpga9001_Tdd_Configure(adi_fpga9001_Device_t *device, adi_fpga9001_TddConfig_t *tddConfig)
 {
+    uint32_t frameSwitchNum;
+
     ADI_PERFORM_VALIDATION(adi_fpga9001_Tdd_Configure_Validate, device, tddConfig);
+
+    frameSwitchNum = 0;
     
-    ADI_EXPECT(fpga9001_TddFraming_Set, device, &tddConfig->framing);
+    fpga9001_Tdd_Frame_Set(device, &tddConfig->framing, frameSwitchNum);
+
+    fpga9001_Tdd_Enable_Set(device,
+                            AXI_ADRV9001_TDD_RX0_DEVICE_ID,
+                            &tddConfig->rxControls[0].pinTiming,
+                            &tddConfig->rxControls[0].pinSequence, 
+							tddConfig->rxControls[0].enable);
+    fpga9001_Tdd_Enable_Set(device,
+                            AXI_ADRV9001_TDD_TX0_DEVICE_ID,
+                            &tddConfig->txControls[0].pinTiming,
+                            &tddConfig->txControls[0].pinSequence,
+							tddConfig->txControls[0].enable);
+    fpga9001_Tdd_Enable_Set(device,
+                            AXI_ADRV9001_TDD_RX1_DEVICE_ID,
+                            &tddConfig->rxControls[1].pinTiming,
+                            &tddConfig->rxControls[1].pinSequence,
+							tddConfig->rxControls[1].enable);
+    fpga9001_Tdd_Enable_Set(device,
+                            AXI_ADRV9001_TDD_TX1_DEVICE_ID,
+                            &tddConfig->txControls[1].pinTiming,
+                            &tddConfig->txControls[1].pinSequence,
+							tddConfig->txControls[1].enable);
+    fpga9001_Tdd_Enable_Set(device,
+                            AXI_ADRV9001_TDD_ORX0_DEVICE_ID,
+                            &tddConfig->orxControls[0].pinTiming,
+                            &tddConfig->orxControls[0].pinSequence,
+							tddConfig->orxControls[0].enable);
+    fpga9001_Tdd_Enable_Set(device,
+                            AXI_ADRV9001_TDD_ORX1_DEVICE_ID,
+                            &tddConfig->orxControls[1].pinTiming,
+                            &tddConfig->orxControls[1].pinSequence,
+							tddConfig->orxControls[1].enable);
+    fpga9001_Tdd_Enable_Set(device,
+                            AXI_ADRV9001_TDD_AUX0_DEVICE_ID,
+                            &tddConfig->txGpioControls[0].pinTiming,
+                            &tddConfig->txGpioControls[0].pinSequence,
+							tddConfig->txGpioControls[0].enable);
+    fpga9001_Tdd_Enable_Set(device,
+                            AXI_ADRV9001_TDD_AUX1_DEVICE_ID,
+                            &tddConfig->txGpioControls[1].pinTiming,
+                            &tddConfig->txGpioControls[1].pinSequence,
+							tddConfig->txGpioControls[1].enable);
+    fpga9001_Tdd_Enable_Set(device,
+                            AXI_ADRV9001_TDD_CTL0_DEVICE_ID,
+                            &tddConfig->interFrameControlSignal1[0].pinTiming,
+                            &tddConfig->interFrameControlSignal1[0].pinSequence,
+							tddConfig->interFrameControlSignal1[0].enable);
+    fpga9001_Tdd_Enable_Set(device,
+                            AXI_ADRV9001_TDD_CTL1_DEVICE_ID,
+                            &tddConfig->interFrameControlSignal1[1].pinTiming,
+                            &tddConfig->interFrameControlSignal1[1].pinSequence,
+							tddConfig->interFrameControlSignal1[1].enable);
+    fpga9001_Tdd_Enable_Set(device,
+                            AXI_ADRV9001_TDD_CTL2_DEVICE_ID,
+                            &tddConfig->interFrameControlSignal2[0].pinTiming,
+                            &tddConfig->interFrameControlSignal2[0].pinSequence,
+							tddConfig->interFrameControlSignal2[0].enable);
+    fpga9001_Tdd_Enable_Set(device,
+                            AXI_ADRV9001_TDD_CTL3_DEVICE_ID,
+                            &tddConfig->interFrameControlSignal2[1].pinTiming,
+                            &tddConfig->interFrameControlSignal2[1].pinSequence,
+							tddConfig->interFrameControlSignal2[1].enable);
     
-    ADI_EXPECT(fpga9001_TddChannel_Configure, device, FPGA9001_BF_AXI_ADRV9001_TDD_ENABLE_RX_0, &tddConfig->rxControls[0]);
-    ADI_EXPECT(fpga9001_TddChannel_Configure, device, FPGA9001_BF_AXI_ADRV9001_TDD_ENABLE_RX_1, &tddConfig->rxControls[1]);
-    
-    ADI_EXPECT(fpga9001_TddChannel_Configure, device, FPGA9001_BF_AXI_ADRV9001_TDD_ENABLE_ORX_0, &tddConfig->orxControls[0]);
-    ADI_EXPECT(fpga9001_TddChannel_Configure, device, FPGA9001_BF_AXI_ADRV9001_TDD_ENABLE_ORX_1, &tddConfig->orxControls[1]);
-    
-    ADI_EXPECT(fpga9001_TddChannel_Configure, device, FPGA9001_BF_AXI_ADRV9001_TDD_ENABLE_TX_0, &tddConfig->txControls[0]);
-    ADI_EXPECT(fpga9001_TddChannel_Configure, device, FPGA9001_BF_AXI_ADRV9001_TDD_ENABLE_TX_1, &tddConfig->txControls[1]);
-    
-    ADI_EXPECT(fpga9001_TddChannel_Configure, device, FPGA9001_BF_AXI_ADRV9001_TDD_ENABLE_AUX_0, &tddConfig->txGpioControls[0]);
-    ADI_EXPECT(fpga9001_TddChannel_Configure, device, FPGA9001_BF_AXI_ADRV9001_TDD_ENABLE_AUX_1, &tddConfig->txGpioControls[1]);
-    
-    ADI_EXPECT(fpga9001_TddChannel_Configure, device, FPGA9001_BF_AXI_ADRV9001_TDD_ENABLE_CTL0_CONTROL1, &tddConfig->interFrameControlSignal1[0]);
-    ADI_EXPECT(fpga9001_TddChannel_Configure, device, FPGA9001_BF_AXI_ADRV9001_TDD_ENABLE_CTL0_CONTROL2, &tddConfig->interFrameControlSignal1[1]);
-    
-    ADI_EXPECT(fpga9001_TddChannel_Configure, device, FPGA9001_BF_AXI_ADRV9001_TDD_ENABLE_CTL1_CONTROL1, &tddConfig->interFrameControlSignal2[0]);
-    ADI_EXPECT(fpga9001_TddChannel_Configure, device, FPGA9001_BF_AXI_ADRV9001_TDD_ENABLE_CTL1_CONTROL2, &tddConfig->interFrameControlSignal2[1]);
-    
+    fpga9001_Tdd_Enable_Set(device,
+                            AXI_ADRV9001_TDD_TRIG1_DEVICE_ID,
+                            &tddConfig->smaOutput1.pinTiming,
+                            &tddConfig->smaOutput1.pinSequence,
+							tddConfig->smaOutput1.enable);
+    fpga9001_Tdd_Enable_Set(device,
+                            AXI_ADRV9001_TDD_TRIG2_DEVICE_ID,
+                            &tddConfig->smaOutput2.pinTiming,
+                            &tddConfig->smaOutput2.pinSequence,
+							tddConfig->smaOutput2.enable);
+
+    fpga9001_Tdd_Enable_Set(device,
+                            AXI_ADRV9001_TDD_RX0_DMA_ID,
+                            &tddConfig->rxControls[0].tollgateTiming,
+                            &tddConfig->rxControls[0].tollgateSequence,
+							tddConfig->rxControls[0].enable);
+    fpga9001_Tdd_Enable_Set(device,
+                            AXI_ADRV9001_TDD_TX0_DMA_ID,
+                            &tddConfig->txControls[0].tollgateTiming,
+                            &tddConfig->txControls[0].tollgateSequence,
+							tddConfig->txControls[0].enable);
+    fpga9001_Tdd_Enable_Set(device,
+                            AXI_ADRV9001_TDD_RX1_DMA_ID,
+                            &tddConfig->rxControls[1].tollgateTiming,
+                            &tddConfig->rxControls[1].tollgateSequence,
+							tddConfig->rxControls[1].enable);
+    fpga9001_Tdd_Enable_Set(device,
+                            AXI_ADRV9001_TDD_TX1_DMA_ID,
+                            &tddConfig->txControls[1].tollgateTiming,
+                            &tddConfig->txControls[1].tollgateSequence,
+							tddConfig->txControls[1].enable);
+    fpga9001_Tdd_Enable_Set(device,
+                            AXI_ADRV9001_TDD_ORX0_DMA_ID,
+                            &tddConfig->orxControls[0].tollgateTiming,
+                            &tddConfig->orxControls[0].tollgateSequence,
+							tddConfig->orxControls[0].enable);
+    fpga9001_Tdd_Enable_Set(device,
+                            AXI_ADRV9001_TDD_ORX1_DMA_ID,
+                            &tddConfig->orxControls[1].tollgateTiming,
+                            &tddConfig->orxControls[1].tollgateSequence,
+							tddConfig->orxControls[1].enable);
     ADI_API_RETURN(device);
 }
 
 int32_t adi_fpga9001_Tdd_Inspect(adi_fpga9001_Device_t *device, adi_fpga9001_TddConfig_t *tddConfig)
 {
+    uint32_t frameSwitchNum;
+
     ADI_NULL_PTR_RETURN(&device->common, tddConfig);
     
-    ADI_EXPECT(fpga9001_TddFraming_Get, device, &tddConfig->framing);
+    fpga9001_Tdd_Frame_Get(device, &tddConfig->framing, &frameSwitchNum);
+    tddConfig->framing.frameSwitchTimeChannel = 0;
+
+    fpga9001_Tdd_Enable_Get(device,
+                            AXI_ADRV9001_TDD_RX0_DEVICE_ID,
+                            &tddConfig->rxControls[0].pinTiming,
+                            &tddConfig->rxControls[0].pinSequence,
+							&tddConfig->rxControls[0].enable);
+    fpga9001_Tdd_Enable_Get(device,
+                            AXI_ADRV9001_TDD_TX0_DEVICE_ID,
+                            &tddConfig->txControls[0].pinTiming,
+                            &tddConfig->txControls[0].pinSequence,
+							&tddConfig->txControls[0].enable);
+    fpga9001_Tdd_Enable_Get(device,
+                            AXI_ADRV9001_TDD_RX1_DEVICE_ID,
+                            &tddConfig->rxControls[1].pinTiming,
+                            &tddConfig->rxControls[1].pinSequence,
+							&tddConfig->rxControls[1].enable);
+    fpga9001_Tdd_Enable_Get(device,
+                            AXI_ADRV9001_TDD_TX1_DEVICE_ID,
+                            &tddConfig->txControls[1].pinTiming,
+                            &tddConfig->txControls[1].pinSequence,
+							&tddConfig->txControls[1].enable);
+    fpga9001_Tdd_Enable_Get(device,
+                            AXI_ADRV9001_TDD_ORX0_DEVICE_ID,
+                            &tddConfig->orxControls[0].pinTiming,
+                            &tddConfig->orxControls[0].pinSequence,
+							&tddConfig->orxControls[0].enable);
+    fpga9001_Tdd_Enable_Get(device,
+                            AXI_ADRV9001_TDD_ORX1_DEVICE_ID,
+                            &tddConfig->orxControls[1].pinTiming,
+                            &tddConfig->orxControls[1].pinSequence,
+							&tddConfig->orxControls[1].enable);
+    fpga9001_Tdd_Enable_Get(device,
+                            AXI_ADRV9001_TDD_AUX0_DEVICE_ID,
+                            &tddConfig->txGpioControls[0].pinTiming,
+                            &tddConfig->txGpioControls[0].pinSequence,
+							&tddConfig->txGpioControls[0].enable);
+    fpga9001_Tdd_Enable_Get(device,
+                            AXI_ADRV9001_TDD_AUX1_DEVICE_ID,
+                            &tddConfig->txGpioControls[1].pinTiming,
+                            &tddConfig->txGpioControls[1].pinSequence,
+							&tddConfig->txGpioControls[1].enable);
+    fpga9001_Tdd_Enable_Get(device,
+                            AXI_ADRV9001_TDD_CTL0_DEVICE_ID,
+                            &tddConfig->interFrameControlSignal1[0].pinTiming,
+                            &tddConfig->interFrameControlSignal1[0].pinSequence,
+							&tddConfig->interFrameControlSignal1[0].enable);
+    fpga9001_Tdd_Enable_Get(device,
+                            AXI_ADRV9001_TDD_CTL1_DEVICE_ID,
+                            &tddConfig->interFrameControlSignal1[1].pinTiming,
+                            &tddConfig->interFrameControlSignal1[1].pinSequence,
+							&tddConfig->interFrameControlSignal1[1].enable);
+    fpga9001_Tdd_Enable_Get(device,
+                            AXI_ADRV9001_TDD_CTL2_DEVICE_ID,
+                            &tddConfig->interFrameControlSignal2[0].pinTiming,
+                            &tddConfig->interFrameControlSignal2[0].pinSequence,
+							&tddConfig->interFrameControlSignal2[0].enable);
+    fpga9001_Tdd_Enable_Get(device,
+                            AXI_ADRV9001_TDD_CTL3_DEVICE_ID,
+                            &tddConfig->interFrameControlSignal2[1].pinTiming,
+                            &tddConfig->interFrameControlSignal2[1].pinSequence,
+							&tddConfig->interFrameControlSignal2[1].enable);
     
-    ADI_EXPECT(fpga9001_TddChannel_Inspect, device, FPGA9001_BF_AXI_ADRV9001_TDD_ENABLE_RX_0, &tddConfig->rxControls[0]);
-    ADI_EXPECT(fpga9001_TddChannel_Inspect, device, FPGA9001_BF_AXI_ADRV9001_TDD_ENABLE_RX_1, &tddConfig->rxControls[1]);
-    
-    ADI_EXPECT(fpga9001_TddChannel_Inspect, device, FPGA9001_BF_AXI_ADRV9001_TDD_ENABLE_ORX_0, &tddConfig->orxControls[0]);
-    ADI_EXPECT(fpga9001_TddChannel_Inspect, device, FPGA9001_BF_AXI_ADRV9001_TDD_ENABLE_ORX_1, &tddConfig->orxControls[1]);
-    
-    ADI_EXPECT(fpga9001_TddChannel_Inspect, device, FPGA9001_BF_AXI_ADRV9001_TDD_ENABLE_TX_0, &tddConfig->txControls[0]);
-    ADI_EXPECT(fpga9001_TddChannel_Inspect, device, FPGA9001_BF_AXI_ADRV9001_TDD_ENABLE_TX_1, &tddConfig->txControls[1]);
-    
-    ADI_EXPECT(fpga9001_TddChannel_Inspect, device, FPGA9001_BF_AXI_ADRV9001_TDD_ENABLE_AUX_0, &tddConfig->txGpioControls[0]);
-    ADI_EXPECT(fpga9001_TddChannel_Inspect, device, FPGA9001_BF_AXI_ADRV9001_TDD_ENABLE_AUX_1, &tddConfig->txGpioControls[1]);
+    fpga9001_Tdd_Enable_Get(device,
+                            AXI_ADRV9001_TDD_TRIG1_DEVICE_ID,
+                            &tddConfig->smaOutput1.pinTiming,
+                            &tddConfig->smaOutput1.pinSequence,
+							&tddConfig->smaOutput1.enable);
+    fpga9001_Tdd_Enable_Get(device,
+                            AXI_ADRV9001_TDD_TRIG2_DEVICE_ID,
+                            &tddConfig->smaOutput2.pinTiming,
+                            &tddConfig->smaOutput2.pinSequence,
+							&tddConfig->smaOutput2.enable);
+
+    fpga9001_Tdd_Enable_Get(device,
+                            AXI_ADRV9001_TDD_RX0_DMA_ID,
+                            &tddConfig->rxControls[0].tollgateTiming,
+                            &tddConfig->rxControls[0].tollgateSequence,
+							&tddConfig->rxControls[0].enable);
+    fpga9001_Tdd_Enable_Get(device,
+                            AXI_ADRV9001_TDD_TX0_DMA_ID,
+                            &tddConfig->txControls[0].tollgateTiming,
+                            &tddConfig->txControls[0].tollgateSequence,
+							&tddConfig->txControls[0].enable);
+    fpga9001_Tdd_Enable_Get(device,
+                            AXI_ADRV9001_TDD_RX1_DMA_ID,
+                            &tddConfig->rxControls[1].tollgateTiming,
+                            &tddConfig->rxControls[1].tollgateSequence,
+							&tddConfig->rxControls[1].enable);
+    fpga9001_Tdd_Enable_Get(device,
+                            AXI_ADRV9001_TDD_TX1_DMA_ID,
+                            &tddConfig->txControls[1].tollgateTiming,
+                            &tddConfig->txControls[1].tollgateSequence,
+							&tddConfig->txControls[1].enable);
+    fpga9001_Tdd_Enable_Get(device,
+                            AXI_ADRV9001_TDD_ORX0_DMA_ID,
+                            &tddConfig->orxControls[0].tollgateTiming,
+                            &tddConfig->orxControls[0].tollgateSequence,
+							&tddConfig->orxControls[0].enable);
+    fpga9001_Tdd_Enable_Get(device,
+                            AXI_ADRV9001_TDD_ORX1_DMA_ID,
+                            &tddConfig->orxControls[1].tollgateTiming,
+                            &tddConfig->orxControls[1].tollgateSequence,
+							&tddConfig->orxControls[1].enable);
     
     ADI_API_RETURN(device);
 }
 
 int32_t adi_fpga9001_Tdd_ProgrammedEnable_Set(adi_fpga9001_Device_t *device, bool enable)
 {
-    fpga9001_BfAxiTddFrameChanAddr_e baseAddr = FPGA9001_BF_AXI_ADRV9001_TDD_FRAME_0;
-    uint32_t numberFrames = 0;
-    
-    ADI_API_ENTRY_EXPECT(device);
-    /* TODO: MMCM must be locked */
-    
-    ADI_EXPECT(fpga9001_AxiTddFrameTddframecountersresetBfSet, device, baseAddr, true);
-    
-    /* Only set TddNumberFramesEnable if TddNumberFrames > 0*/
-    ADI_EXPECT(fpga9001_AxiTddFrameTddnumberframesBfGet, device, baseAddr, &numberFrames);
-    if (numberFrames > 0)
+    if (enable)
     {
-        ADI_EXPECT(fpga9001_AxiTddFrameTddnumberframesenableBfSet, device, baseAddr, enable);
+        axi_adrv9001_tdd_start((void *)device, AXI_ADRV9001_ID);
     }
-    
-    ADI_EXPECT(fpga9001_AxiTddFrameTddframeperiodenableBfSet, device, baseAddr, enable);
-    
-    /* FIXME: To disable, is it necessary to disable individual enable control modules and datapath control modules, as in Tokelau? */
-    
+    else
+    {
+        axi_adrv9001_tdd_stop((void *)device, AXI_ADRV9001_ID);
+    }
     ADI_API_RETURN(device);
 }
 
 int32_t adi_fpga9001_Tdd_ProgrammedEnable_Get(adi_fpga9001_Device_t *device, bool *enable)
 {
-    fpga9001_BfAxiTddFrameChanAddr_e baseAddr = FPGA9001_BF_AXI_ADRV9001_TDD_FRAME_0;
-    uint8_t bfValue = 0;
-    
-    ADI_API_ENTRY_PTR_EXPECT(device, enable);
-    
-    ADI_EXPECT(fpga9001_AxiTddFrameTddframeperiodenableBfGet, device, baseAddr, &bfValue);
-    *enable = (bool)bfValue;
-    
+    *enable = (axi_adrv9001_tdd_status((void *)device, AXI_ADRV9001_ID) == 0x1) ? true : false;
     ADI_API_RETURN(device);
 }
+

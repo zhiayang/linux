@@ -17,13 +17,8 @@
 *                                             INCLUDE FILES
 *********************************************************************************************************
 */
-/* "adi_adrv9001_user.h" contains the #define that other header file use */
 #include "adi_adrv9001_user.h"
-
-/* Header file corresponding to the C file */
 #include "adi_adrv9001_arm.h"
-
-/* ADI specific header files */
 #include "adi_adrv9001.h"
 #include "adi_adrv9001_error.h"
 #include "adi_adrv9001_gpio.h"
@@ -34,15 +29,11 @@
 #include "adrv9001_arm.h"
 #include "adrv9001_arm_macros.h"
 #include "adrv9001_arm_error_mapping.h"
-#include "adrv9001_bf_nvs_regmap_core.h"
+#include "adrv9001_bf.h"
 #include "adrv9001_init.h"
 #include "adrv9001_reg_addr_macros.h"
 #include "adrv9001_validators.h"
-
-/* Header files related to libraries */
-
-
-/* System header files */
+#include "adrv9001_bf.h"
 
 /*********************************************************************************************************/
 int32_t adi_adrv9001_arm_Enable(adi_adrv9001_Device_t *device)
@@ -227,7 +218,7 @@ int32_t adi_adrv9001_arm_PfirProfiles_Write(adi_adrv9001_Device_t *device, const
 
     /* FIXME: JS: Why does this function exist? */
     ADI_EXPECT(adrv9001_PfirProfilesWrite, device, init);
-
+    
     ADI_API_RETURN(device);
 }
 
@@ -326,25 +317,23 @@ int32_t adi_adrv9001_arm_Image_Write(adi_adrv9001_Device_t *device, uint32_t byt
     ADI_API_RETURN(device);
 }
 
-int32_t adi_adrv9001_arm_Memory_Read(adi_adrv9001_Device_t *device,
-                                     uint32_t address,
-                                     uint8_t returnData[],
-                                     uint32_t byteCount,
-                                     uint8_t autoIncrement)
+static int32_t adi_adrv9001_arm_Memory_ReadWrite_Validate(adi_adrv9001_Device_t *device, 
+                                                          uint32_t address,
+                                                          uint8_t returnData[],
+                                                          uint32_t byteCount,
+                                                          uint8_t autoIncrement)
 {
-    int32_t recoveryAction = ADI_COMMON_ACT_NO_ACTION;
-
     ADI_API_ENTRY_PTR_ARRAY_EXPECT(device, returnData, byteCount);
 
     if (!(address >= ADRV9001_ADDR_ARM_START_PROG && address <= ADRV9001_ADDR_ARM_END_PROG) &&
         !(address >= ADRV9001_ADDR_ARM_START_DATA && address <= ADRV9001_ADDR_ARM_END_DATA))
     {
         ADI_ERROR_REPORT(&device->common,
-            ADI_COMMON_ERRSRC_API,
-            ADI_COMMON_ERR_INV_PARAM,
-            ADI_COMMON_ACT_ERR_CHECK_PARAM,
-            address,
-            "Invalid ARM Memory Address");
+                         ADI_COMMON_ERRSRC_API,
+                         ADI_COMMON_ERR_INV_PARAM,
+                         ADI_COMMON_ACT_ERR_CHECK_PARAM,
+                         address,
+                         "Invalid ARM Memory Address");
         ADI_ERROR_RETURN(device->common.error.newAction);
     }
 
@@ -352,46 +341,45 @@ int32_t adi_adrv9001_arm_Memory_Read(adi_adrv9001_Device_t *device,
         !((address + byteCount - 1) >= ADRV9001_ADDR_ARM_START_DATA && (address + byteCount - 1) <= ADRV9001_ADDR_ARM_END_DATA))
     {
         ADI_ERROR_REPORT(&device->common,
-            ADI_COMMON_ERRSRC_API,
-            ADI_COMMON_ERR_INV_PARAM,
-            ADI_COMMON_ACT_ERR_CHECK_PARAM,
-            address,
-            "Invalid ARM Memory Address + byteCount");
+                         ADI_COMMON_ERRSRC_API,
+                         ADI_COMMON_ERR_INV_PARAM,
+                         ADI_COMMON_ACT_ERR_CHECK_PARAM,
+                         address,
+                         "Invalid ARM Memory Address + byteCount");
         ADI_ERROR_RETURN(device->common.error.newAction);
     }
 
-    recoveryAction = adrv9001_DmaMemRead(device, address, returnData, byteCount, autoIncrement);
-    ADI_ERROR_REPORT(&device->common, ADI_COMMON_ERRSRC_API, ADI_COMMON_ERR_API_FAIL, recoveryAction, NULL, "ArmMemRead failed during DMA transaction");
-    ADI_ERROR_RETURN(device->common.error.newAction);
+    if (autoIncrement && (byteCount % 4 != 0))
+    {
+        ADI_ERROR_REPORT(&device->common,
+                         ADI_COMMON_ERRSRC_API,
+                         ADI_COMMON_ERR_INV_PARAM,
+                         ADI_COMMON_ACT_ERR_CHECK_PARAM,
+                         byteCount,
+                         "Invalid parameter value. byteCount must be a multiple of 4 when using autoIncrement");
+        ADI_ERROR_RETURN(device->common.error.newAction);
+    }
+    ADI_API_RETURN(device);
+}
+
+int32_t adi_adrv9001_arm_Memory_Read(adi_adrv9001_Device_t *device, 
+                                     uint32_t address,
+                                     uint8_t returnData[],
+                                     uint32_t byteCount,
+                                     uint8_t autoIncrement)
+{
+    ADI_PERFORM_VALIDATION(adi_adrv9001_arm_Memory_ReadWrite_Validate, device, address, returnData, byteCount, autoIncrement);
+
+    ADI_EXPECT(adrv9001_DmaMemRead, device, address, returnData, byteCount, autoIncrement);
 
     ADI_API_RETURN(device);
 }
 
 int32_t adi_adrv9001_arm_Memory_Write(adi_adrv9001_Device_t *device, uint32_t address, const uint8_t data[], uint32_t byteCount)
 {
-    int32_t recoveryAction = ADI_COMMON_ACT_NO_ACTION;
+    ADI_PERFORM_VALIDATION(adi_adrv9001_arm_Memory_ReadWrite_Validate, device, address, (uint8_t *)data, byteCount, false);
 
-    ADI_API_ENTRY_PTR_ARRAY_EXPECT(device, data, byteCount);
-
-    if (!(address >= ADRV9001_ADDR_ARM_START_PROG && address <= ADRV9001_ADDR_ARM_END_PROG) &&
-        !(address >= ADRV9001_ADDR_ARM_START_DATA && address <= ADRV9001_ADDR_ARM_END_DATA))
-    {
-        ADI_ERROR_REPORT(&device->common, ADI_COMMON_ERRSRC_API, ADI_COMMON_ERR_INV_PARAM, ADI_COMMON_ACT_ERR_CHECK_PARAM,
-            address, "Invalid ARM Memory Address");
-        ADI_ERROR_RETURN(device->common.error.newAction);
-    }
-
-    if (!((address + byteCount - 1) >= ADRV9001_ADDR_ARM_START_PROG && (address + byteCount - 1) <= ADRV9001_ADDR_ARM_END_PROG) &&
-        !((address + byteCount - 1) >= ADRV9001_ADDR_ARM_START_DATA && (address + byteCount - 1) <= ADRV9001_ADDR_ARM_END_DATA))
-    {
-        ADI_ERROR_REPORT(&device->common, ADI_COMMON_ERRSRC_API, ADI_COMMON_ERR_INV_PARAM, ADI_COMMON_ACT_ERR_CHECK_PARAM,
-            address, "Invalid ARM Memory Address + byteCount");
-        ADI_ERROR_RETURN(device->common.error.newAction);
-    }
-
-    recoveryAction = adrv9001_DmaMemWrite(device, address, data, byteCount);
-    ADI_ERROR_REPORT(&device->common, ADI_COMMON_ERRSRC_API, ADI_COMMON_ERR_API_FAIL, recoveryAction, NULL, "ArmMemWrite failed during DMA transaction");
-    ADI_ERROR_RETURN(device->common.error.newAction);
+    ADI_EXPECT(adrv9001_DmaMemWrite, device, address, data, byteCount);
 
     ADI_API_RETURN(device);
 }
@@ -403,7 +391,7 @@ int32_t adi_adrv9001_arm_Config_Write(adi_adrv9001_Device_t *device, uint8_t obj
     ADI_API_ENTRY_PTR_ARRAY_EXPECT(device, data, byteCount);
 
     /* TODO: Validate objectId? */
-
+    
     extendedData[0] = (uint8_t)((byteCount >> 0) & 0xFF);
     extendedData[1] = (uint8_t)((byteCount >> 8) & 0xFF);
     extendedData[2] = (uint8_t)((byteCount >> 16) & 0xFF);
@@ -437,14 +425,14 @@ int32_t adi_adrv9001_arm_Config_Read(adi_adrv9001_Device_t *device, uint8_t obje
     uint8_t extendedData[5] = { 0 };
 
     ADI_API_ENTRY_PTR_ARRAY_EXPECT(device, returnData, byteCount);
-
+    
     /* TODO: Validate objectId? */
 
     extendedData[0] = (uint8_t)((byteCount >> 0) & 0xFF);
     extendedData[1] = (uint8_t)((byteCount >> 8) & 0xFF);
     extendedData[2] = (uint8_t)((byteCount >> 16) & 0xFF);
     extendedData[3] = (uint8_t)((byteCount >> 24) & 0xFF);
-
+    
     ADI_EXPECT(adi_adrv9001_arm_Memory_Write, device, ADRV9001_ADDR_ARM_MAILBOX_GET, &extendedData[0], 4);
 
     /* ARM Object id, byte offset LSB, offset MSB = 0, byteCount will read that number of bytes */
@@ -687,9 +675,8 @@ int32_t adi_adrv9001_arm_Cmd_Write(adi_adrv9001_Device_t *device, uint8_t opCode
     int32_t recoveryAction = ADI_COMMON_ACT_NO_ACTION;
 
 #define EXT_CMD_BYTE_MAX 5
-    //    static const char *cmdByte[EXT_CMD_BYTE_MAX] = { "ARM_EXT_CMD_BYTE_1", "ARM_EXT_CMD_BYTE_2", "ARM_EXT_CMD_BYTE_3", "ARM_EXT_CMD_BYTE_4" };
 
-        ADI_API_ENTRY_EXPECT(device);
+    ADI_API_ENTRY_EXPECT(device);
 
     if (byteCount > 0)
     {
@@ -1109,7 +1096,7 @@ int32_t adi_adrv9001_arm_MailboxBusy_Get(adi_adrv9001_Device_t *device, bool *ma
     ADI_API_ENTRY_PTR_EXPECT(device, mailboxBusy);
 
     /* Read arm_command_busy bit in arm_command(0x00c3) register*/
-    ADI_EXPECT(adrv9001_NvsRegmapCoreArmCommandBusyBfGet, device, ADRV9001_BF_CORE, &bfVal);
+    ADI_EXPECT(adrv9001_NvsRegmapCore_ArmCommandBusy_Get, device, &bfVal);
     *mailboxBusy = (bool)bfVal;
 
     ADI_API_RETURN(device);
@@ -1219,27 +1206,7 @@ int32_t adi_adrv9001_arm_System_Program(adi_adrv9001_Device_t *device, uint8_t c
     extData[0] = channelMask;
     extData[1] = ADRV9001_ARM_OBJECTID_SYSTEM_CONFIG;
 
-    recoveryAction = adi_common_hal_Wait_us(&device->common, 1000000);
-
-    ADI_ERROR_REPORT(&device->common,
-                     ADI_ADRV9001_SRC_ARMCMD,
-                     recoveryAction,
-                     ADI_COMMON_ACT_ERR_CHECK_TIMER,
-                     device,
-                     "Timer not working in ArmCmdStatusWait()");
-    ADI_ERROR_RETURN(device->common.error.newAction);
-
     ADI_EXPECT(adi_adrv9001_arm_Cmd_Write, device, (uint8_t)ADRV9001_ARM_SET_OPCODE, &extData[0], sizeof(extData));
-
-    recoveryAction = adi_common_hal_Wait_us(&device->common, 1000000);
-
-    ADI_ERROR_REPORT(&device->common,
-                     ADI_ADRV9001_SRC_ARMCMD,
-                     recoveryAction,
-                     ADI_COMMON_ACT_ERR_CHECK_TIMER,
-                     device,
-                     "Timer not working in ArmCmdStatusWait()");
-    ADI_ERROR_RETURN(device->common.error.newAction);
 
     /* Wait for command to finish executing */
     recoveryAction = adi_adrv9001_arm_CmdStatus_Wait(device,
@@ -1248,54 +1215,16 @@ int32_t adi_adrv9001_arm_System_Program(adi_adrv9001_Device_t *device, uint8_t c
                                                      ADI_ADRV9001_SETARMSYSTEM_TIMEOUT_US,
                                                      ADI_ADRV9001_SETARMSYSTEM_INTERVAL_US);
 
-    /* ARM error handler to provide valid recovery action based on ARM error code */
-    if ((cmdStatusByte >> 1) > 0)
+    if (recoveryAction != ADI_COMMON_ACT_NO_ACTION)
     {
-        ADI_EXPECT(adrv9001_ArmCmdErrorHandler,
-                   device,
-                   ADRV9001_ARMCMD_ERRCODE(ADRV9001_ARM_SET_OPCODE, 0, cmdStatusByte));
+        /* ARM error handler to provide valid recovery action based on ARM error code */
+        if ((cmdStatusByte >> 1) > 0)
+        {
+            ADI_EXPECT(adrv9001_ArmCmdErrorHandler,
+                device,
+                ADRV9001_ARMCMD_ERRCODE(ADRV9001_ARM_SET_OPCODE, 0, cmdStatusByte));
+        }
     }
-
-    ADI_API_RETURN(device);
-}
-
-static int32_t __maybe_unused adi_adrv9001_arm_Clocks_ProgramValidate(adi_adrv9001_Device_t *device,
-								      adi_adrv9001_ArmClock_t *armClock)
-{
-    /* Check device pointer is not null */
-    ADI_API_ENTRY_PTR_EXPECT(device, armClock);
-
-    /*Check that channel mask is valid*/
-    ADI_RANGE_CHECK(device, armClock->channelMask, 0x01, 0x0F);
-
-    /*Check that clock type is valid*/
-    ADI_RANGE_CHECK(device, armClock->clockType, 0x0, (ADI_ADRV9001_ARMCLOCK_MAX - 1));
-
-    /*Check that clock enable is valid*/
-    ADI_RANGE_CHECK(device, armClock->clockEnable, 0x0, 0x1);
-
-    ADI_API_RETURN(device);
-}
-
-int32_t adi_adrv9001_arm_Clocks_Program(adi_adrv9001_Device_t *device, adi_adrv9001_ArmClock_t *armClock)
-{
-    uint8_t extData[4] = { 0 };
-
-    ADI_PERFORM_VALIDATION(adi_adrv9001_arm_Clocks_ProgramValidate, device, armClock);
-
-    /* Executing the SET System Config command */
-    extData[0] = armClock->channelMask;
-    extData[1] = ADRV9001_ARM_OBJECTID_CLOCK_ENABLE;
-    extData[2] = armClock->clockType;
-    extData[3] = armClock->clockEnable;
-
-    ADI_EXPECT(adi_adrv9001_arm_Cmd_Write, device, (uint8_t)ADRV9001_ARM_SET_OPCODE, &extData[0], sizeof(extData));
-
-    ADRV9001_ARM_CMD_STATUS_WAIT_EXPECT(device,
-                                        ADRV9001_ARM_SET_OPCODE,
-                                        extData[1],
-                                        ADI_ADRV9001_SETARMCLOCK_TIMEOUT_US,
-                                        ADI_ADRV9001_SETARMCLOCK_INTERVAL_US);
 
     ADI_API_RETURN(device);
 }
@@ -1328,8 +1257,8 @@ int32_t adi_adrv9001_arm_WakeupInterrupt_Set(adi_adrv9001_Device_t *device)
     ADI_API_RETURN(device);
 }
 
-int32_t adi_adrv9001_arm_NextDynamicProfile_Set(adi_adrv9001_Device_t *device,
-                                                uint8_t dynamicProfileIndex,
+int32_t adi_adrv9001_arm_NextDynamicProfile_Set(adi_adrv9001_Device_t *device, 
+                                                uint8_t dynamicProfileIndex, 
                                                 const adi_adrv9001_Init_t *init)
 {
     uint8_t extData[5] = { 0 };
@@ -1355,8 +1284,8 @@ int32_t adi_adrv9001_arm_NextDynamicProfile_Set(adi_adrv9001_Device_t *device,
     ADI_API_RETURN(device);
 }
 
-int32_t adi_adrv9001_arm_NextPfir_Set(adi_adrv9001_Device_t *device,
-                                      uint8_t channelMask,
+int32_t adi_adrv9001_arm_NextPfir_Set(adi_adrv9001_Device_t *device, 
+                                      uint8_t channelMask, 
                                       const adi_adrv9001_PfirWbNbBuffer_t *pfirCoeff)
 {
     uint8_t extData[5] = { 0 };
@@ -1456,9 +1385,9 @@ int32_t adi_adrv9001_arm_Profile_Switch(adi_adrv9001_Device_t *device)
     ADI_API_RETURN(device);
 }
 
-static int32_t __maybe_unused adi_adrv9001_arm_ChannelPowerSaving_Configure_Validate(adi_adrv9001_Device_t *device,
-										     adi_common_ChannelNumber_e channel,
-										     adi_adrv9001_ChannelPowerSavingCfg_t *powerSavingCfg)
+static int32_t adi_adrv9001_arm_ChannelPowerSaving_Configure_Validate(adi_adrv9001_Device_t *device,
+                                                                      adi_common_ChannelNumber_e channel,
+                                                                      adi_adrv9001_ChannelPowerSavingCfg_t *powerSavingCfg)
 {
     static const uint32_t TX_CHANNELS[] = { ADI_ADRV9001_TX1, ADI_ADRV9001_TX2 };
     static const uint32_t RX_CHANNELS[] = { ADI_ADRV9001_RX1, ADI_ADRV9001_RX2 };
@@ -1470,7 +1399,7 @@ static int32_t __maybe_unused adi_adrv9001_arm_ChannelPowerSaving_Configure_Vali
     {
         signal = ADI_ADRV9001_GPIO_SIGNAL_POWER_SAVING_CHANNEL2;
     }
-
+    
     ADI_NULL_PTR_RETURN(&device->common, powerSavingCfg);
 
     /* Check for valid channel */
@@ -1503,12 +1432,12 @@ static int32_t __maybe_unused adi_adrv9001_arm_ChannelPowerSaving_Configure_Vali
                         powerSavingCfg->channelDisabledPowerDownMode + 1,
                         ADI_ADRV9001_CHANNEL_POWER_DOWN_MODE_LDO);
     }
-
+    
     adi_common_channel_to_index(channel, &chan_index);
     if (ADRV9001_BF_EQUAL(device->devStateInfo.initializedChannels, RX_CHANNELS[chan_index]))
     {
         ADI_EXPECT(adi_adrv9001_Radio_Channel_State_Get, device, ADI_RX, channel, &state);
-
+        
         if (ADI_ADRV9001_CHANNEL_STANDBY == state)
         {
             ADI_ERROR_REPORT(&device->common,
@@ -1525,7 +1454,7 @@ static int32_t __maybe_unused adi_adrv9001_arm_ChannelPowerSaving_Configure_Vali
     if (ADRV9001_BF_EQUAL(device->devStateInfo.initializedChannels, TX_CHANNELS[chan_index]))
     {
         ADI_EXPECT(adi_adrv9001_Radio_Channel_State_Get, device, ADI_TX, channel, &state);
-
+        
         if (ADI_ADRV9001_CHANNEL_STANDBY == state)
         {
             ADI_ERROR_REPORT(&device->common,
@@ -1566,47 +1495,53 @@ int32_t adi_adrv9001_arm_ChannelPowerSaving_Configure(adi_adrv9001_Device_t *dev
     ADI_API_RETURN(device);
 }
 
-static int32_t __maybe_unused adi_adrv9001_arm_ChannelPowerSaving_Inspect_Validate(adi_adrv9001_Device_t *device,
-										   adi_common_ChannelNumber_e channel,
-										   adi_adrv9001_ChannelPowerSavingCfg_t *powerSavingCfg)
+static int32_t adi_adrv9001_arm_ChannelPowerSaving_Inspect_Validate(adi_adrv9001_Device_t *device,
+                                                                    adi_common_ChannelNumber_e channel,
+                                                                    adi_adrv9001_ChannelPowerSavingCfg_t *powerSavingCfg)
 {
-    uint8_t port_index = 0;
+    static const uint32_t TX_CHANNELS[] = { ADI_ADRV9001_TX1, ADI_ADRV9001_TX2 };
+    static const uint32_t RX_CHANNELS[] = { ADI_ADRV9001_RX1, ADI_ADRV9001_RX2 };
     uint8_t chan_index = 0;
 
-    adi_adrv9001_RadioState_t currentState = { 0 };
+    adi_adrv9001_ChannelState_e state = ADI_ADRV9001_CHANNEL_STANDBY;
 
     /* Check device pointer and rxInterfaceGainCtrl are not null */
     ADI_API_ENTRY_PTR_EXPECT(device, powerSavingCfg);
 
     ADI_RANGE_CHECK(device, channel, ADI_CHANNEL_1, ADI_CHANNEL_2);
 
-    ADI_EXPECT(adi_adrv9001_Radio_State_Get, device, &currentState);
-
     adi_common_channel_to_index(channel, &chan_index);
-    adi_common_port_to_index(ADI_RX, &port_index);
 
-    if (ADI_ADRV9001_CHANNEL_STANDBY == currentState.channelStates[port_index][chan_index])
+    if (ADRV9001_BF_EQUAL(device->devStateInfo.initializedChannels, RX_CHANNELS[chan_index]))
     {
-        ADI_ERROR_REPORT(&device->common,
-            ADI_COMMON_ERRSRC_API,
-            ADI_COMMON_ERR_API_FAIL,
-            ADI_COMMON_ACT_ERR_CHECK_PARAM,
-            currentState.channelStates[port_index][chan_index],
-            "Error while attempting to inspect power saving configuration. Specified channel is in wrong state.");
-        ADI_API_RETURN(device)
+        ADI_EXPECT(adi_adrv9001_Radio_Channel_State_Get, device, ADI_RX, channel, &state);
+        
+        if (ADI_ADRV9001_CHANNEL_STANDBY == state)
+        {
+            ADI_ERROR_REPORT(&device->common,
+                             ADI_COMMON_ERRSRC_API,
+                             ADI_COMMON_ERR_API_FAIL,
+                             ADI_COMMON_ACT_ERR_CHECK_PARAM,
+                             currentState.channelStates[port_index][chan_index],
+                             "Error while attempting to inspect power saving configuration. Rx channel is in wrong state.");
+            ADI_API_RETURN(device)
+        }
     }
-
-    adi_common_port_to_index(ADI_TX, &port_index);
-
-    if (ADI_ADRV9001_CHANNEL_STANDBY == currentState.channelStates[port_index][chan_index])
+    
+    if (ADRV9001_BF_EQUAL(device->devStateInfo.initializedChannels, TX_CHANNELS[chan_index]))
     {
-        ADI_ERROR_REPORT(&device->common,
-            ADI_COMMON_ERRSRC_API,
-            ADI_COMMON_ERR_API_FAIL,
-            ADI_COMMON_ACT_ERR_CHECK_PARAM,
-            currentState.channelStates[port_index][chan_index],
-            "Error while attempting to inspect power saving configuration. Specified channel is in wrong state.");
-        ADI_API_RETURN(device)
+        ADI_EXPECT(adi_adrv9001_Radio_Channel_State_Get, device, ADI_TX, channel, &state);
+        
+        if (ADI_ADRV9001_CHANNEL_STANDBY == state)
+        {
+            ADI_ERROR_REPORT(&device->common,
+                             ADI_COMMON_ERRSRC_API,
+                             ADI_COMMON_ERR_API_FAIL,
+                             ADI_COMMON_ACT_ERR_CHECK_PARAM,
+                             currentState.channelStates[port_index][chan_index],
+                             "Error while attempting to inspect power saving configuration. Specified channel is in wrong state.");
+            ADI_API_RETURN(device)
+        }
     }
 
     ADI_API_RETURN(device);
@@ -1639,7 +1574,7 @@ int32_t adi_adrv9001_arm_ChannelPowerSaving_Inspect(adi_adrv9001_Device_t *devic
                ADRV9001_ADDR_ARM_MAILBOX_GET,
                &armReadBack[0],
                sizeof(armReadBack),
-               ADRV9001_ARM_MEM_READ_AUTOINCR)
+               false)
 
     powerSavingCfg->channelDisabledPowerDownMode = (adi_adrv9001_ChannelPowerDownMode_e)armReadBack[0];
     powerSavingCfg->gpioPinPowerDownMode = (adi_adrv9001_ChannelPowerDownMode_e)armReadBack[1];
@@ -1647,11 +1582,23 @@ int32_t adi_adrv9001_arm_ChannelPowerSaving_Inspect(adi_adrv9001_Device_t *devic
     ADI_API_RETURN(device);
 }
 
-static int32_t __maybe_unused SystemPowerSavingAndMonitorMode_Configure_Validate(adi_adrv9001_Device_t *device,
-										 adi_adrv9001_SystemPowerSavingAndMonitorModeCfg_t *monitorModeCfg)
+static int32_t SystemPowerSavingAndMonitorMode_Configure_Validate(adi_adrv9001_Device_t *device,
+    adi_adrv9001_SystemPowerSavingAndMonitorModeCfg_t *monitorModeCfg)
 {
     adi_adrv9001_GpioCfg_t gpio = { 0 };
-
+    
+    /* Rx1 must be enabled to support Monitor Mode feature */
+    if (0 == ADRV9001_BF_EQUAL(device->devStateInfo.initializedChannels, ADI_ADRV9001_RX1))
+    {
+        ADI_ERROR_REPORT(&device->common,
+            ADI_COMMON_ERRSRC_API,
+            ADI_COMMON_ERR_INV_PARAM,
+            ADI_COMMON_ACT_ERR_CHECK_PARAM,
+            device->devStateInfo.initializedChannels,
+            "Rx1 channel must be initialized to support Monitor Mode feature");
+        ADI_ERROR_RETURN(device->common.error.newAction);
+    }
+    
     ADI_NULL_PTR_RETURN(&device->common, monitorModeCfg);
 
     ADI_RANGE_CHECK(device,
@@ -1663,10 +1610,10 @@ static int32_t __maybe_unused SystemPowerSavingAndMonitorMode_Configure_Validate
                     monitorModeCfg->detectionMode,
                     ADI_ADRV9001_MONITOR_DETECTION_MODE_RSSI,
                     ADI_ADRV9001_MONITOR_DETECTION_MODE_RSSI_FFT);
-
+    
     ADI_EXPECT(adi_adrv9001_gpio_Inspect, device, ADI_ADRV9001_GPIO_SIGNAL_MON_ENABLE_SPS, &gpio);
     ADI_RANGE_CHECK(device, gpio.pin, ADI_ADRV9001_GPIO_DIGITAL_00, ADI_ADRV9001_GPIO_DIGITAL_15);
-
+    
     ADI_API_RETURN(device);
 }
 
@@ -1702,7 +1649,7 @@ int32_t adi_adrv9001_arm_SystemPowerSavingAndMonitorMode_Configure(adi_adrv9001_
                                         extData[1],
                                         (uint32_t)ADI_ADRV9001_DEFAULT_TIMEOUT_US,
                                         (uint32_t)ADI_ADRV9001_DEFAULT_INTERVAL_US);
-
+    
     ADI_API_RETURN(device);
 }
 
@@ -1734,7 +1681,7 @@ int32_t adi_adrv9001_arm_SystemPowerSavingAndMonitorMode_Inspect(adi_adrv9001_De
                ADRV9001_ADDR_ARM_MAILBOX_GET,
                &armReadBack[0],
                sizeof(armReadBack),
-               ADRV9001_ARM_MEM_READ_AUTOINCR)
+               false)
 
     monitorModeCfg->powerDownMode = (adi_adrv9001_SystemPowerDownMode_e)armReadBack[offset++];
     adrv9001_ParseFourBytes(&offset, armReadBack, &monitorModeCfg->initialBatterySaverDelay_us);
@@ -1758,29 +1705,353 @@ int32_t adi_adrv9001_arm_SystemPowerSavingMode_Set(adi_adrv9001_Device_t *adrv90
         .detectionMode = ADI_ADRV9001_MONITOR_DETECTION_MODE_RSSI,
         .detectionDataBufferEnable = 0
     };
-
+    
     config.powerDownMode = mode;
     ADI_EXPECT(adi_adrv9001_arm_SystemPowerSavingAndMonitorMode_Configure, adrv9001, &config);
-
+    
     ADI_API_RETURN(adrv9001);
 }
 
-static int32_t __maybe_unused adi_adrv9001_arm_SystemPowerSavingMode_Get_Validate(adi_adrv9001_Device_t *adrv9001,
-										  adi_adrv9001_SystemPowerDownMode_e *mode)
+static int32_t adi_adrv9001_arm_SystemPowerSavingMode_Get_Validate(adi_adrv9001_Device_t *adrv9001, adi_adrv9001_SystemPowerDownMode_e *mode)
 {
     ADI_NULL_PTR_RETURN(&adrv9001->common, mode);
-
+    
     ADI_API_RETURN(adrv9001);
 }
 
 int32_t adi_adrv9001_arm_SystemPowerSavingMode_Get(adi_adrv9001_Device_t *adrv9001, adi_adrv9001_SystemPowerDownMode_e *mode)
 {
     adi_adrv9001_SystemPowerSavingAndMonitorModeCfg_t config = { 0 };
-
+    
     ADI_PERFORM_VALIDATION(adi_adrv9001_arm_SystemPowerSavingMode_Get_Validate, adrv9001, mode);
-
+    
     ADI_EXPECT(adi_adrv9001_arm_SystemPowerSavingAndMonitorMode_Inspect, adrv9001, &config);
     *mode = config.powerDownMode;
+    
+    ADI_API_RETURN(adrv9001);
+}
+
+static int32_t adi_adrv9001_arm_MonitorMode_Pattern_Configure_Validate(adi_adrv9001_Device_t *adrv9001,
+                                                                       adi_common_ChannelNumber_e channel,
+                                                                       adi_adrv9001_MonitorModePatternCfg_t *monitorModePattern)
+{
+    ADI_NULL_PTR_RETURN(&adrv9001->common, monitorModePattern);
+    ADI_RANGE_CHECK(adrv9001, channel, ADI_CHANNEL_1, ADI_CHANNEL_2);
+    ADI_RANGE_CHECK(adrv9001, monitorModePattern->patternLength, ADI_ADRV9001_MONITOR_MODE_PATTERN_LENGTH_240, ADI_ADRV9001_MONITOR_MODE_PATTERN_LENGTH_480)
+    ADI_API_RETURN(adrv9001);
+}
+
+/* TODO: Change this function to be private when a function to measure 
+ * the value from CALIBRATED and program the value to the ADRV9001 is added */
+int32_t adi_adrv9001_arm_MonitorMode_Pattern_Configure(adi_adrv9001_Device_t *adrv9001,
+                                                       adi_common_ChannelNumber_e channel,
+                                                       adi_adrv9001_MonitorModePatternCfg_t *monitorModePattern) 
+{
+    uint16_t pattern = 0;
+    uint16_t patternLength = 240;
+    uint32_t readPattern = 0;
+    adrv9001_BfNvsRegmapRx_e baseAddress = ADRV9001_BF_RX1_CORE;
+    ADI_PERFORM_VALIDATION(adi_adrv9001_arm_MonitorMode_Pattern_Configure_Validate, adrv9001, channel, monitorModePattern);
+    if (ADI_CHANNEL_2 == channel)
+    {
+        baseAddress = ADRV9001_BF_RX2_CORE;
+    }
+    /* Select DpinFIFO test pattern; 1: select test pattern. 0: select datapath data */
+    ADI_EXPECT(adrv9001_NvsRegmapRx_DpinfifoTestdataSel_Set, adrv9001, baseAddress, 0x1);
+    /* 1: enable DpinFIFO block 0: disable DPinFIFO */
+    ADI_EXPECT(adrv9001_NvsRegmapRx_DpinfifoEn_Set, adrv9001, baseAddress, 0x1);
+    
+    if (ADI_ADRV9001_MONITOR_MODE_PATTERN_LENGTH_480 == monitorModePattern->patternLength)
+    {
+        patternLength = 480;
+    }
+
+    for (pattern = 0; pattern < patternLength; pattern++)
+    {
+        ADI_EXPECT(adrv9001_NvsRegmapRx_DpinfifoTestdataI_Set, adrv9001, baseAddress, monitorModePattern->patternI[pattern]);
+        ADI_EXPECT(adrv9001_NvsRegmapRx_DpinfifoTestdataI_Get, adrv9001, baseAddress, &readPattern);
+        if (readPattern != monitorModePattern->patternI[pattern])
+        {
+            ADI_ERROR_REPORT(&adrv9001->common,
+                ADI_COMMON_ERRSRC_API,
+                ADI_COMMON_ERR_INV_PARAM,
+                ADI_COMMON_ACT_ERR_CHECK_PARAM,
+                readPattern,
+                "Test pattern I is not written properly in DpInFIFO.");
+            ADI_ERROR_RETURN(adrv9001->common.error.newAction);
+        }
+        ADI_EXPECT(adrv9001_NvsRegmapRx_DpinfifoTestdataQ_Set, adrv9001, baseAddress, monitorModePattern->patternQ[pattern]);
+        ADI_EXPECT(adrv9001_NvsRegmapRx_DpinfifoTestdataQ_Get, adrv9001, baseAddress, &readPattern);
+        if (readPattern != monitorModePattern->patternQ[pattern])
+        {
+            ADI_ERROR_REPORT(&adrv9001->common,
+                ADI_COMMON_ERRSRC_API,
+                ADI_COMMON_ERR_INV_PARAM,
+                ADI_COMMON_ACT_ERR_CHECK_PARAM,
+                readPattern,
+                "Test pattern Q is not written properly in DpInFIFO.");
+            ADI_ERROR_RETURN(adrv9001->common.error.newAction);
+        }
+
+        ADI_EXPECT(adrv9001_NvsRegmapRx_DpinfifoTestDataUpdate_Set, adrv9001, baseAddress, 0x1);
+    }
+    ADI_API_RETURN(adrv9001);
+}
+
+static int32_t adi_adrv9001_arm_MonitorMode_Vector_Configure_Validate(adi_adrv9001_Device_t *adrv9001,
+                                                                      adi_common_ChannelNumber_e channel,
+                                                                      adi_adrv9001_MonitorModeVectorCfg_t *monitorModeVector)
+{
+    static uint16_t VECTOR_MASK_MAX = 0x3FFF;
+    ADI_NULL_PTR_RETURN(&adrv9001->common, monitorModeVector);
+    ADI_RANGE_CHECK(adrv9001, channel, ADI_CHANNEL_1, ADI_CHANNEL_2);
+    ADI_RANGE_CHECK(adrv9001, monitorModeVector->vectorMask, 0x1, VECTOR_MASK_MAX);
+    ADI_API_RETURN(adrv9001);
+}
+
+int32_t adi_adrv9001_arm_MonitorMode_Vector_Configure(adi_adrv9001_Device_t *adrv9001,
+                                                      adi_common_ChannelNumber_e channel,
+                                                      adi_adrv9001_MonitorModeVectorCfg_t *monitorModeVector)
+{
+    uint8_t mask = 0;
+    uint8_t nibSel = 0;
+    uint8_t vectorCrumb = 0;
+    uint8_t vectorNibble = 0;
+    uint16_t bfValue = 0;
+    uint32_t vectorConverted = 0;
+    static const uint8_t MONITOR_MODE_VECTOR_MAX = 14;
+    static const uint8_t MAX_NIBBLE_PER_VECTOR = 12;
+    adrv9001_BfNvsRegmapRx_e baseAddress = ADRV9001_BF_RX1_CORE;
+
+    ADI_PERFORM_VALIDATION(adi_adrv9001_arm_MonitorMode_Vector_Configure_Validate, adrv9001, channel, monitorModeVector);
+    if (ADI_CHANNEL_2 == channel)
+    {
+        baseAddress = ADRV9001_BF_RX2_CORE;
+    }
+
+    /* Hard code D14 and D15 = 0x1 */
+    bfValue = monitorModeVector->vectorMask | 0xC000;
+    ADI_EXPECT(adrv9001_NvsRegmapRx_CorrCtrl_Set, adrv9001, baseAddress, bfValue);
+
+    for (mask = 0; mask < MONITOR_MODE_VECTOR_MAX; mask++)
+    {
+        if (bfValue & (1 << mask))
+        {
+            for (nibSel = 0; nibSel < MAX_NIBBLE_PER_VECTOR; nibSel++)
+            {
+                vectorNibble = (monitorModeVector->vector[mask] >> (nibSel * 4)) & 0xF;
+                /* bit3 and bit1 are extracted in each nibble and combined for conversion */
+                /* 0x5: 0x00, 0x7:0x1, 0xD:0x2, 0xF:0x3 */
+                vectorCrumb = ((vectorNibble & 0x8) >> 2) | ((vectorNibble & 0x2) >> 1);
+                vectorConverted |= (vectorCrumb << (nibSel * 2));
+            }
+            ADI_EXPECT(adrv9001_NvsRegmapRx_Vcorrsig_Set, adrv9001, baseAddress, mask, vectorConverted);
+            vectorConverted = 0;
+        }
+    }
+    
+    ADI_API_RETURN(adrv9001);
+}
+
+static int32_t adi_adrv9001_arm_MonitorMode_Vector_Inspect_Validate(adi_adrv9001_Device_t *adrv9001,
+                                                                    adi_common_ChannelNumber_e channel,
+                                                                    adi_adrv9001_MonitorModeVectorCfg_t *monitorModeVector)
+{
+    ADI_NULL_PTR_RETURN(&adrv9001->common, monitorModeVector);
+    ADI_RANGE_CHECK(adrv9001, channel, ADI_CHANNEL_1, ADI_CHANNEL_2);
+    ADI_API_RETURN(adrv9001);
+}
+
+int32_t adi_adrv9001_arm_MonitorMode_Vector_Inspect(adi_adrv9001_Device_t *adrv9001,
+                                                    adi_common_ChannelNumber_e channel,
+                                                    adi_adrv9001_MonitorModeVectorCfg_t *monitorModeVector)
+{
+    uint8_t mask = 0;
+    uint8_t crumbSel = 0;
+    uint8_t vectorCrumb = 0;
+    uint8_t vectorLut[4] = { 0x5, 0x7, 0xD, 0xF };
+    uint16_t bfValue = 0;
+    uint32_t readvector = 0;
+    uint64_t vectorConverted = 0;
+    uint64_t tempVector = 0;
+    static const uint8_t MONITOR_MODE_VECTOR_MAX = 14;
+    static const uint8_t MAX_CRUMB_PER_READVECTOR = 12;
+
+    adrv9001_BfNvsRegmapRx_e baseAddress = ADRV9001_BF_RX1_CORE;
+
+    ADI_PERFORM_VALIDATION(adi_adrv9001_arm_MonitorMode_Vector_Inspect_Validate, adrv9001, channel, monitorModeVector);
+    if (ADI_CHANNEL_2 == channel)
+    {
+        baseAddress = ADRV9001_BF_RX2_CORE;
+    }
+
+    ADI_EXPECT(adrv9001_NvsRegmapRx_CorrCtrl_Get, adrv9001, baseAddress, &bfValue);
+    monitorModeVector->vectorMask = bfValue & 0x3FFF;
+
+    for (mask = 0; mask < MONITOR_MODE_VECTOR_MAX; mask++)
+    {
+        if (bfValue & (1 << mask))
+        {
+            ADI_EXPECT(adrv9001_NvsRegmapRx_Vcorrsig_Get, adrv9001, baseAddress, mask, &readvector);
+
+            for (crumbSel = 0; crumbSel < MAX_CRUMB_PER_READVECTOR; crumbSel++)
+            {
+                vectorCrumb = (readvector >> (crumbSel * 2)) & 0x3;
+                tempVector = (uint64_t)vectorLut[vectorCrumb] << (crumbSel * 4);
+                vectorConverted |= tempVector;
+            }
+            monitorModeVector->vector[mask] = vectorConverted;
+            vectorConverted = 0;
+        }
+    }
+
+    ADI_API_RETURN(adrv9001);
+}
+
+static int32_t adi_adrv9001_arm_MonitorMode_Rssi_Configure_Validate(adi_adrv9001_Device_t *adrv9001,
+                                                                    adi_adrv9001_arm_MonitorModeRssiCfg_t *monitorModeRssiCfg)
+{
+    adi_adrv9001_RadioState_t state = { 0 };
+    uint8_t port = 0;
+    uint8_t channel = 0;
+    uint8_t port_index = 0;
+    uint8_t chan_index = 0;
+    uint32_t MEASUREMENT_DURATION_SAMPLES_MAX = 0x1FFFFF;
+    int32_t  DETECTION_THRESHOLD_MIN = -140000;
+    adi_common_Port_e ports[2] = { ADI_RX, ADI_TX };
+    adi_common_ChannelNumber_e channels[2] = { ADI_CHANNEL_1, ADI_CHANNEL_2 };
+    ADI_NULL_PTR_RETURN(&adrv9001->common, monitorModeRssiCfg);
+
+    ADI_RANGE_CHECK(adrv9001, monitorModeRssiCfg->measurementDuration_samples, 0x2, MEASUREMENT_DURATION_SAMPLES_MAX);
+    ADI_RANGE_CHECK(adrv9001, monitorModeRssiCfg->detectionThreshold_mdBFS, DETECTION_THRESHOLD_MIN, 0);
+
+    if (0 == monitorModeRssiCfg->numberOfMeasurementsToAverage)
+    {
+        ADI_ERROR_REPORT(&adrv9001->common,
+            ADI_COMMON_ERRSRC_API,
+            ADI_COMMON_ERR_INV_PARAM,
+            ADI_COMMON_ACT_ERR_CHECK_PARAM,
+            monitorModeRssiCfg->numberOfMeasurementsToAverage,
+            "'numberOfMeasurementsToAverage' cannot be 0.");
+        ADI_ERROR_RETURN(adrv9001->common.error.newAction);
+    }
+
+    /* TODO: Remove this check in future. 
+     * measurementsStartPeriod_ms = 0: Continuous RSSI measurements (currently not supported by FW) */
+    if (0 == monitorModeRssiCfg->measurementsStartPeriod_ms)
+    {
+        ADI_ERROR_REPORT(&adrv9001->common,
+            ADI_COMMON_ERRSRC_API,
+            ADI_COMMON_ERR_INV_PARAM,
+            ADI_COMMON_ACT_ERR_CHECK_PARAM,
+            monitorModeRssiCfg->measurementsStartPeriod_ms,
+            "'measurementsStartPeriod_ms = 0' is currently not supported by FW.");
+        ADI_ERROR_RETURN(adrv9001->common.error.newAction);
+    }
+
+    /* Validate state is STANDBY */
+    ADI_EXPECT(adi_adrv9001_Radio_State_Get, adrv9001, &state);
+    for (port = 0; port < ADI_ARRAY_LEN(ports); port++)
+    {
+        for (channel = 0; channel < ADI_ARRAY_LEN(channels); channel++)
+        {
+            adi_common_port_to_index(ports[port], &port_index);
+            adi_common_channel_to_index(channels[channel], &chan_index);
+            if (ADI_ADRV9001_CHANNEL_STANDBY != state.channelStates[port_index][chan_index])
+            {
+                ADI_ERROR_REPORT(&adrv9001->common,
+                                 ADI_COMMON_ERRSRC_API,
+                                 ADI_COMMON_ERR_INV_PARAM,
+                                 ADI_COMMON_ACT_ERR_CHECK_PARAM,
+                                 channel,
+                                 "Invalid channel state. Channel must be in STANDBY state");
+                ADI_ERROR_RETURN(adrv9001->common.error.newAction);
+            }
+        }
+    }
+
+    ADI_API_RETURN(adrv9001);
+}
+
+int32_t adi_adrv9001_arm_MonitorMode_Rssi_Configure(adi_adrv9001_Device_t *adrv9001,
+                                                    adi_adrv9001_arm_MonitorModeRssiCfg_t *monitorModeRssiCfg)
+{
+    uint8_t armData[16] = { 0 };
+    uint8_t extData[5] = { 0 };
+    uint32_t offset = 0;
+    static const uint8_t OBJID_CFG_MONITOR_MODE_RSSI = 0xAD;
+
+    ADI_PERFORM_VALIDATION(adi_adrv9001_arm_MonitorMode_Rssi_Configure_Validate, adrv9001, monitorModeRssiCfg);
+
+    offset += 4;
+    armData[offset++] = monitorModeRssiCfg->numberOfMeasurementsToAverage;
+    armData[offset++] = monitorModeRssiCfg->measurementsStartPeriod_ms;
+    offset += 2;
+    adrv9001_LoadFourBytes(&offset, armData, monitorModeRssiCfg->measurementDuration_samples);
+    adrv9001_LoadFourBytes(&offset, armData, monitorModeRssiCfg->detectionThreshold_mdBFS);
+
+    /* Write monitor mode RSSI configuration parameters to ARM data memory */
+    ADI_EXPECT(adi_adrv9001_arm_Memory_Write, adrv9001, ADRV9001_ADDR_ARM_MAILBOX_SET, &armData[0], sizeof(armData));
+
+    extData[0] = 0;
+    extData[1] = ADRV9001_ARM_OBJECTID_CONFIG;
+    extData[2] = OBJID_CFG_MONITOR_MODE_RSSI;
+
+    ADI_EXPECT(adi_adrv9001_arm_Cmd_Write, adrv9001, ADRV9001_ARM_SET_OPCODE, extData, sizeof(extData));
+
+    /* Wait for command to finish executing */
+    ADRV9001_ARM_CMD_STATUS_WAIT_EXPECT(adrv9001,
+                                        ADRV9001_ARM_SET_OPCODE,
+                                        extData[1],
+                                        (uint32_t)ADI_ADRV9001_DEFAULT_TIMEOUT_US,
+                                        (uint32_t)ADI_ADRV9001_DEFAULT_INTERVAL_US);
+    
+    ADI_API_RETURN(adrv9001);
+}
+
+static int32_t adi_adrv9001_arm_MonitorMode_Rssi_Inspect_Validate(adi_adrv9001_Device_t *device,
+                                                                  adi_adrv9001_arm_MonitorModeRssiCfg_t *monitorModeRssiCfg)
+{
+    ADI_NULL_PTR_RETURN(&device->common, monitorModeRssiCfg);
+    ADI_API_RETURN(device);
+}
+
+int32_t adi_adrv9001_arm_MonitorMode_Rssi_Inspect(adi_adrv9001_Device_t *adrv9001,
+                                                  adi_adrv9001_arm_MonitorModeRssiCfg_t *monitorModeRssiCfg)
+{
+    uint8_t armData[12] = { 0 };
+    uint8_t extData[5] = { 0 };
+    uint32_t offset = 0;
+    static const uint8_t OBJID_CFG_MONITOR_MODE_RSSI = 0xAD;
+
+    ADI_PERFORM_VALIDATION(adi_adrv9001_arm_MonitorMode_Rssi_Inspect_Validate, adrv9001, monitorModeRssiCfg);
+
+    /* Tell the ARM how much data to read */
+    adrv9001_LoadFourBytes(&offset, armData, sizeof(armData));
+    ADI_EXPECT(adi_adrv9001_arm_Memory_Write, adrv9001, ADRV9001_ADDR_ARM_MAILBOX_GET, &armData[0], sizeof(uint32_t));
+    offset = 0;
+
+    /* Invoke the GET command */
+    extData[0] = 0;
+    extData[1] = ADRV9001_ARM_OBJECTID_CONFIG;
+    extData[2] = OBJID_CFG_MONITOR_MODE_RSSI;
+    ADI_EXPECT(adi_adrv9001_arm_Cmd_Write, adrv9001, ADRV9001_ARM_GET_OPCODE, &extData[0], sizeof(extData));
+
+        /* Wait for command to finish executing */
+    ADRV9001_ARM_CMD_STATUS_WAIT_EXPECT(adrv9001,
+                                        ADRV9001_ARM_GET_OPCODE,
+                                        extData[1],
+                                        ADI_ADRV9001_DEFAULT_TIMEOUT_US,
+                                        ADI_ADRV9001_DEFAULT_INTERVAL_US);
+
+    /* Read and parse the data */
+    ADI_EXPECT(adi_adrv9001_arm_Memory_Read, adrv9001, ADRV9001_ADDR_ARM_MAILBOX_GET, armData, sizeof(armData), ADRV9001_ARM_MEM_READ_AUTOINCR);
+
+    monitorModeRssiCfg->numberOfMeasurementsToAverage = armData[offset++];
+    monitorModeRssiCfg->measurementsStartPeriod_ms = armData[offset++];
+    offset += 2;
+    adrv9001_ParseFourBytes(&offset, armData, &monitorModeRssiCfg->measurementDuration_samples);
+    adrv9001_ParseFourBytes(&offset, armData, (uint32_t *)(&monitorModeRssiCfg->detectionThreshold_mdBFS));
 
     ADI_API_RETURN(adrv9001);
 }

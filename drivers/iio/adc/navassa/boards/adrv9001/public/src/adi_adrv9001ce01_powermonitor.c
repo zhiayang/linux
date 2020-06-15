@@ -93,8 +93,15 @@ int32_t adi_adrv9001Ce01_PowerMonitor_Read(adi_adrv9001Ce01_Board_t *adrv9001Ce0
     {
         *measuredVoltage_mV = ((float)voltage + VOLTAGE_OFFSET) * 1.801;
     }
-    
-    *measuredCurrent_mA = current == 0xFFFF ? 0.0 : ((float)current + CURRENT_OFFSET) * 1.25;
+	
+	if (current == 0xFFFF || current == 0xFFFE)
+	{
+		*measuredCurrent_mA = (float)0.0;
+	}
+	else
+	{
+		*measuredCurrent_mA = ((float)current + CURRENT_OFFSET) * 1.25;
+	}
     
     return recoveryAction;
 }

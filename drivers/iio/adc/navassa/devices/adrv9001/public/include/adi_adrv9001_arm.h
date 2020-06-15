@@ -14,16 +14,15 @@
 #ifndef _ADI_ADRV9001_ARM_H_
 #define _ADI_ADRV9001_ARM_H_
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-/* ADI specific header files */
 #include "adi_adrv9001_arm_types.h"
 #include "adi_common_error_types.h"
 #include "adi_adrv9001_types.h"
 #include "adi_adrv9001_error.h"
 #include "adrv9001_arm.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /**
  * \brief Enable the ARM processor
@@ -270,6 +269,80 @@ int32_t adi_adrv9001_arm_SystemPowerSavingMode_Set(adi_adrv9001_Device_t *adrv90
  */
 int32_t adi_adrv9001_arm_SystemPowerSavingMode_Get(adi_adrv9001_Device_t *adrv9001, adi_adrv9001_SystemPowerDownMode_e *mode);
 
+/**
+ * \brief Configure monitor mode pattern and inspects each pattern by reading back
+ *
+ * \note Message type: \ref timing_direct "Direct register access"
+ *
+ * \param[in]  adrv9001			    Context variable - Pointer to the ADRV9001 device settings data structure
+ * \param[in]  channel              The Channel for which to configure the monitor mode pattern
+ * \param[in]  monitorModePattern   The desired monitor mode pattern
+ *
+ * \returns A code indicating success (ADI_COMMON_ACT_NO_ACTION) or the required action to recover
+ */
+int32_t adi_adrv9001_arm_MonitorMode_Pattern_Configure(adi_adrv9001_Device_t *adrv9001,
+                                                       adi_common_ChannelNumber_e channel,
+                                                       adi_adrv9001_MonitorModePatternCfg_t *monitorModePattern);
+
+/**
+ * \brief Configure monitor mode vector
+ *
+ * \note Message type: \ref timing_direct "Direct register access"
+ *
+ * \param[in]  adrv9001			   Context variable - Pointer to the ADRV9001 device settings data structure
+ * \param[in]  channel             The Channel for which to configure the monitor mode vector
+ * \param[in]  monitorModeVector   The desired monitor mode pattern
+ *
+ * \returns A code indicating success (ADI_COMMON_ACT_NO_ACTION) or the required action to recover
+ */
+int32_t adi_adrv9001_arm_MonitorMode_Vector_Configure(adi_adrv9001_Device_t *adrv9001,
+                                                      adi_common_ChannelNumber_e channel,
+                                                      adi_adrv9001_MonitorModeVectorCfg_t *monitorModeVector);
+
+/**
+ * \brief Configure monitor mode pattern
+ *
+ * \note Message type: \ref timing_direct "Direct register access"
+ *
+ * \param[in]  adrv9001 		   Context variable - Pointer to the ADRV9001 device settings data structure
+ * \param[in]  channel             The Channel for which to inspect the monitor mode vector
+ * \param[out] monitorModeVector   The current monitor mode pattern
+ *
+ * \returns A code indicating success (ADI_COMMON_ACT_NO_ACTION) or the required action to recover
+ */
+int32_t adi_adrv9001_arm_MonitorMode_Vector_Inspect(adi_adrv9001_Device_t *adrv9001,
+                                                    adi_common_ChannelNumber_e channel,
+                                                    adi_adrv9001_MonitorModeVectorCfg_t *monitorModeVector);
+
+/**
+ * \brief Set the monitor mode RSSI configuration settings
+ * 
+ * \note Message type: \ref timing_mailbox "Mailbox command"
+ * 
+ * \pre Channel state is STANDBY
+ * 
+ * \param[in] adrv9001	           Context variable - Pointer to the ADRV9001 device settings data structure
+ * \param[in] monitorModeRssiCfg   The desired monitor mode RSSI configuration settings
+ * 
+ * \returns A code indicating success (ADI_COMMON_ACT_NO_ACTION) or the required action to recover
+ */
+int32_t adi_adrv9001_arm_MonitorMode_Rssi_Configure(adi_adrv9001_Device_t *adrv9001,
+                                                    adi_adrv9001_arm_MonitorModeRssiCfg_t *monitorModeRssiCfg);
+
+/**
+ * \brief Get the monitor mode RSSI configuration settings
+ * 
+ * \note Message type: \ref timing_mailbox "Mailbox command"
+ * 
+ * \pre Channel state any of STANDBY, CALIBRATED, PRIMED, RF_ENABLED
+ * 
+ * \param[in]  adrv9001	            Context variable - Pointer to the ADRV9001 device settings data structure
+ * \param[out] monitorModeRssiCfg   The current monitor mode RSSI configuration settings
+ * 
+ * \returns A code indicating success (ADI_COMMON_ACT_NO_ACTION) or the required action to recover
+ */
+int32_t adi_adrv9001_arm_MonitorMode_Rssi_Inspect(adi_adrv9001_Device_t *adrv9001,
+                                                  adi_adrv9001_arm_MonitorModeRssiCfg_t *monitorModeRssiCfg);
 /****************************************************************************
  * Helper functions
  ****************************************************************************
@@ -503,20 +576,6 @@ int32_t adi_adrv9001_arm_Profile_Program(adi_adrv9001_Device_t *adrv9001);
  * \returns A code indicating success (ADI_COMMON_ACT_NO_ACTION) or the required action to recover
  */
 int32_t adi_adrv9001_arm_System_Program(adi_adrv9001_Device_t *adrv9001, uint8_t channelMask);
-
-/**
- * \brief Sends a command SET CLOCK_ENABLE to the ADRV9001 ARM processor interface
- *
- * \note Message type: \ref timing_mailbox "Mailbox command"
- *
- * \pre Channel state is STANDBY
- *
- * \param[in] adrv9001          Context variable - Pointer to the ADRV9001 device data structure containing settings
- * \param[in] armClock			pointer to adi_adrv9001_ArmClock_t data structure
- *
- * \returns A code indicating success (ADI_COMMON_ACT_NO_ACTION) or the required action to recover
- */
-int32_t adi_adrv9001_arm_Clocks_Program(adi_adrv9001_Device_t *adrv9001, adi_adrv9001_ArmClock_t *armClock);
 
  /****************************************************************************
  * Debug functions

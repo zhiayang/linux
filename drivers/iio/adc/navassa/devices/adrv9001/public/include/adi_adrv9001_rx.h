@@ -137,8 +137,19 @@ int32_t adi_adrv9001_Rx_MinMaxGainIndex_Set(adi_adrv9001_Device_t *adrv9001,
  * even though every index is accessible from 0x00 to 0xFF.
  *
  * \note Message type: \ref timing_direct "Direct register access"
+ * \note The new gain only takes effect in States where Clocks are enabled:
+ *       Clocks are enabled in the following transitions:
+ *           CALIBRATED->PRIMED
+ *           PRIMED->RF_ENABLED
  *
- * \pre This function may be called any time after device initialization
+ *       Clocks are disabled in the following transitions:
+ *           RF_ENABLED->PRIMED
+ *
+ * \pre If gain control mode is ADI_ADRV9001_RX_GAIN_CONTROL_MODE_PIN: 
+ *      channel state is any of CALIBRATED, PRIMED, RF_ENABLED 
+ *      and can only take action in RF_ENABLED
+ * \pre If gain control mode is ADI_ADRV9001_RX_GAIN_CONTROL_MODE_SPI:
+ *      channel state is any of STANDBY, CALIBRATED, PRIMED, RF_ENABLED
  *
  * \param[in] adrv9001      Context variable - Pointer to the ADRV9001 device data structure
  * \param[in] channel       The Rx Channel for which to set the gain
@@ -155,12 +166,13 @@ int32_t adi_adrv9001_Rx_Gain_Set(adi_adrv9001_Device_t *adrv9001,
  *        - The current gain index value read will be Rx Gain index in Rx mode
  *        - The current gain index value read will be ORx Gain index in ORx mode
  *
- * This function reads the gain index for the passed channel Rx1, Rx2, ORx1, ORx2 depending on the gain control mode
+ * This function reads the gain index of the channel last time clocks were enabled
  *
- * \note Message type: \ref timing_direct "Direct register access"
- *
- * \pre This function may be called any time after the requested channel is ON.
- *      However, gain indices are tracked only after the device goes into a Receiver mode.
+ * \note Message type: \ref timing_direct "Direct register access
+ * 
+ * \pre Channel state is any of STANDBY, CALIBRATED, PRIMED, RF_ENABLED
+ *      However, gain indices are tracked only after the channel state is RF_ENABLED
+ *      and returns the gainIndex of the channel last time clocks were enabled
  *
  * \param[in]  adrv9001     Context variable - Pointer to the ADRV9001 device data structure
  * \param[in]  channel      The Rx Channel from which to read the gain
@@ -310,7 +322,7 @@ int32_t adi_adrv9001_Rx_FrequencyCorrection_Set(adi_adrv9001_Device_t *adrv9001,
 
 /**
  * \brief Set the enabledness of dynamic switch between Low Power and High Power ADCs
- *
+ * 
  * \note Message type: \ref timing_mailbox "Mailbox command"
  *
  * \pre Channel state any of STANDBY, CALIBRATED
@@ -318,16 +330,16 @@ int32_t adi_adrv9001_Rx_FrequencyCorrection_Set(adi_adrv9001_Device_t *adrv9001,
  * \param[in] adrv9001   Context variable - Pointer to the ADRV9001 device data structure
  * \param[in] channel    The Rx Channel for which to set the enabledness of the ADC dynamic switch
  * \param[in] enable     A boolean flag to enable or disable dynamic switching between LP and HP ADCs
- *
+ * 
  * \returns A code indicating success (ADI_COMMON_ACT_NO_ACTION) or the required action to recover
  */
-int32_t adi_adrv9001_Rx_AdcSwitchEnable_Set(adi_adrv9001_Device_t *adrv9001,
+int32_t adi_adrv9001_Rx_AdcSwitchEnable_Set(adi_adrv9001_Device_t *adrv9001, 
                                             adi_common_ChannelNumber_e channel,
                                             bool enable);
 
 /**
  * \brief Get the enabledness of dynamic switch between Low Power and High Power ADCs
- *
+ * 
  * \note Message type: \ref timing_mailbox "Mailbox command"
  *
  * \pre Channel state any of STANDBY, CALIBRATED, PRIMED, RF_ENABLED
@@ -335,16 +347,16 @@ int32_t adi_adrv9001_Rx_AdcSwitchEnable_Set(adi_adrv9001_Device_t *adrv9001,
  * \param[in]  adrv9001   Context variable - Pointer to the ADRV9001 device data structure
  * \param[in]  channel    The Rx Channel for which to get the current enabledness of the ADC dynamic switch
  * \param[out] enable     A boolean flag to get the current enabledness of the ADC dynamic switch
- *
+ * 
  * \returns A code indicating success (ADI_COMMON_ACT_NO_ACTION) or the required action to recover
  */
-int32_t adi_adrv9001_Rx_AdcSwitchEnable_Get(adi_adrv9001_Device_t *adrv9001,
+int32_t adi_adrv9001_Rx_AdcSwitchEnable_Get(adi_adrv9001_Device_t *adrv9001, 
                                             adi_common_ChannelNumber_e channel,
                                             bool *enable);
 
 /**
  * \brief Configure ADC dynamic switch settings for the specified channel
- *
+ * 
  * \note Message type: \ref timing_mailbox "Mailbox command"
  *
  * \pre Channel state must be CALIBRATED
@@ -352,16 +364,16 @@ int32_t adi_adrv9001_Rx_AdcSwitchEnable_Get(adi_adrv9001_Device_t *adrv9001,
  * \param[in] adrv9001         Context variable - Pointer to the ADRV9001 device data structure
  * \param[in] channel          The Rx Channel for which to set the enabledness of the ADC dynamic switch
  * \param[in] switchConfig     The desired ADC dynamic switch configuration
- *
+ * 
  * \returns A code indicating success (ADI_COMMON_ACT_NO_ACTION) or the required action to recover
  */
-int32_t adi_adrv9001_Rx_AdcSwitch_Configure(adi_adrv9001_Device_t *adrv9001,
+int32_t adi_adrv9001_Rx_AdcSwitch_Configure(adi_adrv9001_Device_t *adrv9001, 
                                             adi_common_ChannelNumber_e channel,
                                             adi_adrv9001_AdcSwitchCfg_t *switchConfig);
 
 /**
  * \brief Inspect the current ADC dynamic switch settings for the specified channel
- *
+ * 
  * \note Message type: \ref timing_mailbox "Mailbox command"
  *
  * \pre Channel state any of STANDBY, CALIBRATED, PRIMED, RF_ENABLED
@@ -369,16 +381,16 @@ int32_t adi_adrv9001_Rx_AdcSwitch_Configure(adi_adrv9001_Device_t *adrv9001,
  * \param[in]  adrv9001         Context variable - Pointer to the ADRV9001 device data structure
  * \param[in]  channel          The Rx Channel for which to get the current enabledness of the ADC dynamic switch
  * \param[out] switchConfig     The current ADC dynamic switch configuration
- *
+ * 
  * \returns A code indicating success (ADI_COMMON_ACT_NO_ACTION) or the required action to recover
  */
-int32_t adi_adrv9001_Rx_AdcSwitch_Inspect(adi_adrv9001_Device_t *adrv9001,
+int32_t adi_adrv9001_Rx_AdcSwitch_Inspect(adi_adrv9001_Device_t *adrv9001, 
                                           adi_common_ChannelNumber_e channel,
                                           adi_adrv9001_AdcSwitchCfg_t *switchConfig);
 
 /**
  * \brief Get the current ADC type for the specified channel
- *
+ * 
  * \note Message type: \ref timing_mailbox "Mailbox command"
  *
  * \pre Channel state any of STANDBY, CALIBRATED, PRIMED, RF_ENABLED
@@ -386,12 +398,32 @@ int32_t adi_adrv9001_Rx_AdcSwitch_Inspect(adi_adrv9001_Device_t *adrv9001,
  * \param[in]  adrv9001   Context variable - Pointer to the ADRV9001 device data structure
  * \param[in]  channel    The Channel for which to get the ADC type
  * \param[out] adcType    The current ADC type
- *
+ * 
  * \returns A code indicating success (ADI_COMMON_ACT_NO_ACTION) or the required action to recover
  */
-int32_t adi_adrv9001_Rx_AdcType_Get(adi_adrv9001_Device_t *adrv9001,
+int32_t adi_adrv9001_Rx_AdcType_Get(adi_adrv9001_Device_t *adrv9001, 
                                     adi_common_ChannelNumber_e channel,
                                     adi_adrv9001_AdcType_e *adcType);
+
+/**
+* \brief Configure GPIO pins to route the ADRV9001 Rx1 and Rx2 gain indices
+*
+* \note  gain index ranges from 183 to 255 and occupies 8-bits[7:0]. So the 'msb' is always be '1'.
+*        Hence the 'msb' control out mux register for gain index is replaced with 'gt_gain_index', which allowstoggles/triggers on the gain_change.
+*        So in BBIC, the user must replace the 'msb' received with '1' always.
+*        
+* \pre Channel state must be CALIBRATED
+*      Level of GPIO pins is only reflective of channel gainIndex when channel is in the RF_ENABLED state
+*
+* \param[in] adrv9001           Context variable - Pointer to the ADRV9001 device data structure
+* \param[in] channel            The channel of the specified port for which to route gain index to the specified GPIO pin
+* \param[in] gainIndexPinCfg    The desired DGPIO pin selection to route gain index for the specified channel
+*
+* \returns A code indicating success (ADI_COMMON_ACT_NO_ACTION) or the required action to recover
+*/
+int32_t adi_adrv9001_Rx_GainIndex_Gpio_Configure(adi_adrv9001_Device_t *adrv9001,
+                                                 adi_common_ChannelNumber_e channel,
+                                                 adi_adrv9001_GainIndexPinCfg_t *gainIndexPinCfg);
 
 #ifdef __cplusplus
 }

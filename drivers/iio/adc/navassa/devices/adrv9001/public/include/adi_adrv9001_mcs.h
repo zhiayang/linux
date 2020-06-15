@@ -22,6 +22,7 @@ extern "C" {
 #include "adi_adrv9001_user.h"
 #include "adi_adrv9001_types.h"
 #include "adi_adrv9001_mcs_types.h"
+#include "adi_adrv9001_radio_types.h"
 
 /**
  * \brief Sets up the transceiver to listen for incoming MCS pulses to synchronize the internal clock tree.
@@ -44,13 +45,13 @@ extern "C" {
  * \pre Must be called after the device has been initialized and PLL lock status has been verified.
  * \pre Transceiver must NOT be transmitting or receiving
  *
- * \param[in] adrv9001	        Context variable - Pointer to the ADRV9001 device settings data structure
- * \param[in] pllType       The PLL to prepare for MCS
+ * \param[in] adrv9001	    Context variable - Pointer to the ADRV9001 device settings data structure
+ * \param[in] pll           The PLL to prepare for MCS
  *
  * \returns A code indicating success (ADI_COMMON_ACT_NO_ACTION) or the required action to recover
  */
 
-int32_t adi_adrv9001_Mcs_Prepare(adi_adrv9001_Device_t *adrv9001, adi_adrv9001_PllType_e pllType);
+int32_t adi_adrv9001_Mcs_Prepare(adi_adrv9001_Device_t *adrv9001, adi_adrv9001_Pll_e pll);
 
 /**
  * \brief Request ARM to prepare for MCS
@@ -76,7 +77,7 @@ int32_t adi_adrv9001_Mcs_PrepareArm(adi_adrv9001_Device_t *adrv9001);
  * \note Message type: \ref timing_direct "Direct register access"
  *
  * \param[in]  adrv9001	        Context variable - Pointer to the ADRV9001 device settings data structure
- * \param[in]  pllType          The PLL to prepare for MCS
+ * \param[in]  pll              The PLL to prepare for MCS
  * \param[out] mcsStatus        The analog mcsStatus word
  * \parblock
  *  mcsStatus | bit Description
@@ -93,9 +94,7 @@ int32_t adi_adrv9001_Mcs_PrepareArm(adi_adrv9001_Device_t *adrv9001);
  *
  * \returns A code indicating success (ADI_COMMON_ACT_NO_ACTION) or the required action to recover
  */
-int32_t adi_adrv9001_Mcs_AnalogStatus_Get(adi_adrv9001_Device_t *adrv9001,
-                                          adi_adrv9001_PllType_e pllType,
-                                          uint32_t *mcsStatus);
+int32_t adi_adrv9001_Mcs_AnalogStatus_Get(adi_adrv9001_Device_t *adrv9001, adi_adrv9001_Pll_e pll, uint32_t *mcsStatus);
 
 /**
  * \brief Resets the MCS

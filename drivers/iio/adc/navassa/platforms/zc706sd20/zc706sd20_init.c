@@ -255,7 +255,7 @@ int32_t zc706sd20_HwReset(void *devHalCfg, uint8_t pinLevel)
     uint32_t writeData = 0;
     uint32_t pinLevelBit = 0;
     uint32_t resetPinBitPostion = 0;
-    static const uint32_t FPGA_RESETPIN_REGISTER = 0x43050020;
+    static const uint32_t FPGA_RESETPIN_REGISTER = 0x43010020;
     
     if (devHalCfg == NULL)
     {

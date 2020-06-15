@@ -125,7 +125,7 @@ typedef struct adi_adrv9001_GainControlCfg
     uint8_t minGainIndex;           /*!< AGC Rx min gain index. Valid range is from 0 to maxGainIndex */
     /** AGC gain update time denominated in AGC clock cycles; Valid range is from 0 to 4194303. */
     uint32_t gainUpdateCounter;
-    uint8_t attackDelay_us;         /*!< Delay time, denominated in microseconds, before starting AGC, after starting Rx */
+    uint8_t attackDelay_us;         /*!< Delay time, denominated in microseconds, before starting AGC, after starting Rx. Valid range is from 0 to 63 */
     /** On any gain change, the AGC waits for the time (range 0 to 127) specified in AGC clock cycles to allow gain
      *  transients to flow through the Rx path before starting any measurements. */
     uint8_t slowLoopSettlingDelay;
@@ -137,7 +137,7 @@ typedef struct adi_adrv9001_GainControlCfg
      *  Power-based AGC changes are disabled in this mode. */
     adi_adrv9001_RxGainControlDetectionMode_e agcMode;
     bool resetOnRxon;       /*!< Reset the AGC slow loop state machine to max gain when the Rx Enable is taken low */
-    uint8_t resetOnRxonGainIndex;       /*!< AGC Reset On gain index. Valid range is from 0 to 255 */
+    uint8_t resetOnRxonGainIndex;       /*!< AGC Reset On gain index. Valid range is from minGainIndex to maxGainIndex */
     bool enableSyncPulseForGainCounter; /*!< Enable the AGC gain update counter to be sync'ed to a time-slot boundary. */
     bool enableFastRecoveryLoop;        /*!< Enable multiple time constants in AGC loop for fast attack and fast recovery. */
     adi_adrv9001_PowerDetector_t power;

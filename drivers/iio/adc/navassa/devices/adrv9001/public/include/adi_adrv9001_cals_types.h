@@ -88,11 +88,11 @@ typedef enum adi_adrv9001_TrackingCalibrations
  */
 typedef enum adi_adrv9001_InitCalMode
 {
-    ADI_ADRV9001_INIT_CAL_MODE_ALL  = 0,      //!< Run algorithms on all profiles
-    ADI_ADRV9001_INIT_CAL_MODE_RX   = 1,      //!< Run algorithms on Rx profiles
-    ADI_ADRV9001_INIT_CAL_MODE_TX   = 2,      //!< Run algorithms on Tx and Loopback (Internal & External) profiles
-    ADI_ADRV9001_INIT_CAL_MODE_ELB_ONLY = 3   //!< Run algorithms only on External Loop Back (ELB) profiles.
-                                              //!< 'ADI_ADRV9001_INIT_CAL_MODE_ELB_ONLY' can be selected only when external path delay calibration is run
+    ADI_ADRV9001_INIT_CAL_MODE_ALL,             //!< Run initial calibrations on all profiles
+    ADI_ADRV9001_INIT_CAL_MODE_SYSTEM_AND_RX,   //!< Run initial calibrations for the system and on Rx profiles
+    ADI_ADRV9001_INIT_CAL_MODE_LOOPBACK_AND_TX, //!< Run initial calibrations on Loopback (Internal & External) and Tx profiles
+    ADI_ADRV9001_INIT_CAL_MODE_ELB_ONLY         //!< Run initial calibrations only on External Loop Back (ELB) profiles.
+                                                //!< 'ADI_ADRV9001_INIT_CAL_MODE_ELB_ONLY' can be selected only when external path delay calibration is run
 }adi_adrv9001_InitCalMode_e;
 
 /**

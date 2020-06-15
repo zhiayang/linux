@@ -8,12 +8,8 @@
 #ifndef _ADI_ADRV9001_CLOCKSETTINGS_TYPES_H_
 #define _ADI_ADRV9001_CLOCKSETTINGS_TYPES_H_
 
-#ifdef __KERNEL__
-#include <linux/types.h>
-#else
 #include <stdint.h>
 #include <stdbool.h>
-#endif
 
 /**
  *  \brief Enum of possible ADRV9001 HS divider settings
@@ -33,6 +29,16 @@ typedef enum adi_adrv9001_ClkPllMode
     ADI_ADRV9001_CLK_PLL_HP_MODE = 0x0, /*!< Clock PLL HP Mode */
     ADI_ADRV9001_CLK_PLL_LP_MODE = 0x1, /*!< Clock PLL LP Mode */
 } adi_adrv9001_ClkPllMode_e;
+
+/**
+ * \brief Enumeration of the a component power level
+ */
+typedef enum
+{
+    ADI_ADRV9001_COMPONENT_POWER_LEVEL_LOW = 0,  /*!< Low power */
+    ADI_ADRV9001_COMPONENT_POWER_LEVEL_MEDIUM,   /*!< Medium power */
+    ADI_ADRV9001_COMPONENT_POWER_LEVEL_HIGH      /*!< High power */
+} adi_adrv9001_ComponentPowerLevel_e;
 
 /**
  *  \brief Enum of possible ADRV9001 internal Clock divisor settings
@@ -140,6 +146,8 @@ typedef struct adi_adrv9001_ClockSettings
     adi_adrv9001_InternalClock_Divisor_e  armClkDiv;  /*!< ARM Clock divider */
     uint16_t armPowerSavingClkDiv;                    /*!< B0: ARM clock divider used by FW for power saving; Ranges from 1 to 256 */
     bool refClockOutEnable;                           /*!< Reference clock out enable; False: Disable reference clock out, True: Enable reference clock out */
+    adi_adrv9001_ComponentPowerLevel_e  auxPllPower;  /*!< AUXPLL power level */
+    adi_adrv9001_ComponentPowerLevel_e  clkPllPower;  /*!< CLKPLL power level */
     uint8_t padRefClkDrv;                             /*!< Output Clock Buffer Drive (valid 0-3) */
     uint32_t extLo1OutFreq_kHz;                       /*!< EXT LO1 output frequency in kHz */
     uint32_t extLo2OutFreq_kHz;                       /*!< EXT LO2 output frequency in kHz */

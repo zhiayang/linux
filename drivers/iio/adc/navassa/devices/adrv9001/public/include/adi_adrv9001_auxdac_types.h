@@ -14,42 +14,15 @@
 #ifndef _ADI_ADRV9001_AUXDAC_TYPES_H_
 #define _ADI_ADRV9001_AUXDAC_TYPES_H_
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-/*
-*********************************************************************************************************
-*                                             INCLUDE FILES
-*********************************************************************************************************
-*/
-
-/*
-*********************************************************************************************************
-*                                             ENUMs
-*********************************************************************************************************
-*/
-
 /**
 *  \brief Enum to select AuxDAC
 */
-typedef enum adi_adrv9001_AuxDacs
+typedef enum adi_adrv9001_AuxDac
 {
-    ADI_ADRV9001_AUXDAC0 = 0x01, /*!< AuxDAC0 */
-    ADI_ADRV9001_AUXDAC1 = 0x02, /*!< AuxDAC1 */
-    ADI_ADRV9001_AUXDAC2 = 0x04, /*!< AuxDAC2 */
-    ADI_ADRV9001_AUXDAC3 = 0x08, /*!< AuxDAC3 */
-} adi_adrv9001_AuxDacs_e;
-
-/*
-*********************************************************************************************************
-*                                             Structure definition
-*********************************************************************************************************
-*/
-
-
-#ifdef __cplusplus
-}
-#endif
+    ADI_ADRV9001_AUXDAC0, /*!< AuxDAC0 */
+    ADI_ADRV9001_AUXDAC1, /*!< AuxDAC1 */
+    ADI_ADRV9001_AUXDAC2, /*!< AuxDAC2 */
+    ADI_ADRV9001_AUXDAC3, /*!< AuxDAC3 */
+} adi_adrv9001_AuxDac_e;
 
 #endif /* _ADI_ADRV9001_AUXDAC_TYPES_H_ */

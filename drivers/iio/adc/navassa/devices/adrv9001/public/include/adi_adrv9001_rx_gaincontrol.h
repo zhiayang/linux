@@ -57,7 +57,7 @@ int32_t adi_adrv9001_Rx_GainControl_Mode_Set(adi_adrv9001_Device_t *adrv9001,
 int32_t adi_adrv9001_Rx_GainControl_Mode_Get(adi_adrv9001_Device_t *adrv9001,
                                              adi_common_ChannelNumber_e channel,
                                              adi_adrv9001_RxGainControlMode_e *mode);
-
+    
 /**
  * \brief Configure Automatic Gain Control (AGC) for the specified Rx channel
  *
@@ -65,7 +65,7 @@ int32_t adi_adrv9001_Rx_GainControl_Mode_Get(adi_adrv9001_Device_t *adrv9001,
  *
  * \note This function does NOT enable AGC mode. Call adi_adrv9001_Rx_GainCtrlMode_Set() afterwards
  * \note Message type: \ref timing_direct "Direct register acccess"
- *
+ * 
  * \param[in] adrv9001       Context variable - Pointer to the ADRV9001 device data structure
  * \param[in] channel        The Rx Channel for which to configure AGC
  * \param[in] agcCfg         The AGC configuration to apply
@@ -109,7 +109,7 @@ int32_t adi_adrv9001_Rx_GainControl_MinMaxGainIndex_Set(adi_adrv9001_Device_t *a
                                                         adi_common_ChannelNumber_e channel,
                                                         uint8_t minGainIndex,
                                                         uint8_t maxGainIndex);
-
+    
 /**
  * \brief Get the min and max gain indexes for AGC for the specified Rx channel
  *
@@ -142,31 +142,31 @@ int32_t adi_adrv9001_Rx_GainControl_Reset(adi_adrv9001_Device_t *adrv9001, adi_c
 
 /**
  * \brief Configure gain control for pin mode
- *
+ * 
  * \note Message type: \ref timing_direct "Direct register acccess"
  *
  * \param[in] adrv9001      Context variable - Pointer to the ADRV9001 device data structure
  * \param[in] channel       The Rx Channel for which to configure pin gain control
  * \param[in] config        The desired pin gain control configuration
- *
+ * 
  * \returns A code indicating success (ADI_COMMON_ACT_NO_ACTION) or the required action to recover
  */
-int32_t adi_adrv9001_Rx_GainControl_PinMode_Configure(adi_adrv9001_Device_t *adrv9001,
+int32_t adi_adrv9001_Rx_GainControl_PinMode_Configure(adi_adrv9001_Device_t *adrv9001, 
                                                       adi_common_ChannelNumber_e channel,
                                                       adi_adrv9001_RxGainControlPinCfg_t *config);
 
 /**
  * \brief Inspect gain control for pin mode
- *
+ * 
  * \note Message type: \ref timing_direct "Direct register acccess"
  *
  * \param[in]  adrv9001     Context variable - Pointer to the ADRV9001 device data structure
  * \param[in]  channel      The Rx Channel for which to configure pin gain control
  * \param[out] config       The current pin gain control configuration
- *
+ * 
  * \returns A code indicating success (ADI_COMMON_ACT_NO_ACTION) or the required action to recover
  */
-int32_t adi_adrv9001_Rx_GainControl_PinMode_Inspect(adi_adrv9001_Device_t *adrv9001,
+int32_t adi_adrv9001_Rx_GainControl_PinMode_Inspect(adi_adrv9001_Device_t *adrv9001, 
                                                     adi_common_ChannelNumber_e channel,
                                                     adi_adrv9001_RxGainControlPinCfg_t *config);
 

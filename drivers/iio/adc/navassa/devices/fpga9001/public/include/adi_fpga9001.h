@@ -48,19 +48,6 @@ int32_t adi_fpga9001_HwOpen(adi_fpga9001_Device_t *fpga9001);
  */
 int32_t adi_fpga9001_HwClose(adi_fpga9001_Device_t *fpga9001);
 
-// FIXME: This is an awful way to do this, but it should go away in the future
-extern char fpgaBinDirectory[256];
-/**
- * \brief Change the value of the fpgaBinDirectory global variable used by adi_fpga9001_SwitchBin()
- * 
- * \deprecated Store binaries in the default location
- *
- * \param[in] directory The new path to the directory containing FPGA binaries
- *
- * \returns A code indicating success (ADI_COMMON_ACT_NO_ACTION) or the required action to recover
- */
-int32_t adi_fpga9001_FpgaBinDirectorySet(const char* directory);
-
 /**
  * \brief Reprogram the FPGA to the specified binary
  *

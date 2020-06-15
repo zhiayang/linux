@@ -14,12 +14,8 @@
 #ifndef _ADI_ADRV9001_DPD_TYPES_H_
 #define _ADI_ADRV9001_DPD_TYPES_H_
 
-#ifdef __KERNEL__
-#include <linux/types.h>
-#else
 #include <stdint.h>
 #include <stdbool.h>
-#endif
 
 #ifdef __cplusplus
 extern "C" {

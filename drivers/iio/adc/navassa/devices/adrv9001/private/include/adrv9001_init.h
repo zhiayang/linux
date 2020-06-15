@@ -21,7 +21,6 @@
 extern "C" {
 #endif
 
-#define ADRV9001_INIT_DMA_MEM_READ_CHECK 0  /* Set this to '1' to enable memory write verification */
 //#define ADRV9001_INIT_DEBUG 1
 #ifdef ADRV9001_INIT_DEBUG
 #include <stdio.h>
@@ -167,19 +166,6 @@ int32_t adrv9001_InitAnalog(adi_adrv9001_Device_t *device,
 * \retval ADI_COMMON_ACT_NO_ACTION Function completed successfully, no action required
 */
 int32_t adrv9001_ProfilesVerify(adi_adrv9001_Device_t *device, adi_adrv9001_Init_t *init);
-
-/**
-* \brief Set various Analog Clock PLL registers in the device
-*
-* \pre This function is private and is not called directly by the user.
-*
-* \param device Structure pointer to ADRV9001 device data structure
-* \param init   Structure pointer to ADRV9001 init data structure
-*
-* \retval ADI_COMMON_ACT_ERR_CHECK_PARAM Recovery action for bad parameter check
-* \retval ADI_COMMON_ACT_NO_ACTION Function completed successfully, no action required
-*/
-int32_t adrv9001_ProgramClkPll(adi_adrv9001_Device_t *device, adi_adrv9001_Init_t *init);
 
 /**
 * \brief Set various Analog clock registers in the device

@@ -8,11 +8,7 @@
 #ifndef _ADI_ADRV9001_RXSETTINGS_TYPES_H_
 #define _ADI_ADRV9001_RXSETTINGS_TYPES_H_
 
-#ifdef __KERNEL__
-#include <linux/types.h>
-#else
 #include <stdint.h>
-#endif
 
 #include "adi_adrv9001_pfirBuffer_types.h"
 
@@ -350,8 +346,8 @@ typedef struct adi_adrv9001_RxProfile
     uint32_t		adcClk_kHz;						  /*!< ADC clock 2.2G/1.47G/1.1G */
     uint32_t		rxCorner3dB_kHz;				  /*!< TIA bandwidth in kHz */
     uint32_t		rxCorner3dBLp_kHz;				  /*!< TIA bandwidth for Low Power ADC */
-    uint8_t			tiaPower;                         /*!< RX TIA Power setting */
-    uint8_t			tiaPowerLp;                       /*!< RX TIA Power setting Low Power ADC*/
+    adi_adrv9001_ComponentPowerLevel_e tiaPower;      /*!< Rx TIA power level before the high-performance ADC */
+    adi_adrv9001_ComponentPowerLevel_e tiaPowerLp;    /*!< Rx TIA power level before the low power ADC*/
     uint32_t	    channelType;		              /*!< Channel type described by this profile (Rx/ORx/Loopback) */
     adi_adrv9001_AdcType_e		adcType;			  /*!< ADC type: low/high power ADC */
     adi_adrv9001_Adc_LowPower_CalMode_e  lpAdcCalMode; /*!< Select periodic or continuous Low Power ADC calibration */

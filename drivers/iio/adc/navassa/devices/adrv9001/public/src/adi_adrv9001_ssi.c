@@ -18,16 +18,13 @@
 #include "adi_adrv9001_spi.h"
 #include "adrv9001_init.h"
 #include "adrv9001_reg_addr_macros.h"
-#include "adrv9001_bf_nvs_regmap_rx.h"
-#include "adrv9001_bf_nvs_regmap_tx.h"
-#include "adrv9001_bf_nvs_regmap_core.h"
-#include "adrv9001_bf_nvs_regmap_core_3.h"
+#include "adrv9001_bf.h"
 
-static int32_t __maybe_unused adi_adrv9001_Ssi_Rx_TestMode_Configure_Validate(adi_adrv9001_Device_t *device,
-									      adi_common_ChannelNumber_e channel,
-									      adi_adrv9001_SsiType_e ssiType,
-									      adi_adrv9001_SsiDataFormat_e dataFormat,
-									      adi_adrv9001_RxSsiTestModeCfg_t *ssiTestModeConfig)
+static int32_t adi_adrv9001_Ssi_Rx_TestMode_Configure_Validate(adi_adrv9001_Device_t *device,
+                                                               adi_common_ChannelNumber_e channel,
+                                                               adi_adrv9001_SsiType_e ssiType,
+                                                               adi_adrv9001_SsiDataFormat_e dataFormat,
+                                                               adi_adrv9001_RxSsiTestModeCfg_t *ssiTestModeConfig)
 {
     ADI_NULL_PTR_RETURN(&device->common, ssiTestModeConfig);
     ADI_RANGE_CHECK(device, channel, ADI_CHANNEL_1, ADI_CHANNEL_2);
@@ -65,84 +62,83 @@ int32_t adi_adrv9001_Ssi_Rx_TestMode_Configure(adi_adrv9001_Device_t *device,
                                                adi_adrv9001_RxSsiTestModeCfg_t *ssiTestModeConfig)
 {
     int8_t i = 0;
-    adrv9001_BfNvsRegmapRxChanAddr_e baseAddress = ADRV9001_BF_RX1_CORE;
+    adrv9001_BfNvsRegmapRx_e instance = ADRV9001_BF_RX1_CORE;
+    uint8_t channelIdx = 0;
 
     ADI_PERFORM_VALIDATION(adi_adrv9001_Ssi_Rx_TestMode_Configure_Validate, device, channel, ssiType, dataFormat, ssiTestModeConfig);
-
-    if (channel == ADI_CHANNEL_2)
-    {
-        baseAddress = ADRV9001_BF_RX2_CORE;
-    }
+    
+    adi_common_channel_to_index(channel, &channelIdx);
+    instance = nvsRegmapRxInstances[channelIdx];
 
     if ((ADI_ADRV9001_SSI_TESTMODE_DATA_FIXED_PATTERN != ssiTestModeConfig->testData) &&
         (dataFormat != ADI_ADRV9001_SSI_FORMAT_16_BIT_I_Q_DATA))
     {
         ADI_ERROR_REPORT(&device->common,
-            ADI_COMMON_ERRSRC_API,
-            ADI_COMMON_ERR_INV_PARAM,
-            ADI_COMMON_ACT_ERR_CHECK_PARAM,
-            dataFormat,
-            "Invalid SSI data format for the selected SSI calibration test type");
+                         ADI_COMMON_ERRSRC_API,
+                         ADI_COMMON_ERR_INV_PARAM,
+                         ADI_COMMON_ACT_ERR_CHECK_PARAM,
+                         dataFormat,
+                         "Invalid SSI data format for the selected SSI calibration test type");
         ADI_ERROR_RETURN(device->common.error.newAction);
     }
 
     if (ADI_ADRV9001_SSI_TYPE_CMOS == ssiType)
     {
-        ADI_EXPECT(adrv9001_NvsRegmapRxCssiRxDebugModeBfSet, device, baseAddress, 0x1);
+        ADI_EXPECT(adrv9001_NvsRegmapRx_CssiRxDebugMode_Set, device, instance, 0x1);
         if (ADI_ADRV9001_SSI_TESTMODE_DATA_RAMP_NIBBLE == ssiTestModeConfig->testData)
         {
-            ADI_EXPECT(adrv9001_NvsRegmapRxCssiRxDebugStartRampBfSet, device, baseAddress, 0x1);
+            ADI_EXPECT(adrv9001_NvsRegmapRx_CssiRxDebugStartRamp_Set, device, instance, 0x1);
         }
         else
         {
-            ADI_EXPECT(adrv9001_NvsRegmapRxCssiRxDebugStartRampBfSet, device, baseAddress, 0x0);
+            ADI_EXPECT(adrv9001_NvsRegmapRx_CssiRxDebugStartRamp_Set, device, instance, 0x0);
 
             for (i = 0; i < 2; i++)
             {
-                ADI_EXPECT(adrv9001_NvsRegmapRxCssiRxDebugQSelBfSet, device, baseAddress, i);   // 0: I_data; 1: Q_data
-                ADI_EXPECT(adrv9001_NvsRegmapRxCssiRxDebugNibbleSelBfSet, device, baseAddress, 0x3);
-                ADI_EXPECT(adrv9001_NvsRegmapRxCssiRxDebugLoadValueBfSet, device, baseAddress, (uint8_t)(ssiTestModeConfig->fixedDataPatternToTransmit & 0xF));
-                ADI_EXPECT(adrv9001_NvsRegmapRxCssiRxDebugLoadBfSet, device, baseAddress, 0x1);
-                ADI_EXPECT(adrv9001_NvsRegmapRxCssiRxDebugLoadBfSet, device, baseAddress, 0x0);
+                ADI_EXPECT(adrv9001_NvsRegmapRx_CssiRxDebugQSel_Set, device, instance, i);   // 0: I_data; 1: Q_data
+                ADI_EXPECT(adrv9001_NvsRegmapRx_CssiRxDebugNibbleSel_Set, device, instance, 0x3);
+                ADI_EXPECT(adrv9001_NvsRegmapRx_CssiRxDebugLoadValue_Set, device, instance, (uint8_t)(ssiTestModeConfig->fixedDataPatternToTransmit & 0xF));
+                ADI_EXPECT(adrv9001_NvsRegmapRx_CssiRxDebugLoad_Set, device, instance, 0x1);
+                ADI_EXPECT(adrv9001_NvsRegmapRx_CssiRxDebugLoad_Set, device, instance, 0x0);
             }
         }
     }
     else /* LVDS */
     {
-        ADI_EXPECT(adrv9001_NvsRegmapRxLssiRxDebugModeBfSet, device, baseAddress, 0x1);
+        ADI_EXPECT(adrv9001_NvsRegmapRx_LssiRxDebugMode_Set, device, instance, 0x1);
         if (ADI_ADRV9001_SSI_TESTMODE_DATA_RAMP_16_BIT == ssiTestModeConfig->testData)
         {
-            ADI_EXPECT(adrv9001_NvsRegmapRxLssiRxDebugStartRampBfSet, device, baseAddress, 0x1);
+            ADI_EXPECT(adrv9001_NvsRegmapRx_LssiRxDebugStartRamp_Set, device, instance, 0x1);
         }
         else if (ADI_ADRV9001_SSI_TESTMODE_DATA_PRBS7 == ssiTestModeConfig->testData)
         {
 
-            ADI_EXPECT(adrv9001_NvsRegmapRxLssiRxDebugPrbs7RestartBfSet, device, baseAddress, 0x1);
-            ADI_EXPECT(adrv9001_NvsRegmapRxLssiRxDebugPrbs7EnableBfSet, device, baseAddress, 0x1);
+            ADI_EXPECT(adrv9001_NvsRegmapRx_LssiRxDebugPrbs7Restart_Set, device, instance, 0x1);
+            ADI_EXPECT(adrv9001_NvsRegmapRx_LssiRxDebugPrbs7Enable_Set, device, instance, 0x1);
         }
         else if (ADI_ADRV9001_SSI_TESTMODE_DATA_PRBS15 == ssiTestModeConfig->testData)
         {
-            ADI_EXPECT(adrv9001_NvsRegmapRxLssiRxDebugPrbs15RestartBfSet, device, baseAddress, 0x1);
-            ADI_EXPECT(adrv9001_NvsRegmapRxLssiRxDebugPrbs15EnableBfSet, device, baseAddress, 0x1);
+            ADI_EXPECT(adrv9001_NvsRegmapRx_LssiRxDebugPrbs15Restart_Set, device, instance, 0x1);
+            ADI_EXPECT(adrv9001_NvsRegmapRx_LssiRxDebugPrbs15Enable_Set, device, instance, 0x1);
 
         }
         else /* Fixed Pattern */
         {
-            ADI_EXPECT(adrv9001_NvsRegmapRxLssiRxDebugStartRampBfSet, device, baseAddress, 0x0);
-            ADI_EXPECT(adrv9001_NvsRegmapRxLssiRxDebugLoadValueBfSet, device, baseAddress, (uint16_t)(ssiTestModeConfig->fixedDataPatternToTransmit & 0xFFFF));
-            ADI_EXPECT(adrv9001_NvsRegmapRxLssiRxDebugLoadBfSet, device, baseAddress, 0x1);
-            ADI_EXPECT(adrv9001_NvsRegmapRxLssiRxDebugLoadBfSet, device, baseAddress, 0x0);
+            ADI_EXPECT(adrv9001_NvsRegmapRx_LssiRxDebugStartRamp_Set, device, instance, 0x0);
+            ADI_EXPECT(adrv9001_NvsRegmapRx_LssiRxDebugLoadValue_Set, device, instance, (uint16_t)(ssiTestModeConfig->fixedDataPatternToTransmit & 0xFFFF));
+            ADI_EXPECT(adrv9001_NvsRegmapRx_LssiRxDebugLoad_Set, device, instance, 0x1);
+            ADI_EXPECT(adrv9001_NvsRegmapRx_LssiRxDebugLoad_Set, device, instance, 0x0);
         }
     }
 
     ADI_API_RETURN(device);
 }
 
-static int32_t __maybe_unused adi_adrv9001_Ssi_Tx_TestMode_Configure_Validate(adi_adrv9001_Device_t *device,
-									      adi_common_ChannelNumber_e channel,
-									      adi_adrv9001_SsiType_e ssiType,
-									      adi_adrv9001_SsiDataFormat_e dataFormat,
-									      adi_adrv9001_TxSsiTestModeCfg_t *ssiTestModeConfig)
+static int32_t adi_adrv9001_Ssi_Tx_TestMode_Configure_Validate(adi_adrv9001_Device_t *device,
+                                                               adi_common_ChannelNumber_e channel,
+                                                               adi_adrv9001_SsiType_e ssiType,
+                                                               adi_adrv9001_SsiDataFormat_e dataFormat,
+                                                               adi_adrv9001_TxSsiTestModeCfg_t *ssiTestModeConfig)
 {
     ADI_NULL_PTR_RETURN(&device->common, ssiTestModeConfig);
     ADI_RANGE_CHECK(device, channel, ADI_CHANNEL_1, ADI_CHANNEL_2);
@@ -181,7 +177,7 @@ int32_t adi_adrv9001_Ssi_Tx_TestMode_Configure(adi_adrv9001_Device_t *device,
 {
     int32_t recoveryAction = ADI_COMMON_ACT_NO_ACTION;
 
-    adrv9001_BfNvsRegmapTxChanAddr_e baseAddress = ADRV9001_BF_TX1_CORE;
+    adrv9001_BfNvsRegmapTx_e baseAddress = ADRV9001_BF_TX1_CORE;
 
     ADI_PERFORM_VALIDATION(adi_adrv9001_Ssi_Tx_TestMode_Configure_Validate, device, channel, ssiType, dataFormat, ssiTestModeConfig);
 
@@ -192,45 +188,45 @@ int32_t adi_adrv9001_Ssi_Tx_TestMode_Configure(adi_adrv9001_Device_t *device,
 
     if (ADI_ADRV9001_SSI_TYPE_CMOS == ssiType)
     {
-        ADI_EXPECT(adrv9001_NvsRegmapTxCssiTxDebugModeBfSet, device, baseAddress, 0x1);
+        ADI_EXPECT(adrv9001_NvsRegmapTx_CssiTxDebugMode_Set, device, baseAddress, 0x1);
         /* Nothing to be configured for fixed pattern */
         if (ADI_ADRV9001_SSI_TESTMODE_DATA_RAMP_NIBBLE == ssiTestModeConfig->testData)
         {
-            ADI_EXPECT(adrv9001_NvsRegmapTxCssiTxDebugStartRampBfSet, device, baseAddress, 0x0);
+            ADI_EXPECT(adrv9001_NvsRegmapTx_CssiTxDebugStartRamp_Set, device, baseAddress, 0x0);
 
-            ADI_EXPECT(adrv9001_NvsRegmapTxCssiTxClearRampShiftErrorBfSet, device, baseAddress, 0x0);
-            ADI_EXPECT(adrv9001_NvsRegmapTxCssiTxClearRampShiftErrorBfSet, device, baseAddress, 0x1);
-            ADI_EXPECT(adrv9001_NvsRegmapTxCssiTxClearRampShiftErrorBfSet, device, baseAddress, 0x0);
+            ADI_EXPECT(adrv9001_NvsRegmapTx_CssiTxClearRampShiftError_Set, device, baseAddress, 0x0);
+            ADI_EXPECT(adrv9001_NvsRegmapTx_CssiTxClearRampShiftError_Set, device, baseAddress, 0x1);
+            ADI_EXPECT(adrv9001_NvsRegmapTx_CssiTxClearRampShiftError_Set, device, baseAddress, 0x0);
 
-            ADI_EXPECT(adrv9001_NvsRegmapTxCssiTxFifoClearBfSet, device, baseAddress, 0x0);
-            ADI_EXPECT(adrv9001_NvsRegmapTxCssiTxFifoClearBfSet, device, baseAddress, 0x1);
-            ADI_EXPECT(adrv9001_NvsRegmapTxCssiTxFifoClearBfSet, device, baseAddress, 0x0);
+            ADI_EXPECT(adrv9001_NvsRegmapTx_CssiTxFifoClear_Set, device, baseAddress, 0x0);
+            ADI_EXPECT(adrv9001_NvsRegmapTx_CssiTxFifoClear_Set, device, baseAddress, 0x1);
+            ADI_EXPECT(adrv9001_NvsRegmapTx_CssiTxFifoClear_Set, device, baseAddress, 0x0);
 
-            ADI_EXPECT(adrv9001_NvsRegmapTxCssiTxClearStrobeAlignErrorBfSet, device, baseAddress, 0x0);
-            ADI_EXPECT(adrv9001_NvsRegmapTxCssiTxClearStrobeAlignErrorBfSet, device, baseAddress, 0x1);
-            ADI_EXPECT(adrv9001_NvsRegmapTxCssiTxClearStrobeAlignErrorBfSet, device, baseAddress, 0x0);
+            ADI_EXPECT(adrv9001_NvsRegmapTx_CssiTxClearStrobeAlignError_Set, device, baseAddress, 0x0);
+            ADI_EXPECT(adrv9001_NvsRegmapTx_CssiTxClearStrobeAlignError_Set, device, baseAddress, 0x1);
+            ADI_EXPECT(adrv9001_NvsRegmapTx_CssiTxClearStrobeAlignError_Set, device, baseAddress, 0x0);
 
-            ADI_EXPECT(adrv9001_NvsRegmapTxCssiTxDebugStartRampBfSet, device, baseAddress, 0x1);
+            ADI_EXPECT(adrv9001_NvsRegmapTx_CssiTxDebugStartRamp_Set, device, baseAddress, 0x1);
         }
     }
     else /* LVDS */
     {
-        ADI_EXPECT(adrv9001_NvsRegmapTxLssiTxDebugModeBfSet, device, baseAddress, 0x1);
-        ADI_EXPECT(adrv9001_NvsRegmapTxLssiTxDebugStartRampBfSet, device, baseAddress, 0x0);
-        ADI_EXPECT(adrv9001_NvsRegmapTxLssiTxDebugStartErrorCheckBfSet, device, baseAddress, 0x0);
-        ADI_EXPECT(adrv9001_NvsRegmapTxLssiTxDebugAfterFifoErrorClearBfSet, device, baseAddress, 0x1);
-        ADI_EXPECT(adrv9001_NvsRegmapTxLssiTxDebugAfterFifoErrorClearBfSet, device, baseAddress, 0x0);
-        ADI_EXPECT(adrv9001_NvsRegmapTxLssiTxClearStrobeAlignErrorBfSet, device, baseAddress, 0x1);
-        ADI_EXPECT(adrv9001_NvsRegmapTxLssiTxClearStrobeAlignErrorBfSet, device, baseAddress, 0x0);
-        ADI_EXPECT(adrv9001_NvsRegmapTxLssiTxFifoClearBfSet, device, baseAddress, 0x1);
-        ADI_EXPECT(adrv9001_NvsRegmapTxLssiTxFifoClearBfSet, device, baseAddress, 0x0);
+        ADI_EXPECT(adrv9001_NvsRegmapTx_LssiTxDebugMode_Set, device, baseAddress, 0x1);
+        ADI_EXPECT(adrv9001_NvsRegmapTx_LssiTxDebugStartRamp_Set, device, baseAddress, 0x0);
+        ADI_EXPECT(adrv9001_NvsRegmapTx_LssiTxDebugStartErrorCheck_Set, device, baseAddress, 0x0);
+        ADI_EXPECT(adrv9001_NvsRegmapTx_LssiTxDebugAfterFifoErrorClear_Set, device, baseAddress, 0x1);
+        ADI_EXPECT(adrv9001_NvsRegmapTx_LssiTxDebugAfterFifoErrorClear_Set, device, baseAddress, 0x0);
+        ADI_EXPECT(adrv9001_NvsRegmapTx_LssiTxClearStrobeAlignError_Set, device, baseAddress, 0x1);
+        ADI_EXPECT(adrv9001_NvsRegmapTx_LssiTxClearStrobeAlignError_Set, device, baseAddress, 0x0);
+        ADI_EXPECT(adrv9001_NvsRegmapTx_LssiTxFifoClear_Set, device, baseAddress, 0x1);
+        ADI_EXPECT(adrv9001_NvsRegmapTx_LssiTxFifoClear_Set, device, baseAddress, 0x0);
 
         /* Nothing to be configured for fixed pattern */
         if (ADI_ADRV9001_SSI_TESTMODE_DATA_RAMP_16_BIT == ssiTestModeConfig->testData)
         {
-            ADI_EXPECT(adrv9001_NvsRegmapTxLssiTxDebugStartRampBfSet, device, baseAddress, 0x1);
+            ADI_EXPECT(adrv9001_NvsRegmapTx_LssiTxDebugStartRamp_Set, device, baseAddress, 0x1);
 
-            ADI_EXPECT(adrv9001_NvsRegmapTxLssiTxDebugStartErrorCheckBfSet, device, baseAddress, 0x1);
+            ADI_EXPECT(adrv9001_NvsRegmapTx_LssiTxDebugStartErrorCheck_Set, device, baseAddress, 0x1);
 
             recoveryAction = adi_common_hal_Wait_us(&device->common, 1000);
 
@@ -242,15 +238,15 @@ int32_t adi_adrv9001_Ssi_Tx_TestMode_Configure(adi_adrv9001_Device_t *device,
                              "Timer not working in adi_adrv9001_Ssi_Tx_TestMode_Configure()");
             ADI_ERROR_RETURN(device->common.error.newAction);
 
-            ADI_EXPECT(adrv9001_NvsRegmapTxLssiTxDebugErrorCounterReadBfSet, device, baseAddress, 0x1);
-            ADI_EXPECT(adrv9001_NvsRegmapTxLssiTxDebugErrorCounterReadBfSet, device, baseAddress, 0x0);
+            ADI_EXPECT(adrv9001_NvsRegmapTx_LssiTxDebugErrorCounterRead_Set, device, baseAddress, 0x1);
+            ADI_EXPECT(adrv9001_NvsRegmapTx_LssiTxDebugErrorCounterRead_Set, device, baseAddress, 0x0);
         }
         else if (ADI_ADRV9001_SSI_TESTMODE_DATA_PRBS7 == ssiTestModeConfig->testData)
         {
-            ADI_EXPECT(adrv9001_NvsRegmapTxLssiTxDebugPrbs7EnableBfSet, device, baseAddress, 0x1);
-            ADI_EXPECT(adrv9001_NvsRegmapTxLssiTxDebugPrbs7ErrorClearBfSet, device, baseAddress, 0x1);
-            ADI_EXPECT(adrv9001_NvsRegmapTxLssiTxDebugPrbs7RestartBfSet, device, baseAddress, 0x1);
-            ADI_EXPECT(adrv9001_NvsRegmapTxLssiTxDebugStartErrorCheckBfSet, device, baseAddress, 0x1);
+            ADI_EXPECT(adrv9001_NvsRegmapTx_LssiTxDebugPrbs7Enable_Set, device, baseAddress, 0x1);
+            ADI_EXPECT(adrv9001_NvsRegmapTx_LssiTxDebugPrbs7ErrorClear_Set, device, baseAddress, 0x1);
+            ADI_EXPECT(adrv9001_NvsRegmapTx_LssiTxDebugPrbs7Restart_Set, device, baseAddress, 0x1);
+            ADI_EXPECT(adrv9001_NvsRegmapTx_LssiTxDebugStartErrorCheck_Set, device, baseAddress, 0x1);
             recoveryAction = adi_common_hal_Wait_us(&device->common, 1000);
 
             ADI_ERROR_REPORT(&device->common,
@@ -261,15 +257,15 @@ int32_t adi_adrv9001_Ssi_Tx_TestMode_Configure(adi_adrv9001_Device_t *device,
                 "Timer not working in adi_adrv9001_Ssi_Tx_TestMode_Configure()");
             ADI_ERROR_RETURN(device->common.error.newAction);
 
-            ADI_EXPECT(adrv9001_NvsRegmapTxLssiTxDebugErrorCounterReadBfSet, device, baseAddress, 0x1);
-            ADI_EXPECT(adrv9001_NvsRegmapTxLssiTxDebugErrorCounterReadBfSet, device, baseAddress, 0x0);
+            ADI_EXPECT(adrv9001_NvsRegmapTx_LssiTxDebugErrorCounterRead_Set, device, baseAddress, 0x1);
+            ADI_EXPECT(adrv9001_NvsRegmapTx_LssiTxDebugErrorCounterRead_Set, device, baseAddress, 0x0);
         }
         else /* ADI_ADRV9001_SSI_TESTMODE_DATA_PRBS15 */
         {
-            ADI_EXPECT(adrv9001_NvsRegmapTxLssiTxDebugPrbs15EnableBfSet, device, baseAddress, 0x1);
-            ADI_EXPECT(adrv9001_NvsRegmapTxLssiTxDebugAfterFifoErrorClearBfSet, device, baseAddress, 0x1);
-            ADI_EXPECT(adrv9001_NvsRegmapTxLssiTxDebugPrbs15RestartBfSet, device, baseAddress, 0x1);
-            ADI_EXPECT(adrv9001_NvsRegmapTxLssiTxDebugStartErrorCheckBfSet, device, baseAddress, 0x1);
+            ADI_EXPECT(adrv9001_NvsRegmapTx_LssiTxDebugPrbs15Enable_Set, device, baseAddress, 0x1);
+            ADI_EXPECT(adrv9001_NvsRegmapTx_LssiTxDebugAfterFifoErrorClear_Set, device, baseAddress, 0x1);
+            ADI_EXPECT(adrv9001_NvsRegmapTx_LssiTxDebugPrbs15Restart_Set, device, baseAddress, 0x1);
+            ADI_EXPECT(adrv9001_NvsRegmapTx_LssiTxDebugStartErrorCheck_Set, device, baseAddress, 0x1);
             recoveryAction = adi_common_hal_Wait_us(&device->common, 1000);
 
             ADI_ERROR_REPORT(&device->common,
@@ -280,20 +276,20 @@ int32_t adi_adrv9001_Ssi_Tx_TestMode_Configure(adi_adrv9001_Device_t *device,
                 "Timer not working in adi_adrv9001_Ssi_Tx_TestMode_Configure()");
             ADI_ERROR_RETURN(device->common.error.newAction);
 
-            ADI_EXPECT(adrv9001_NvsRegmapTxLssiTxDebugErrorCounterReadBfSet, device, baseAddress, 0x1);
-            ADI_EXPECT(adrv9001_NvsRegmapTxLssiTxDebugErrorCounterReadBfSet, device, baseAddress, 0x0);
+            ADI_EXPECT(adrv9001_NvsRegmapTx_LssiTxDebugErrorCounterRead_Set, device, baseAddress, 0x1);
+            ADI_EXPECT(adrv9001_NvsRegmapTx_LssiTxDebugErrorCounterRead_Set, device, baseAddress, 0x0);
         }
     }
 
     ADI_API_RETURN(device);
 }
 
-static int32_t __maybe_unused adi_adrv9001_Ssi_Tx_TestMode_Status_Inspect_Validate(adi_adrv9001_Device_t *device,
-										   adi_common_ChannelNumber_e channel,
-										   adi_adrv9001_SsiType_e ssiType,
-										   adi_adrv9001_SsiDataFormat_e dataFormat,
-										   adi_adrv9001_TxSsiTestModeCfg_t *ssiTestModeConfig,
-										   adi_adrv9001_TxSsiTestModeStatus_t *ssiTestModeStatus)
+static int32_t adi_adrv9001_Ssi_Tx_TestMode_Status_Inspect_Validate(adi_adrv9001_Device_t *device,
+                                                                    adi_common_ChannelNumber_e channel,
+                                                                    adi_adrv9001_SsiType_e ssiType,
+                                                                    adi_adrv9001_SsiDataFormat_e dataFormat,
+                                                                    adi_adrv9001_TxSsiTestModeCfg_t *ssiTestModeConfig,
+                                                                    adi_adrv9001_TxSsiTestModeStatus_t *ssiTestModeStatus)
 {
     ADI_NULL_PTR_RETURN(&device->common, ssiTestModeConfig);
     ADI_NULL_PTR_RETURN(&device->common, ssiTestModeStatus);
@@ -345,11 +341,10 @@ int32_t adi_adrv9001_Ssi_Tx_TestMode_Status_Inspect(adi_adrv9001_Device_t *devic
 {
     int8_t i = 0;
     int8_t nibSel = 0;
-    uint8_t bfValue = 0;
-    int16_t dataRead = 0;
+    uint16_t dataRead = 0;
     uint16_t iqValue[2] = { 0 };
 
-    adrv9001_BfNvsRegmapTxChanAddr_e baseAddress = ADRV9001_BF_TX1_CORE;
+    adrv9001_BfNvsRegmapTx_e baseAddress = ADRV9001_BF_TX1_CORE;
 
     ADI_PERFORM_VALIDATION(adi_adrv9001_Ssi_Tx_TestMode_Status_Inspect_Validate, device, channel, ssiType, dataFormat, ssiTestModeConfig, ssiTestModeStatus);
 
@@ -364,15 +359,15 @@ int32_t adi_adrv9001_Ssi_Tx_TestMode_Status_Inspect(adi_adrv9001_Device_t *devic
         {
             for(nibSel = 0 ; nibSel < 4 ; nibSel++)
             {
-                ADI_EXPECT(adrv9001_NvsRegmapTxCssiTxDebugModeBfSet, device, baseAddress, 0x1);
-                ADI_EXPECT(adrv9001_NvsRegmapTxCssiTxDebugStartRampBfSet, device, baseAddress, 0x0);
-                ADI_EXPECT(adrv9001_NvsRegmapTxCssiTxDebugQSelBfSet, device, baseAddress, 0);   // 0: I_data; 1: Q_data
-                ADI_EXPECT(adrv9001_NvsRegmapTxCssiTxDebugNibbleSelBfSet, device, baseAddress, nibSel);
-                ADI_EXPECT(adrv9001_NvsRegmapTxCssiTxClearStrobeAlignErrorBfSet, device, baseAddress, 0x0);
-                ADI_EXPECT(adrv9001_NvsRegmapTxCssiTxClearStrobeAlignErrorBfSet, device, baseAddress, 0x1);
-                ADI_EXPECT(adrv9001_NvsRegmapTxCssiTxClearStrobeAlignErrorBfSet, device, baseAddress, 0x0);
-                ADI_EXPECT(adrv9001_NvsRegmapTxCssiTxDebugStartCaptureBfSet, device, baseAddress, 0x1);
-                ADI_EXPECT(adrv9001_NvsRegmapTxCssiTxDebugCapturedDataBfGet, device, baseAddress, (int8_t *)(&dataRead));
+                ADI_EXPECT(adrv9001_NvsRegmapTx_CssiTxDebugMode_Set, device, baseAddress, 0x1);
+                ADI_EXPECT(adrv9001_NvsRegmapTx_CssiTxDebugStartRamp_Set, device, baseAddress, 0x0);
+                ADI_EXPECT(adrv9001_NvsRegmapTx_CssiTxDebugQSel_Set, device, baseAddress, 0);   // 0: I_data; 1: Q_data
+                ADI_EXPECT(adrv9001_NvsRegmapTx_CssiTxDebugNibbleSel_Set, device, baseAddress, nibSel);
+                ADI_EXPECT(adrv9001_NvsRegmapTx_CssiTxClearStrobeAlignError_Set, device, baseAddress, 0x0);
+                ADI_EXPECT(adrv9001_NvsRegmapTx_CssiTxClearStrobeAlignError_Set, device, baseAddress, 0x1);
+                ADI_EXPECT(adrv9001_NvsRegmapTx_CssiTxClearStrobeAlignError_Set, device, baseAddress, 0x0);
+                ADI_EXPECT(adrv9001_NvsRegmapTx_CssiTxDebugStartCapture_Set, device, baseAddress, 0x1);
+                ADI_EXPECT(adrv9001_NvsRegmapTx_CssiTxDebugCapturedData_Get, device, baseAddress, (uint8_t *)(&dataRead));
                 iqValue[0] |= ((dataRead & 0xF) << 4 * nibSel);
                 dataRead = 0;
             }
@@ -380,15 +375,15 @@ int32_t adi_adrv9001_Ssi_Tx_TestMode_Status_Inspect(adi_adrv9001_Device_t *devic
             {
                 for (nibSel = 0; nibSel < 4; nibSel++)
                 {
-                    ADI_EXPECT(adrv9001_NvsRegmapTxCssiTxDebugModeBfSet, device, baseAddress, 0x1);
-                    ADI_EXPECT(adrv9001_NvsRegmapTxCssiTxDebugStartRampBfSet, device, baseAddress, 0x0);
-                    ADI_EXPECT(adrv9001_NvsRegmapTxCssiTxDebugQSelBfSet, device, baseAddress, 1);     // 0: I_data; 1: Q_data
-                    ADI_EXPECT(adrv9001_NvsRegmapTxCssiTxDebugNibbleSelBfSet, device, baseAddress, nibSel);
-                    ADI_EXPECT(adrv9001_NvsRegmapTxCssiTxClearStrobeAlignErrorBfSet, device, baseAddress, 0x0);
-                    ADI_EXPECT(adrv9001_NvsRegmapTxCssiTxClearStrobeAlignErrorBfSet, device, baseAddress, 0x1);
-                    ADI_EXPECT(adrv9001_NvsRegmapTxCssiTxClearStrobeAlignErrorBfSet, device, baseAddress, 0x0);
-                    ADI_EXPECT(adrv9001_NvsRegmapTxCssiTxDebugStartCaptureBfSet, device, baseAddress, 0x1);
-                    ADI_EXPECT(adrv9001_NvsRegmapTxCssiTxDebugCapturedDataBfGet, device, baseAddress, (int8_t *)(&dataRead));
+                    ADI_EXPECT(adrv9001_NvsRegmapTx_CssiTxDebugMode_Set, device, baseAddress, 0x1);
+                    ADI_EXPECT(adrv9001_NvsRegmapTx_CssiTxDebugStartRamp_Set, device, baseAddress, 0x0);
+                    ADI_EXPECT(adrv9001_NvsRegmapTx_CssiTxDebugQSel_Set, device, baseAddress, 1);     // 0: I_data; 1: Q_data
+                    ADI_EXPECT(adrv9001_NvsRegmapTx_CssiTxDebugNibbleSel_Set, device, baseAddress, nibSel);
+                    ADI_EXPECT(adrv9001_NvsRegmapTx_CssiTxClearStrobeAlignError_Set, device, baseAddress, 0x0);
+                    ADI_EXPECT(adrv9001_NvsRegmapTx_CssiTxClearStrobeAlignError_Set, device, baseAddress, 0x1);
+                    ADI_EXPECT(adrv9001_NvsRegmapTx_CssiTxClearStrobeAlignError_Set, device, baseAddress, 0x0);
+                    ADI_EXPECT(adrv9001_NvsRegmapTx_CssiTxDebugStartCapture_Set, device, baseAddress, 0x1);
+                    ADI_EXPECT(adrv9001_NvsRegmapTx_CssiTxDebugCapturedData_Get, device, baseAddress, (uint8_t *)(&dataRead));
                     iqValue[1] |= ((dataRead & 0xF) << 4 * nibSel);
                     dataRead = 0;
                 }
@@ -433,42 +428,36 @@ int32_t adi_adrv9001_Ssi_Tx_TestMode_Status_Inspect(adi_adrv9001_Device_t *devic
         }
         else
         {
-            ADI_EXPECT(adi_adrv9001_spi_Field_Read, device, ((uint16_t)baseAddress + 0x17), &bfValue, 0x1, 0);
-            ssiTestModeStatus->dataError = bfValue;
+            ADI_EXPECT(adrv9001_NvsRegmapTx_CssiTxDebugRampShiftError_Get, device, baseAddress, &ssiTestModeStatus->dataError);
         }
 
-        ADI_EXPECT(adi_adrv9001_spi_Field_Read, device, ((uint16_t)baseAddress + 0x17), &bfValue, 0x2, 0x1);
-        ssiTestModeStatus->strobeAlignError = bfValue;
+        ADI_EXPECT(adrv9001_NvsRegmapTx_CssiTxStrobeAlignError_Get, device, baseAddress, &ssiTestModeStatus->strobeAlignError);
 
-        ADI_EXPECT(adi_adrv9001_spi_Field_Read, device, ((uint16_t)baseAddress + 0x17), &bfValue, 0x4, 0x2);
-        ssiTestModeStatus->fifoFull = bfValue;
+        ADI_EXPECT(adrv9001_NvsRegmapTx_CssiTxFifoFull_Get, device, baseAddress, &ssiTestModeStatus->fifoFull);
 
-        ADI_EXPECT(adi_adrv9001_spi_Field_Read, device, ((uint16_t)baseAddress + 0x17), &bfValue, 0x8, 0x3);
-        ssiTestModeStatus->fifoEmpty = bfValue;
+        ADI_EXPECT(adrv9001_NvsRegmapTx_CssiTxFifoEmpty_Get, device, baseAddress, &ssiTestModeStatus->fifoEmpty);
     }
     else /* LVDS */
     {
         if ((ADI_ADRV9001_SSI_TESTMODE_DATA_RAMP_16_BIT == ssiTestModeConfig->testData) ||
             (ADI_ADRV9001_SSI_TESTMODE_DATA_PRBS15 == ssiTestModeConfig->testData))
         {
-            ADI_EXPECT(adi_adrv9001_spi_Field_Read, device, ((uint16_t)baseAddress + 0x22), &bfValue, 0xFF, 0x0);
-            ssiTestModeStatus->dataError = bfValue;
+            ADI_EXPECT(adrv9001_NvsRegmapTx_LssiTxDebugPrbs15RampShiftErrorCount_Get, device, baseAddress, &ssiTestModeStatus->dataError);
         }
         else if (ADI_ADRV9001_SSI_TESTMODE_DATA_PRBS7 == ssiTestModeConfig->testData)
         {
-            ADI_EXPECT(adi_adrv9001_spi_Field_Read, device, ((uint16_t)baseAddress + 0x24), &bfValue, 0xFF, 0x0);
-            ssiTestModeStatus->dataError = bfValue;
+            ADI_EXPECT(adrv9001_NvsRegmapTx_LssiTxDebugPrbs7ErrorCount_Get, device, baseAddress, &ssiTestModeStatus->dataError);
         }
         else /* Fixed Pattern */
         {
             for (i = 0; i < 2; i++)
             {
-                ADI_EXPECT(adrv9001_NvsRegmapTxLssiTxDebugModeBfSet, device, baseAddress, 0x1);
-                ADI_EXPECT(adrv9001_NvsRegmapTxLssiTxDebugStartRampBfSet, device, baseAddress, 0x0);
-                ADI_EXPECT(adrv9001_NvsRegmapTxLssiTxDebugQSelBfSet, device, baseAddress, i);   // 0: I_data; 1: Q_data
-                ADI_EXPECT(adrv9001_NvsRegmapTxLssiTxClearStrobeAlignErrorBfSet, device, baseAddress, 0x1);
-                ADI_EXPECT(adrv9001_NvsRegmapTxLssiTxDebugStartCaptureBfSet, device, baseAddress, 0x1);
-                ADI_EXPECT(adrv9001_NvsRegmapTxLssiTxDebugCapturedDataBfGet, device, baseAddress, &dataRead);
+                ADI_EXPECT(adrv9001_NvsRegmapTx_LssiTxDebugMode_Set, device, baseAddress, 0x1);
+                ADI_EXPECT(adrv9001_NvsRegmapTx_LssiTxDebugStartRamp_Set, device, baseAddress, 0x0);
+                ADI_EXPECT(adrv9001_NvsRegmapTx_LssiTxDebugQSel_Set, device, baseAddress, i);   // 0: I_data; 1: Q_data
+                ADI_EXPECT(adrv9001_NvsRegmapTx_LssiTxClearStrobeAlignError_Set, device, baseAddress, 0x1);
+                ADI_EXPECT(adrv9001_NvsRegmapTx_LssiTxDebugStartCapture_Set, device, baseAddress, 0x1);
+                ADI_EXPECT(adrv9001_NvsRegmapTx_LssiTxDebugCapturedData_Get, device, baseAddress, &dataRead);
                 iqValue[i] = dataRead;
             }
 
@@ -497,14 +486,11 @@ int32_t adi_adrv9001_Ssi_Tx_TestMode_Status_Inspect(adi_adrv9001_Device_t *devic
             }
         }
 
-        ADI_EXPECT(adi_adrv9001_spi_Field_Read, device, ((uint16_t)baseAddress + 0x25), &bfValue, 0x10, 0x4);
-        ssiTestModeStatus->strobeAlignError = bfValue;
+        ADI_EXPECT(adrv9001_NvsRegmapTx_LssiTxStrobeAlignError_Get, device, baseAddress, &ssiTestModeStatus->strobeAlignError);
 
-        ADI_EXPECT(adi_adrv9001_spi_Field_Read, device, ((uint16_t)baseAddress + 0x25), &bfValue, 0x1, 0x0);
-        ssiTestModeStatus->fifoFull = bfValue;
+        ADI_EXPECT(adrv9001_NvsRegmapTx_LssiTxFifoFull_Get, device, baseAddress, &ssiTestModeStatus->fifoFull);
 
-        ADI_EXPECT(adi_adrv9001_spi_Field_Read, device, ((uint16_t)baseAddress + 0x25), &bfValue, 0x2, 0x1);
-        ssiTestModeStatus->fifoEmpty = bfValue;
+        ADI_EXPECT(adrv9001_NvsRegmapTx_LssiTxFifoEmpty_Get, device, baseAddress, &ssiTestModeStatus->fifoEmpty);
     }
 
     ADI_API_RETURN(device);
@@ -513,27 +499,27 @@ int32_t adi_adrv9001_Ssi_Tx_TestMode_Status_Inspect(adi_adrv9001_Device_t *devic
 static int32_t adi_adrv9001_Ssi_LvdsDelayConfigSet(adi_adrv9001_Device_t *device,
                                                    adi_adrv9001_SsiCalibrationCfg_t *ssiCalibrationCfg)
 {
-    ADI_EXPECT(adrv9001_NvsRegmapCoreRx1ClkLvdsDelayBfSet,      device, ADRV9001_BF_CORE, ssiCalibrationCfg->rxClkDelay[0]);
-    ADI_EXPECT(adrv9001_NvsRegmapCoreRx1StrobeLvdsDelayBfSet,   device, ADRV9001_BF_CORE, ssiCalibrationCfg->rxStrobeDelay[0]);
-    ADI_EXPECT(adrv9001_NvsRegmapCoreRx1IdataLvdsDelayBfSet,    device, ADRV9001_BF_CORE, ssiCalibrationCfg->rxIDataDelay[0]);
-    ADI_EXPECT(adrv9001_NvsRegmapCoreRx1QdataLvdsDelayBfSet,    device, ADRV9001_BF_CORE, ssiCalibrationCfg->rxQDataDelay[0]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore_Rx1ClkLvdsDelay_Set,      device, ssiCalibrationCfg->rxClkDelay[0]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore_Rx1StrobeLvdsDelay_Set,   device, ssiCalibrationCfg->rxStrobeDelay[0]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore_Rx1IdataLvdsDelay_Set,    device, ssiCalibrationCfg->rxIDataDelay[0]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore_Rx1QdataLvdsDelay_Set,    device, ssiCalibrationCfg->rxQDataDelay[0]);
 
-    ADI_EXPECT(adrv9001_NvsRegmapCoreRx2ClkLvdsDelayBfSet,      device, ADRV9001_BF_CORE, ssiCalibrationCfg->rxClkDelay[1]);
-    ADI_EXPECT(adrv9001_NvsRegmapCoreRx2StrobeLvdsDelayBfSet,   device, ADRV9001_BF_CORE, ssiCalibrationCfg->rxStrobeDelay[1]);
-    ADI_EXPECT(adrv9001_NvsRegmapCoreRx2IdataLvdsDelayBfSet,    device, ADRV9001_BF_CORE, ssiCalibrationCfg->rxIDataDelay[1]);
-    ADI_EXPECT(adrv9001_NvsRegmapCoreRx2QdataLvdsDelayBfSet,    device, ADRV9001_BF_CORE, ssiCalibrationCfg->rxQDataDelay[1]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore_Rx2ClkLvdsDelay_Set,      device, ssiCalibrationCfg->rxClkDelay[1]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore_Rx2StrobeLvdsDelay_Set,   device, ssiCalibrationCfg->rxStrobeDelay[1]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore_Rx2IdataLvdsDelay_Set,    device, ssiCalibrationCfg->rxIDataDelay[1]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore_Rx2QdataLvdsDelay_Set,    device, ssiCalibrationCfg->rxQDataDelay[1]);
 
-    ADI_EXPECT(adrv9001_NvsRegmapCoreTx1ClkLvdsDelayBfSet,      device, ADRV9001_BF_CORE, ssiCalibrationCfg->txClkDelay[0]);
-    ADI_EXPECT(adrv9001_NvsRegmapCoreTx1RefclkLvdsDelayBfSet,   device, ADRV9001_BF_CORE, ssiCalibrationCfg->txRefClkDelay[0]);
-    ADI_EXPECT(adrv9001_NvsRegmapCoreTx1StrobeLvdsDelayBfSet,   device, ADRV9001_BF_CORE, ssiCalibrationCfg->txStrobeDelay[0]);
-    ADI_EXPECT(adrv9001_NvsRegmapCoreTx1IdataLvdsDelayBfSet,    device, ADRV9001_BF_CORE, ssiCalibrationCfg->txIDataDelay[0]);
-    ADI_EXPECT(adrv9001_NvsRegmapCoreTx1QdataLvdsDelayBfSet,    device, ADRV9001_BF_CORE, ssiCalibrationCfg->txQDataDelay[0]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore_Tx1ClkLvdsDelay_Set,      device, ssiCalibrationCfg->txClkDelay[0]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore_Tx1RefclkLvdsDelay_Set,   device, ssiCalibrationCfg->txRefClkDelay[0]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore_Tx1StrobeLvdsDelay_Set,   device, ssiCalibrationCfg->txStrobeDelay[0]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore_Tx1IdataLvdsDelay_Set,    device, ssiCalibrationCfg->txIDataDelay[0]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore_Tx1QdataLvdsDelay_Set,    device, ssiCalibrationCfg->txQDataDelay[0]);
 
-    ADI_EXPECT(adrv9001_NvsRegmapCoreTx2ClkLvdsDelayBfSet,      device, ADRV9001_BF_CORE, ssiCalibrationCfg->txClkDelay[1]);
-    ADI_EXPECT(adrv9001_NvsRegmapCoreTx2RefclkLvdsDelayBfSet,   device, ADRV9001_BF_CORE, ssiCalibrationCfg->txRefClkDelay[1]);
-    ADI_EXPECT(adrv9001_NvsRegmapCoreTx2StrobeLvdsDelayBfSet,   device, ADRV9001_BF_CORE, ssiCalibrationCfg->txStrobeDelay[1]);
-    ADI_EXPECT(adrv9001_NvsRegmapCoreTx2IdataLvdsDelayBfSet,    device, ADRV9001_BF_CORE, ssiCalibrationCfg->txIDataDelay[1]);
-    ADI_EXPECT(adrv9001_NvsRegmapCoreTx2QdataLvdsDelayBfSet,    device, ADRV9001_BF_CORE, ssiCalibrationCfg->txQDataDelay[1]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore_Tx2ClkLvdsDelay_Set,      device, ssiCalibrationCfg->txClkDelay[1]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore_Tx2RefclkLvdsDelay_Set,   device, ssiCalibrationCfg->txRefClkDelay[1]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore_Tx2StrobeLvdsDelay_Set,   device, ssiCalibrationCfg->txStrobeDelay[1]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore_Tx2IdataLvdsDelay_Set,    device, ssiCalibrationCfg->txIDataDelay[1]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore_Tx2QdataLvdsDelay_Set,    device, ssiCalibrationCfg->txQDataDelay[1]);
 
     ADI_API_RETURN(device);
 }
@@ -542,69 +528,69 @@ static int32_t adi_adrv9001_Ssi_CmosDelayConfigSet(adi_adrv9001_Device_t *device
                                                    adi_adrv9001_SsiCalibrationCfg_t *ssiCalibrationCfg)
 {
     /* Rx1 */
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Rx1ClkCmosNDelayBfSet,    device, ADRV9001_BF_CORE_3, ssiCalibrationCfg->rxClkDelay[0]);
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Rx1ClkCmosPDelayBfSet,    device, ADRV9001_BF_CORE_3, ssiCalibrationCfg->rxClkDelay[0]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Rx1ClkCmosNDelay_Set,    device, ssiCalibrationCfg->rxClkDelay[0]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Rx1ClkCmosPDelay_Set,    device, ssiCalibrationCfg->rxClkDelay[0]);
 
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Rx1StrobeCmosNDelayBfSet, device, ADRV9001_BF_CORE_3, ssiCalibrationCfg->rxStrobeDelay[0]);
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Rx1StrobeCmosPDelayBfSet, device, ADRV9001_BF_CORE_3, ssiCalibrationCfg->rxStrobeDelay[0]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Rx1StrobeCmosNDelay_Set, device, ssiCalibrationCfg->rxStrobeDelay[0]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Rx1StrobeCmosPDelay_Set, device, ssiCalibrationCfg->rxStrobeDelay[0]);
 
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Rx1IdataCmosNDelayBfSet,  device, ADRV9001_BF_CORE_3, ssiCalibrationCfg->rxIDataDelay[0]);
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Rx1IdataCmosPDelayBfSet,  device, ADRV9001_BF_CORE_3, ssiCalibrationCfg->rxIDataDelay[0]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Rx1IdataCmosNDelay_Set,  device, ssiCalibrationCfg->rxIDataDelay[0]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Rx1IdataCmosPDelay_Set,  device, ssiCalibrationCfg->rxIDataDelay[0]);
 
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Rx1QdataCmosNDelayBfSet,  device, ADRV9001_BF_CORE_3, ssiCalibrationCfg->rxQDataDelay[0]);
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Rx1QdataCmosPDelayBfSet,  device, ADRV9001_BF_CORE_3, ssiCalibrationCfg->rxQDataDelay[0]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Rx1QdataCmosNDelay_Set,  device, ssiCalibrationCfg->rxQDataDelay[0]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Rx1QdataCmosPDelay_Set,  device, ssiCalibrationCfg->rxQDataDelay[0]);
 
     /* Rx2 */
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Rx2ClkCmosNDelayBfSet,    device, ADRV9001_BF_CORE_3, ssiCalibrationCfg->rxClkDelay[1]);
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Rx2ClkCmosPDelayBfSet,    device, ADRV9001_BF_CORE_3, ssiCalibrationCfg->rxClkDelay[1]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Rx2ClkCmosNDelay_Set,    device, ssiCalibrationCfg->rxClkDelay[1]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Rx2ClkCmosPDelay_Set,    device, ssiCalibrationCfg->rxClkDelay[1]);
 
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Rx2StrobeCmosNDelayBfSet, device, ADRV9001_BF_CORE_3, ssiCalibrationCfg->rxStrobeDelay[1]);
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Rx2StrobeCmosPDelayBfSet, device, ADRV9001_BF_CORE_3, ssiCalibrationCfg->rxStrobeDelay[1]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Rx2StrobeCmosNDelay_Set, device, ssiCalibrationCfg->rxStrobeDelay[1]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Rx2StrobeCmosPDelay_Set, device, ssiCalibrationCfg->rxStrobeDelay[1]);
 
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Rx2IdataCmosNDelayBfSet,  device, ADRV9001_BF_CORE_3, ssiCalibrationCfg->rxIDataDelay[1]);
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Rx2IdataCmosPDelayBfSet,  device, ADRV9001_BF_CORE_3, ssiCalibrationCfg->rxIDataDelay[1]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Rx2IdataCmosNDelay_Set,  device, ssiCalibrationCfg->rxIDataDelay[1]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Rx2IdataCmosPDelay_Set,  device, ssiCalibrationCfg->rxIDataDelay[1]);
 
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Rx2QdataCmosNDelayBfSet,  device, ADRV9001_BF_CORE_3, ssiCalibrationCfg->rxQDataDelay[1]);
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Rx2QdataCmosPDelayBfSet,  device, ADRV9001_BF_CORE_3, ssiCalibrationCfg->rxQDataDelay[1]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Rx2QdataCmosNDelay_Set,  device, ssiCalibrationCfg->rxQDataDelay[1]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Rx2QdataCmosPDelay_Set,  device, ssiCalibrationCfg->rxQDataDelay[1]);
 
     /* Tx1 */
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Tx1ClkCmosNDelayBfSet,    device, ADRV9001_BF_CORE_3, ssiCalibrationCfg->txClkDelay[0]);
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Tx1ClkCmosPDelayBfSet,    device, ADRV9001_BF_CORE_3, ssiCalibrationCfg->txClkDelay[0]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Tx1ClkCmosNDelay_Set,    device, ssiCalibrationCfg->txClkDelay[0]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Tx1ClkCmosPDelay_Set,    device, ssiCalibrationCfg->txClkDelay[0]);
 
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Tx1RefclkCmosNDelayBfSet, device, ADRV9001_BF_CORE_3, ssiCalibrationCfg->txRefClkDelay[0]);
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Tx1RefclkCmosPDelayBfSet, device, ADRV9001_BF_CORE_3, ssiCalibrationCfg->txRefClkDelay[0]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Tx1RefclkCmosNDelay_Set, device, ssiCalibrationCfg->txRefClkDelay[0]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Tx1RefclkCmosPDelay_Set, device, ssiCalibrationCfg->txRefClkDelay[0]);
 
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Tx1StrobeCmosNDelayBfSet, device, ADRV9001_BF_CORE_3, ssiCalibrationCfg->txStrobeDelay[0]);
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Tx1StrobeCmosPDelayBfSet, device, ADRV9001_BF_CORE_3, ssiCalibrationCfg->txStrobeDelay[0]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Tx1StrobeCmosNDelay_Set, device, ssiCalibrationCfg->txStrobeDelay[0]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Tx1StrobeCmosPDelay_Set, device, ssiCalibrationCfg->txStrobeDelay[0]);
 
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Tx1IdataCmosNDelayBfSet,  device, ADRV9001_BF_CORE_3, ssiCalibrationCfg->txIDataDelay[0]);
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Tx1IdataCmosPDelayBfSet,  device, ADRV9001_BF_CORE_3, ssiCalibrationCfg->txIDataDelay[0]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Tx1IdataCmosNDelay_Set,  device, ssiCalibrationCfg->txIDataDelay[0]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Tx1IdataCmosPDelay_Set,  device, ssiCalibrationCfg->txIDataDelay[0]);
 
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Tx1QdataCmosNDelayBfSet,  device, ADRV9001_BF_CORE_3, ssiCalibrationCfg->txQDataDelay[0]);
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Tx1QdataCmosPDelayBfSet,  device, ADRV9001_BF_CORE_3, ssiCalibrationCfg->txQDataDelay[0]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Tx1QdataCmosNDelay_Set,  device, ssiCalibrationCfg->txQDataDelay[0]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Tx1QdataCmosPDelay_Set,  device, ssiCalibrationCfg->txQDataDelay[0]);
 
     /* Tx2 */
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Tx2ClkCmosNDelayBfSet,    device, ADRV9001_BF_CORE_3, ssiCalibrationCfg->txClkDelay[1]);
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Tx2ClkCmosPDelayBfSet,    device, ADRV9001_BF_CORE_3, ssiCalibrationCfg->txClkDelay[1]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Tx2ClkCmosNDelay_Set,    device, ssiCalibrationCfg->txClkDelay[1]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Tx2ClkCmosPDelay_Set,    device, ssiCalibrationCfg->txClkDelay[1]);
 
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Tx2RefclkCmosNDelayBfSet, device, ADRV9001_BF_CORE_3, ssiCalibrationCfg->txRefClkDelay[1]);
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Tx2RefclkCmosPDelayBfSet, device, ADRV9001_BF_CORE_3, ssiCalibrationCfg->txRefClkDelay[1]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Tx2RefclkCmosNDelay_Set, device, ssiCalibrationCfg->txRefClkDelay[1]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Tx2RefclkCmosPDelay_Set, device, ssiCalibrationCfg->txRefClkDelay[1]);
 
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Tx2StrobeCmosNDelayBfSet, device, ADRV9001_BF_CORE_3, ssiCalibrationCfg->txStrobeDelay[1]);
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Tx2StrobeCmosPDelayBfSet, device, ADRV9001_BF_CORE_3, ssiCalibrationCfg->txStrobeDelay[1]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Tx2StrobeCmosNDelay_Set, device, ssiCalibrationCfg->txStrobeDelay[1]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Tx2StrobeCmosPDelay_Set, device, ssiCalibrationCfg->txStrobeDelay[1]);
 
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Tx2IdataCmosNDelayBfSet,  device, ADRV9001_BF_CORE_3, ssiCalibrationCfg->txIDataDelay[1]);
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Tx2IdataCmosPDelayBfSet,  device, ADRV9001_BF_CORE_3, ssiCalibrationCfg->txIDataDelay[1]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Tx2IdataCmosNDelay_Set,  device, ssiCalibrationCfg->txIDataDelay[1]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Tx2IdataCmosPDelay_Set,  device, ssiCalibrationCfg->txIDataDelay[1]);
 
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Tx2QdataCmosNDelayBfSet,  device, ADRV9001_BF_CORE_3, ssiCalibrationCfg->txQDataDelay[1]);
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Tx2QdataCmosPDelayBfSet,  device, ADRV9001_BF_CORE_3, ssiCalibrationCfg->txQDataDelay[1]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Tx2QdataCmosNDelay_Set,  device, ssiCalibrationCfg->txQDataDelay[1]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Tx2QdataCmosPDelay_Set,  device, ssiCalibrationCfg->txQDataDelay[1]);
 
     ADI_API_RETURN(device);
 }
 
-static int32_t __maybe_unused adi_adrv9001_Ssi_Delay_Configure_Validate(adi_adrv9001_Device_t *device,
-									adi_adrv9001_SsiType_e ssiType,
-									adi_adrv9001_SsiCalibrationCfg_t *ssiCalibration)
+static int32_t adi_adrv9001_Ssi_Delay_Configure_Validate(adi_adrv9001_Device_t *device,
+                                                         adi_adrv9001_SsiType_e ssiType,
+                                                         adi_adrv9001_SsiCalibrationCfg_t *ssiCalibration)
 {
     static const uint8_t MAX_DELAY = 7;
     ADI_RANGE_CHECK(device, ssiType, ADI_ADRV9001_SSI_TYPE_CMOS, ADI_ADRV9001_SSI_TYPE_LVDS);
@@ -655,27 +641,27 @@ int32_t adi_adrv9001_Ssi_Delay_Configure(adi_adrv9001_Device_t *device,
 static int32_t adi_adrv9001_Ssi_LvdsDelayConfigGet(adi_adrv9001_Device_t *device,
                                                    adi_adrv9001_SsiCalibrationCfg_t *ssiCalibrationCfg)
 {
-    ADI_EXPECT(adrv9001_NvsRegmapCoreRx1ClkLvdsDelayBfGet,      device, ADRV9001_BF_CORE, (int8_t *)&ssiCalibrationCfg->rxClkDelay[0]);
-    ADI_EXPECT(adrv9001_NvsRegmapCoreRx1StrobeLvdsDelayBfGet,   device, ADRV9001_BF_CORE, (int8_t *)&ssiCalibrationCfg->rxStrobeDelay[0]);
-    ADI_EXPECT(adrv9001_NvsRegmapCoreRx1IdataLvdsDelayBfGet,    device, ADRV9001_BF_CORE, (int8_t *)&ssiCalibrationCfg->rxIDataDelay[0]);
-    ADI_EXPECT(adrv9001_NvsRegmapCoreRx1QdataLvdsDelayBfGet,    device, ADRV9001_BF_CORE, (int8_t *)&ssiCalibrationCfg->rxQDataDelay[0]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore_Rx1ClkLvdsDelay_Get,      device, &ssiCalibrationCfg->rxClkDelay[0]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore_Rx1StrobeLvdsDelay_Get,   device, &ssiCalibrationCfg->rxStrobeDelay[0]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore_Rx1IdataLvdsDelay_Get,    device, &ssiCalibrationCfg->rxIDataDelay[0]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore_Rx1QdataLvdsDelay_Get,    device, &ssiCalibrationCfg->rxQDataDelay[0]);
 
-    ADI_EXPECT(adrv9001_NvsRegmapCoreRx2ClkLvdsDelayBfGet,      device, ADRV9001_BF_CORE, (int8_t *)&ssiCalibrationCfg->rxClkDelay[1]);
-    ADI_EXPECT(adrv9001_NvsRegmapCoreRx2StrobeLvdsDelayBfGet,   device, ADRV9001_BF_CORE, (int8_t *)&ssiCalibrationCfg->rxStrobeDelay[1]);
-    ADI_EXPECT(adrv9001_NvsRegmapCoreRx2IdataLvdsDelayBfGet,    device, ADRV9001_BF_CORE, (int8_t *)&ssiCalibrationCfg->rxIDataDelay[1]);
-    ADI_EXPECT(adrv9001_NvsRegmapCoreRx2QdataLvdsDelayBfGet,    device, ADRV9001_BF_CORE, (int8_t *)&ssiCalibrationCfg->rxQDataDelay[1]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore_Rx2ClkLvdsDelay_Get,      device, &ssiCalibrationCfg->rxClkDelay[1]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore_Rx2StrobeLvdsDelay_Get,   device, &ssiCalibrationCfg->rxStrobeDelay[1]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore_Rx2IdataLvdsDelay_Get,    device, &ssiCalibrationCfg->rxIDataDelay[1]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore_Rx2QdataLvdsDelay_Get,    device, &ssiCalibrationCfg->rxQDataDelay[1]);
 
-    ADI_EXPECT(adrv9001_NvsRegmapCoreTx1ClkLvdsDelayBfGet,      device, ADRV9001_BF_CORE, (int8_t *)&ssiCalibrationCfg->txClkDelay[0]);
-    ADI_EXPECT(adrv9001_NvsRegmapCoreTx1RefclkLvdsDelayBfGet,   device, ADRV9001_BF_CORE, (int8_t *)&ssiCalibrationCfg->txRefClkDelay[0]);
-    ADI_EXPECT(adrv9001_NvsRegmapCoreTx1StrobeLvdsDelayBfGet,   device, ADRV9001_BF_CORE, (int8_t *)&ssiCalibrationCfg->txStrobeDelay[0]);
-    ADI_EXPECT(adrv9001_NvsRegmapCoreTx1IdataLvdsDelayBfGet,    device, ADRV9001_BF_CORE, (int8_t *)&ssiCalibrationCfg->txIDataDelay[0]);
-    ADI_EXPECT(adrv9001_NvsRegmapCoreTx1QdataLvdsDelayBfGet,    device, ADRV9001_BF_CORE, (int8_t *)&ssiCalibrationCfg->txQDataDelay[0]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore_Tx1ClkLvdsDelay_Get,      device, &ssiCalibrationCfg->txClkDelay[0]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore_Tx1RefclkLvdsDelay_Get,   device, &ssiCalibrationCfg->txRefClkDelay[0]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore_Tx1StrobeLvdsDelay_Get,   device, &ssiCalibrationCfg->txStrobeDelay[0]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore_Tx1IdataLvdsDelay_Get,    device, &ssiCalibrationCfg->txIDataDelay[0]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore_Tx1QdataLvdsDelay_Get,    device, &ssiCalibrationCfg->txQDataDelay[0]);
 
-    ADI_EXPECT(adrv9001_NvsRegmapCoreTx2ClkLvdsDelayBfGet,      device, ADRV9001_BF_CORE, (int8_t *)&ssiCalibrationCfg->txClkDelay[1]);
-    ADI_EXPECT(adrv9001_NvsRegmapCoreTx2RefclkLvdsDelayBfGet,   device, ADRV9001_BF_CORE, (int8_t *)&ssiCalibrationCfg->txRefClkDelay[1]);
-    ADI_EXPECT(adrv9001_NvsRegmapCoreTx2StrobeLvdsDelayBfGet,   device, ADRV9001_BF_CORE, (int8_t *)&ssiCalibrationCfg->txStrobeDelay[1]);
-    ADI_EXPECT(adrv9001_NvsRegmapCoreTx2IdataLvdsDelayBfGet,    device, ADRV9001_BF_CORE, (int8_t *)&ssiCalibrationCfg->txIDataDelay[1]);
-    ADI_EXPECT(adrv9001_NvsRegmapCoreTx2QdataLvdsDelayBfGet,    device, ADRV9001_BF_CORE, (int8_t *)&ssiCalibrationCfg->txQDataDelay[1]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore_Tx2ClkLvdsDelay_Get,      device, &ssiCalibrationCfg->txClkDelay[1]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore_Tx2RefclkLvdsDelay_Get,   device, &ssiCalibrationCfg->txRefClkDelay[1]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore_Tx2StrobeLvdsDelay_Get,   device, &ssiCalibrationCfg->txStrobeDelay[1]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore_Tx2IdataLvdsDelay_Get,    device, &ssiCalibrationCfg->txIDataDelay[1]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore_Tx2QdataLvdsDelay_Get,    device, &ssiCalibrationCfg->txQDataDelay[1]);
 
     ADI_API_RETURN(device);
 }
@@ -684,69 +670,69 @@ static int32_t adi_adrv9001_Ssi_CmosDelayConfigGet(adi_adrv9001_Device_t *device
                                                    adi_adrv9001_SsiCalibrationCfg_t *ssiCalibrationCfg)
 {
     /* Rx1 */
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Rx1ClkCmosNDelayBfGet,    device, ADRV9001_BF_CORE_3, &ssiCalibrationCfg->rxClkDelay[0]);
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Rx1ClkCmosPDelayBfGet,    device, ADRV9001_BF_CORE_3, &ssiCalibrationCfg->rxClkDelay[0]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Rx1ClkCmosNDelay_Get,    device, &ssiCalibrationCfg->rxClkDelay[0]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Rx1ClkCmosPDelay_Get,    device, &ssiCalibrationCfg->rxClkDelay[0]);
 
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Rx1StrobeCmosNDelayBfGet, device, ADRV9001_BF_CORE_3, &ssiCalibrationCfg->rxStrobeDelay[0]);
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Rx1StrobeCmosPDelayBfGet, device, ADRV9001_BF_CORE_3, &ssiCalibrationCfg->rxStrobeDelay[0]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Rx1StrobeCmosNDelay_Get, device, &ssiCalibrationCfg->rxStrobeDelay[0]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Rx1StrobeCmosPDelay_Get, device, &ssiCalibrationCfg->rxStrobeDelay[0]);
 
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Rx1IdataCmosNDelayBfGet,  device, ADRV9001_BF_CORE_3, &ssiCalibrationCfg->rxIDataDelay[0]);
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Rx1IdataCmosPDelayBfGet,  device, ADRV9001_BF_CORE_3, &ssiCalibrationCfg->rxIDataDelay[0]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Rx1IdataCmosNDelay_Get,  device, &ssiCalibrationCfg->rxIDataDelay[0]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Rx1IdataCmosPDelay_Get,  device, &ssiCalibrationCfg->rxIDataDelay[0]);
 
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Rx1QdataCmosNDelayBfGet,  device, ADRV9001_BF_CORE_3, &ssiCalibrationCfg->rxQDataDelay[0]);
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Rx1QdataCmosPDelayBfGet,  device, ADRV9001_BF_CORE_3, &ssiCalibrationCfg->rxQDataDelay[0]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Rx1QdataCmosNDelay_Get,  device, &ssiCalibrationCfg->rxQDataDelay[0]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Rx1QdataCmosPDelay_Get,  device, &ssiCalibrationCfg->rxQDataDelay[0]);
 
     /* Rx2 */
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Rx2ClkCmosNDelayBfGet,    device, ADRV9001_BF_CORE_3, &ssiCalibrationCfg->rxClkDelay[1]);
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Rx2ClkCmosPDelayBfGet,    device, ADRV9001_BF_CORE_3, &ssiCalibrationCfg->rxClkDelay[1]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Rx2ClkCmosNDelay_Get,    device, &ssiCalibrationCfg->rxClkDelay[1]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Rx2ClkCmosPDelay_Get,    device, &ssiCalibrationCfg->rxClkDelay[1]);
 
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Rx2StrobeCmosNDelayBfGet, device, ADRV9001_BF_CORE_3, &ssiCalibrationCfg->rxStrobeDelay[1]);
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Rx2StrobeCmosPDelayBfGet, device, ADRV9001_BF_CORE_3, &ssiCalibrationCfg->rxStrobeDelay[1]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Rx2StrobeCmosNDelay_Get, device, &ssiCalibrationCfg->rxStrobeDelay[1]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Rx2StrobeCmosPDelay_Get, device, &ssiCalibrationCfg->rxStrobeDelay[1]);
 
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Rx2IdataCmosNDelayBfGet,  device, ADRV9001_BF_CORE_3, &ssiCalibrationCfg->rxIDataDelay[1]);
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Rx2IdataCmosPDelayBfGet,  device, ADRV9001_BF_CORE_3, &ssiCalibrationCfg->rxIDataDelay[1]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Rx2IdataCmosNDelay_Get,  device, &ssiCalibrationCfg->rxIDataDelay[1]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Rx2IdataCmosPDelay_Get,  device, &ssiCalibrationCfg->rxIDataDelay[1]);
 
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Rx2QdataCmosNDelayBfGet,  device, ADRV9001_BF_CORE_3, &ssiCalibrationCfg->rxQDataDelay[1]);
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Rx2QdataCmosPDelayBfGet,  device, ADRV9001_BF_CORE_3, &ssiCalibrationCfg->rxQDataDelay[1]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Rx2QdataCmosNDelay_Get,  device, &ssiCalibrationCfg->rxQDataDelay[1]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Rx2QdataCmosPDelay_Get,  device, &ssiCalibrationCfg->rxQDataDelay[1]);
 
     /* Tx1 */
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Tx1ClkCmosNDelayBfGet,    device, ADRV9001_BF_CORE_3, &ssiCalibrationCfg->txClkDelay[0]);
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Tx1ClkCmosPDelayBfGet,    device, ADRV9001_BF_CORE_3, &ssiCalibrationCfg->txClkDelay[0]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Tx1ClkCmosNDelay_Get,    device, &ssiCalibrationCfg->txClkDelay[0]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Tx1ClkCmosPDelay_Get,    device, &ssiCalibrationCfg->txClkDelay[0]);
 
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Tx1RefclkCmosNDelayBfGet, device, ADRV9001_BF_CORE_3, &ssiCalibrationCfg->txRefClkDelay[0]);
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Tx1RefclkCmosPDelayBfGet, device, ADRV9001_BF_CORE_3, &ssiCalibrationCfg->txRefClkDelay[0]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Tx1RefclkCmosNDelay_Get, device, &ssiCalibrationCfg->txRefClkDelay[0]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Tx1RefclkCmosPDelay_Get, device, &ssiCalibrationCfg->txRefClkDelay[0]);
 
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Tx1StrobeCmosNDelayBfGet, device, ADRV9001_BF_CORE_3, &ssiCalibrationCfg->txStrobeDelay[0]);
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Tx1StrobeCmosPDelayBfGet, device, ADRV9001_BF_CORE_3, &ssiCalibrationCfg->txStrobeDelay[0]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Tx1StrobeCmosNDelay_Get, device, &ssiCalibrationCfg->txStrobeDelay[0]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Tx1StrobeCmosPDelay_Get, device, &ssiCalibrationCfg->txStrobeDelay[0]);
 
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Tx1IdataCmosNDelayBfGet,  device, ADRV9001_BF_CORE_3, &ssiCalibrationCfg->txIDataDelay[0]);
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Tx1IdataCmosPDelayBfGet,  device, ADRV9001_BF_CORE_3, &ssiCalibrationCfg->txIDataDelay[0]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Tx1IdataCmosNDelay_Get,  device, &ssiCalibrationCfg->txIDataDelay[0]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Tx1IdataCmosPDelay_Get,  device, &ssiCalibrationCfg->txIDataDelay[0]);
 
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Tx1QdataCmosNDelayBfGet,  device, ADRV9001_BF_CORE_3, &ssiCalibrationCfg->txQDataDelay[0]);
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Tx1QdataCmosPDelayBfGet,  device, ADRV9001_BF_CORE_3, &ssiCalibrationCfg->txQDataDelay[0]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Tx1QdataCmosNDelay_Get,  device, &ssiCalibrationCfg->txQDataDelay[0]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Tx1QdataCmosPDelay_Get,  device, &ssiCalibrationCfg->txQDataDelay[0]);
 
     /* Tx2 */
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Tx2ClkCmosNDelayBfGet,    device, ADRV9001_BF_CORE_3, &ssiCalibrationCfg->txClkDelay[1]);
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Tx2ClkCmosPDelayBfGet,    device, ADRV9001_BF_CORE_3, &ssiCalibrationCfg->txClkDelay[1]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Tx2ClkCmosNDelay_Get,    device, &ssiCalibrationCfg->txClkDelay[1]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Tx2ClkCmosPDelay_Get,    device, &ssiCalibrationCfg->txClkDelay[1]);
 
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Tx2RefclkCmosNDelayBfGet, device, ADRV9001_BF_CORE_3, &ssiCalibrationCfg->txRefClkDelay[1]);
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Tx2RefclkCmosPDelayBfGet, device, ADRV9001_BF_CORE_3, &ssiCalibrationCfg->txRefClkDelay[1]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Tx2RefclkCmosNDelay_Get, device, &ssiCalibrationCfg->txRefClkDelay[1]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Tx2RefclkCmosPDelay_Get, device, &ssiCalibrationCfg->txRefClkDelay[1]);
 
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Tx2StrobeCmosNDelayBfGet, device, ADRV9001_BF_CORE_3, &ssiCalibrationCfg->txStrobeDelay[1]);
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Tx2StrobeCmosPDelayBfGet, device, ADRV9001_BF_CORE_3, &ssiCalibrationCfg->txStrobeDelay[1]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Tx2StrobeCmosNDelay_Get, device, &ssiCalibrationCfg->txStrobeDelay[1]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Tx2StrobeCmosPDelay_Get, device, &ssiCalibrationCfg->txStrobeDelay[1]);
 
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Tx2IdataCmosNDelayBfGet,  device, ADRV9001_BF_CORE_3, &ssiCalibrationCfg->txIDataDelay[1]);
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Tx2IdataCmosPDelayBfGet,  device, ADRV9001_BF_CORE_3, &ssiCalibrationCfg->txIDataDelay[1]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Tx2IdataCmosNDelay_Get,  device, &ssiCalibrationCfg->txIDataDelay[1]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Tx2IdataCmosPDelay_Get,  device, &ssiCalibrationCfg->txIDataDelay[1]);
 
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Tx2QdataCmosNDelayBfGet,  device, ADRV9001_BF_CORE_3, &ssiCalibrationCfg->txQDataDelay[1]);
-    ADI_EXPECT(adrv9001_NvsRegmapCore3Tx2QdataCmosPDelayBfGet,  device, ADRV9001_BF_CORE_3, &ssiCalibrationCfg->txQDataDelay[1]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Tx2QdataCmosNDelay_Get,  device, &ssiCalibrationCfg->txQDataDelay[1]);
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_Tx2QdataCmosPDelay_Get,  device, &ssiCalibrationCfg->txQDataDelay[1]);
 
     ADI_API_RETURN(device);
 }
 
-static int32_t __maybe_unused adi_adrv9001_Ssi_Delay_Inspect_Validate(adi_adrv9001_Device_t *device,
-								      adi_adrv9001_SsiType_e ssiType,
-								      adi_adrv9001_SsiCalibrationCfg_t *ssiCalibration)
+static int32_t adi_adrv9001_Ssi_Delay_Inspect_Validate(adi_adrv9001_Device_t *device,
+                                                       adi_adrv9001_SsiType_e ssiType,
+                                                       adi_adrv9001_SsiCalibrationCfg_t *ssiCalibration)
 {
     ADI_RANGE_CHECK(device, ssiType, ADI_ADRV9001_SSI_TYPE_CMOS, ADI_ADRV9001_SSI_TYPE_LVDS);
     ADI_NULL_PTR_RETURN(&device->common, ssiCalibration);

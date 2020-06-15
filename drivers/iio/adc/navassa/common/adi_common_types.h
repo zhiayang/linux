@@ -23,7 +23,7 @@ extern "C" {
 
 /**
  * \brief Enumeration of channel numbers
- * 
+ *
  * \note These enums may be masked (OR'd) to specify multiple channels at once
  */
 typedef enum adi_common_ChannelNumber
@@ -34,7 +34,7 @@ typedef enum adi_common_ChannelNumber
 
 /**
  * \brief Enumeration of port types
- * 
+ *
  * \note These enums may NOT be masked (OR'd) to specify multiple ports at once
  */
 typedef enum adi_common_Port
@@ -45,7 +45,7 @@ typedef enum adi_common_Port
     ADI_ILB = 3,
     ADI_ELB = 4
 } adi_common_Port_e;
-    
+
 #ifndef CLIENT_IGNORE
 /**
  *  \brief ADI common device structure
@@ -54,11 +54,10 @@ typedef struct adi_common_Device
 {
     void                     *devHalInfo; /*!< ADI_HAL Hardware layer settings pointer specific to this device instance */
     adi_common_ErrStruct_t   error;
-    adi_common_Cache_t       cacheInfo; /*!< TODO: add description */
     /* function pointer for datapacking or device specific hal */
 } adi_common_Device_t;
 #endif // !CLIENT_IGNORE
-    
+
 /**
  * \brief Data structure to hold API version information
  */
@@ -67,7 +66,6 @@ typedef struct adi_common_ApiVersion
     uint32_t major; /*!< API Major Version number */
     uint32_t minor; /*!< API Minor Version number */
     uint32_t patch; /*!< API Patch Version number */
-    uint32_t build;
 } adi_common_ApiVersion_t;
 
 #ifdef __cplusplus

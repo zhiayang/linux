@@ -26,31 +26,10 @@
 /* ADI specific header files */
 #include "adi_adrv9001.h"
 #include "adi_adrv9001_error.h"
-#include "adrv9001_bf_analog_tx_mem_map.h"
-#include "adrv9001_bf_hal.h"
-#include "adrv9001_bf_nvs_regmap_core.h"
 #include "adrv9001_gpio.h"
-#include "adrv9001_bf_nvs_regmap_core_2.h"
 #include "adrv9001_reg_addr_macros.h"
+#include "adrv9001_bf.h"
 
-/* Header files related to libraries */
-
-/* System header files */
-
-/*
-*********************************************************************************************************
-*                                             LOCAL DEFINES
-*********************************************************************************************************
-*/
-
-
-/*
-*********************************************************************************************************
-*                                         FUNCTION PROTOTYPES
-*********************************************************************************************************
-*/
-
-/*********************************************************************************************************/
 int32_t adrv9001_GpIntHandler(adi_adrv9001_Device_t *device, adi_adrv9001_gpIntStatus_t *gpIntStatus)
 {
     int32_t recoveryAction = 10000;
@@ -237,6 +216,10 @@ int32_t adrv9001_GpIntHandler(adi_adrv9001_Device_t *device, adi_adrv9001_gpIntS
         recoveryAction = ADI_ADRV9001_ACT_ERR_BBIC_LOG_ERROR;
         errMsg = "Unknown GP Interrupt source";
     }
+    if (errMsg == '\0')
+    {
+        errMsg = "No Interrupt Detected";
+    }
 
     if (recoveryAction == 10000)
     {
@@ -249,184 +232,98 @@ int32_t adrv9001_GpIntHandler(adi_adrv9001_Device_t *device, adi_adrv9001_gpIntS
     return device->common.error.newAction;
 }
 
-int32_t adrv9001_GpInterruptsMaskPinBfSet(adi_adrv9001_Device_t *device,
-    adrv9001_BfNvsRegmapCore1ChanAddr_e baseAddr,
-    uint32_t bfValue)
+int32_t adrv9001_GpInterruptsMaskPinBfSet(adi_adrv9001_Device_t *device, uint32_t bfValue)
 {
-    int32_t recoveryAction = ADI_COMMON_ACT_NO_ACTION;
+    int32_t status = 0;
 
     ADI_NULL_DEVICE_PTR_RETURN(device);
 
-    ADI_FUNCTION_ENTRY_LOG(&device->common, ADI_COMMON_LOG_BF);
-
-#ifdef ADRV9001_BITFIELD_VALUE_CHECK
-    static const uint32_t MAX_RANGE_UNSIGNED_32BIT = 4294967295U;
-
-    /* Range check */
-    if ((bfValue < 0) ||
-        (bfValue > MAX_RANGE_UNSIGNED_32BIT))
-    {
-        ADI_ERROR_REPORT(&device->common,
-            ADI_COMMON_ERRSRC_DEVICEBF,
-            ADI_COMMON_ERR_INV_PARAM,
-            ADI_COMMON_ACT_ERR_CHECK_PARAM,
-            bfValue,
-            "Invalid adrv9001_GpInterruptsMaskPinBfSet parameter");
-        ADI_ERROR_RETURN(device->common.error.newAction);
-    }
-#endif /* ADRV9001_BITFIELD_VALUE_CHECK */
-
-#ifdef ADRV9001_BITFIELD_ADDR_CHECK
-    /* Base Address check */
-    if ((baseAddr != ADRV9001_BF_CORE_1))
-    {
-        ADI_ERROR_REPORT(&device->common,
-            ADI_COMMON_ERRSRC_DEVICEBF,
-            ADI_COMMON_ERR_INV_PARAM,
-            ADI_COMMON_ACT_ERR_CHECK_PARAM,
-            baseAddr,
-            "Invalid adrv9001_GpInterruptsMaskPinBfSet Address");
-        ADI_ERROR_RETURN(device->common.error.newAction);
-    }
-#endif /* ADRV9001_BITFIELD_ADDR_CHECK */
-
-    recoveryAction = adrv9001_BfWriteCacheInit(device);
-    ADI_ERROR_RETURN(device->common.error.newAction);
+    /* Write to Field 8 bits */
+    status = adi_bf_hal_Register_Write(device, (0x200 + 0xA1), (uint8_t)(bfValue >> 24));
+    if (0 != status) return status;
 
     /* Write to Field 8 bits */
-    recoveryAction = adrv9001_BfByteWrite(device, (baseAddr + 0xA1), (uint8_t)(bfValue >> 24));
-    ADI_ERROR_RETURN(device->common.error.newAction);
+    status = adi_bf_hal_Register_Write(device, (0x200 + 0xA0), (uint8_t)(bfValue >> 16));
+    if (0 != status) return status;
 
     /* Write to Field 8 bits */
-    recoveryAction = adrv9001_BfByteWrite(device, (baseAddr + 0xA0), (uint8_t)(bfValue >> 16));
-    ADI_ERROR_RETURN(device->common.error.newAction);
+    status = adi_bf_hal_Register_Write(device, (0x200 + 0x9F), (uint8_t)(bfValue >> 8));
+    if (0 != status) return status;
 
     /* Write to Field 8 bits */
-    recoveryAction = adrv9001_BfByteWrite(device, (baseAddr + 0x9F), (uint8_t)(bfValue >> 8));
-    ADI_ERROR_RETURN(device->common.error.newAction);
+    status = adi_bf_hal_Register_Write(device, (0x200 + 0x9E), (uint8_t)(bfValue >> 0));
 
-    /* Write to Field 8 bits */
-    recoveryAction = adrv9001_BfByteWrite(device, (baseAddr + 0x9E), (uint8_t)(bfValue >> 0));
-    ADI_ERROR_RETURN(device->common.error.newAction);
-
-    recoveryAction = adrv9001_BfWriteCacheFlush(device);
-    ADI_ERROR_RETURN(device->common.error.newAction);
-
-    return recoveryAction;
+    return status;
 }
 
-int32_t adrv9001_GpInterruptsMaskPinBfGet(adi_adrv9001_Device_t *device,
-    adrv9001_BfNvsRegmapCore1ChanAddr_e baseAddr,
-    uint32_t *bfValue)
+int32_t adrv9001_GpInterruptsMaskPinBfGet(adi_adrv9001_Device_t *device, uint32_t *bfValue)
 {
-    int32_t recoveryAction = ADI_COMMON_ACT_NO_ACTION;
-    uint8_t rxBfData[8] = { 0 };
-    uint64_t data = 0;
+    int32_t status = 0;
+    uint8_t register_value = 0;
 
     ADI_NULL_DEVICE_PTR_RETURN(device);
 
     ADI_FUNCTION_ENTRY_LOG(&device->common, ADI_COMMON_LOG_BF);
 
-#ifdef ADRV9001_BITFIELD_NULL_CHECK
+#if ADRV9001_BITFIELD_NULL_CHECK > 0
     /* NULL check */
     ADI_NULL_PTR_RETURN(&device->common, bfValue);
 #endif /* ADRV9001_BITFIELD_NULL_CHECK */
 
-#ifdef ADRV9001_BITFIELD_ADDR_CHECK
-    /* Base Address check */
-    if ((baseAddr != ADRV9001_BF_CORE_1))
-    {
-        ADI_ERROR_REPORT(&device->common,
-            ADI_COMMON_ERRSRC_DEVICEBF,
-            ADI_COMMON_ERR_INV_PARAM,
-            ADI_COMMON_ACT_ERR_CHECK_PARAM,
-            baseAddr,
-            "Invalid adrv9001_GpInterruptsMaskPinBfGet Address");
-        ADI_ERROR_RETURN(device->common.error.newAction);
-    }
-#endif /* ADRV9001_BITFIELD_ADDR_CHECK */
-
-    recoveryAction = adrv9001_BfReadCacheInit(device);
-    ADI_ERROR_RETURN(device->common.error.newAction);
+    /* Read Field 8 bits */
+    status = adi_bf_hal_Register_Read(device, (0x200 + 0xA1), &register_value);
+    *bfValue = 0;
+    if (0 != status) return status;
+    *bfValue = (*bfValue << 8) | register_value;
 
     /* Read Field 8 bits */
-    recoveryAction = adrv9001_BfByteRead(device, (baseAddr + 0xA1), &rxBfData[0x0], 0x00);
-    ADI_ERROR_RETURN(device->common.error.newAction);
+    status = adi_bf_hal_Register_Read(device, (0x200 + 0xA0), &register_value);
+    if (0 != status) return status;
+    *bfValue = (*bfValue << 8) | register_value;
 
     /* Read Field 8 bits */
-    recoveryAction = adrv9001_BfByteRead(device, (baseAddr + 0xA0), &rxBfData[0x1], 0x00);
-    ADI_ERROR_RETURN(device->common.error.newAction);
+    status = adi_bf_hal_Register_Read(device, (0x200 + 0x9F), &register_value);
+    if (0 != status) return status;
+    *bfValue = (*bfValue << 8) | register_value;
 
     /* Read Field 8 bits */
-    recoveryAction = adrv9001_BfByteRead(device, (baseAddr + 0x9F), &rxBfData[0x2], 0x00);
-    ADI_ERROR_RETURN(device->common.error.newAction);
+    status = adi_bf_hal_Register_Read(device, (0x200 + 0x9E), &register_value);
+    *bfValue = (*bfValue << 8) | register_value;
 
-    /* Read Field 8 bits */
-    recoveryAction = adrv9001_BfByteRead(device, (baseAddr + 0x9E), &rxBfData[0x3], 0xC0);
-    ADI_ERROR_RETURN(device->common.error.newAction);
-
-    recoveryAction = adrv9001_BfReadAssembleData(device, &rxBfData[0x0], 0x4, &data);
-    ADI_ERROR_RETURN(device->common.error.newAction);
-
-    *bfValue = (uint32_t) data;
-
-    return recoveryAction;
+    return status;
 }
 
-int32_t adrv9001_GpInterruptsStatusWordBfGet(adi_adrv9001_Device_t *device,
-    adrv9001_BfNvsRegmapCore1ChanAddr_e baseAddr,
-    uint32_t *bfValue)
+int32_t adrv9001_GpInterruptsStatusWordBfGet(adi_adrv9001_Device_t *device, uint32_t *bfValue)
 {
-    int32_t recoveryAction = ADI_COMMON_ACT_NO_ACTION;
-    uint8_t rxBfData[8] = { 0 };
-    uint64_t data = 0;
+    int32_t status = ADI_COMMON_ACT_NO_ACTION;
+    uint8_t register_value = 0;
 
     ADI_NULL_DEVICE_PTR_RETURN(device);
 
-    ADI_FUNCTION_ENTRY_LOG(&device->common, ADI_COMMON_LOG_BF);
-
-#ifdef ADRV9001_BITFIELD_NULL_CHECK
+#if ADRV9001_BITFIELD_NULL_CHECK > 0
     /* NULL check */
     ADI_NULL_PTR_RETURN(&device->common, bfValue);
 #endif /* ADRV9001_BITFIELD_NULL_CHECK */
 
-#ifdef ADRV9001_BITFIELD_ADDR_CHECK
-    /* Base Address check */
-    if ((baseAddr != ADRV9001_BF_CORE_1))
-    {
-        ADI_ERROR_REPORT(&device->common,
-            ADI_COMMON_ERRSRC_DEVICEBF,
-            ADI_COMMON_ERR_INV_PARAM,
-            ADI_COMMON_ACT_ERR_CHECK_PARAM,
-            baseAddr,
-            "Invalid adrv9001_GpInterruptsStatusWordBfGet Address");
-        ADI_ERROR_RETURN(device->common.error.newAction);
-    }
-#endif /* ADRV9001_BITFIELD_ADDR_CHECK */
-
-    recoveryAction = adrv9001_BfReadCacheInit(device);
-    ADI_ERROR_RETURN(device->common.error.newAction);
+    /* Read Field 8 bits */
+    status = adi_bf_hal_Register_Read(device, (0x200 + 0xA6), &register_value);
+    *bfValue = 0;
+    if (0 != status) return status;
+    *bfValue = (*bfValue << 8) | register_value;
 
     /* Read Field 8 bits */
-    recoveryAction = adrv9001_BfByteRead(device, (baseAddr + 0xA6), &rxBfData[0x0], 0x00);
-    ADI_ERROR_RETURN(device->common.error.newAction);
+    status = adi_bf_hal_Register_Read(device, (0x200 + 0xA5), &register_value);
+    if (0 != status) return status;
+    *bfValue = (*bfValue << 8) | register_value;
 
     /* Read Field 8 bits */
-    recoveryAction = adrv9001_BfByteRead(device, (baseAddr + 0xA5), &rxBfData[0x1], 0x00);
-    ADI_ERROR_RETURN(device->common.error.newAction);
+    status = adi_bf_hal_Register_Read(device, (0x200 + 0xA4), &register_value);
+    if (0 != status) return status;
+    *bfValue = (*bfValue << 8) | register_value;
 
     /* Read Field 8 bits */
-    recoveryAction = adrv9001_BfByteRead(device, (baseAddr + 0xA4), &rxBfData[0x2], 0x00);
-    ADI_ERROR_RETURN(device->common.error.newAction);
+    status = adi_bf_hal_Register_Read(device, (0x200 + 0xA3), &register_value);
+    *bfValue = (*bfValue << 8) | register_value;
 
-    /* Read Field 8 bits */
-    recoveryAction = adrv9001_BfByteRead(device, (baseAddr + 0xA3), &rxBfData[0x3], 0xC0);
-    ADI_ERROR_RETURN(device->common.error.newAction);
-
-    recoveryAction = adrv9001_BfReadAssembleData(device, &rxBfData[0x0], 0x4, &data);
-    ADI_ERROR_RETURN(device->common.error.newAction);
-
-    *bfValue = (uint32_t) data;
-
-    return recoveryAction;
+    return status;
 }

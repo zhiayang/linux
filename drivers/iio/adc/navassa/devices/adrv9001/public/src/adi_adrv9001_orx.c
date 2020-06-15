@@ -29,7 +29,7 @@
 #include "adi_adrv9001_error.h"
 #include "adi_adrv9001_radio.h"
 #include "adrv9001_arm_macros.h"
-#include "adrv9001_bf_nvs_regmap_rxb.h"
+#include "adrv9001_bf.h"
 
 /* Header files related to libraries */
 
@@ -43,9 +43,9 @@
 */
 
 /*********************************************************************************************************/
-static int32_t __maybe_unused adi_adrv9001_ORx_Gain_Set_Validate(adi_adrv9001_Device_t *device,
-								 adi_common_ChannelNumber_e channel,
-								 uint8_t gainIndex)
+static int32_t adi_adrv9001_ORx_Gain_Set_Validate(adi_adrv9001_Device_t *device,
+                                                  adi_common_ChannelNumber_e channel,
+                                                  uint8_t gainIndex)
 {
     static const uint8_t ORX_MIN_GAIN_INDEX = 2;
     static const uint8_t ORX_MAX_GAIN_INDEX = 14;
@@ -65,23 +65,8 @@ static int32_t __maybe_unused adi_adrv9001_ORx_Gain_Set_Validate(adi_adrv9001_De
         ADI_ERROR_RETURN(device->common.error.newAction);
     }
 
-    /*Check that gain indices are within range for the channel selected*/
-    if (channel == ADI_CHANNEL_1)
-    {
-        ADI_RANGE_CHECK(device,
-                        gainIndex,
-                        ORX_MIN_GAIN_INDEX,
-                        ORX_MAX_GAIN_INDEX);
-    }
-
-    if (channel == ADI_CHANNEL_2)
-    {
-        ADI_RANGE_CHECK(device,
-                        gainIndex,
-                        ORX_MIN_GAIN_INDEX,
-                        ORX_MAX_GAIN_INDEX);
-    }
-
+    ADI_RANGE_CHECK(device, gainIndex, ORX_MIN_GAIN_INDEX, ORX_MAX_GAIN_INDEX);
+    
     ADI_API_RETURN(device)
 }
 
@@ -94,19 +79,19 @@ int32_t adi_adrv9001_ORx_Gain_Set(adi_adrv9001_Device_t *device,
     /* Update manual gain index setting for the requested port and channel */
     if (channel == ADI_CHANNEL_1)
     {
-        ADI_EXPECT(adrv9001_NvsRegmapRxbAgcManualGainIndexOrxBfSet, device, ADRV9001_BF_RXB1_CORE, gainIndex);
+        ADI_EXPECT(adrv9001_NvsRegmapRxb_AgcManualGainIndexOrx_Set, device, ADRV9001_BF_RXB1_CORE, gainIndex);
     }
     else /* ORx2 */
     {
-        ADI_EXPECT(adrv9001_NvsRegmapRxbAgcManualGainIndexOrxBfSet, device, ADRV9001_BF_RXB2_CORE, gainIndex);
+        ADI_EXPECT(adrv9001_NvsRegmapRxb_AgcManualGainIndexOrx_Set, device, ADRV9001_BF_RXB2_CORE, gainIndex);
     }
 
     ADI_API_RETURN(device)
 }
 
-static int32_t __maybe_unused adi_adrv9001_ORx_Gain_Get_Validate(adi_adrv9001_Device_t *device,
-								 adi_common_ChannelNumber_e channel,
-								 uint8_t *gainIndex)
+static int32_t adi_adrv9001_ORx_Gain_Get_Validate(adi_adrv9001_Device_t *device,
+                                                  adi_common_ChannelNumber_e channel,
+                                                  uint8_t *gainIndex)
 {
     ADI_NULL_PTR_RETURN(&device->common, gainIndex);
 
@@ -136,11 +121,11 @@ int32_t adi_adrv9001_ORx_Gain_Get(adi_adrv9001_Device_t *device,
     /* Check the ORx channel for which the manual gain to be set */
     if (channel == ADI_CHANNEL_1)
     {
-        ADI_EXPECT(adrv9001_NvsRegmapRxbAgcManualGainIndexOrxBfGet, device, ADRV9001_BF_RXB1_CORE, gainIndex);
+        ADI_EXPECT(adrv9001_NvsRegmapRxb_AgcManualGainIndexOrx_Get, device, ADRV9001_BF_RXB1_CORE, gainIndex);
     }
     else /* ADI_CHANNEL_2 */
     {
-        ADI_EXPECT(adrv9001_NvsRegmapRxbAgcManualGainIndexOrxBfGet, device, ADRV9001_BF_RXB2_CORE, gainIndex);
+        ADI_EXPECT(adrv9001_NvsRegmapRxb_AgcManualGainIndexOrx_Get, device, ADRV9001_BF_RXB2_CORE, gainIndex);
     }
 
     ADI_API_RETURN(device);

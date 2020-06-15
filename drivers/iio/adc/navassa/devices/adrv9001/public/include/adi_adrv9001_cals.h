@@ -215,6 +215,27 @@ int32_t adi_adrv9001_cals_ExternalPathDelay_Get(adi_adrv9001_Device_t *adrv9001,
                                                 adi_common_ChannelNumber_e channel,
                                                 uint32_t *externalPathDelay_ps);
 
+    /**
+ * \brief Get the internal path delay calculated for the given port and channel
+ * 
+ * \note Message type: \ref timing_mailbox "Mailbox command"
+ * 
+ * \param[in]  adrv9001                 Context variable - Pointer to the ADRV9001 device settings data structure
+ * \param[in]  port                     The port that the channel refers to
+ * \param[in]  channel                  The channel of the specified port
+ * \param[out] internalPathDelays_ns    An array of internal path delays in nanoseconds calculated for the given port/channel.
+ *                                      internalPathDelays_ns[0] contains the value for the main profile
+ *                                      internalPathDelays_ns[1:5] will return as 0x0 until Dynamic Profile Switching is supported
+ * \param[in]  length                   Length of the array with '6 'is the maximum (1 main profile and 5 dynamic profile)
+ * 
+ * \returns A code indicating success (ADI_COMMON_ACT_NO_ACTION) or the required action to recover
+ */
+int32_t adi_adrv9001_cals_InternalPathDelay_Get(adi_adrv9001_Device_t *adrv9001,
+                                                adi_common_Port_e port,
+                                                adi_common_ChannelNumber_e channel,
+                                                uint32_t internalPathDelays_ns[],
+                                                uint32_t length);
+
 #ifdef __cplusplus
 }
 #endif

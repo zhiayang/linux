@@ -12,40 +12,9 @@
 * see the "LICENSE.txt" file in this zip file.
 */
 
-/*
-*********************************************************************************************************
-*                                             INCLUDE FILES
-*********************************************************************************************************
-*/
-
-/* "adi_adrv9001_user.h" contains the #define that other header file use */
-#include "adi_adrv9001_user.h"
-
-/* Header file corresponding to the C file */
 #include "adi_adrv9001_spi.h"
 
-/* ADI specific header files */
-#include "adi_adrv9001_arm.h"
 #include "adi_adrv9001_error.h"
-#include "adi_adrv9001_version.h"
-#include "adrv9001_arm.h"
-#include "adrv9001_arm_macros.h"
-#include "adrv9001_init.h"
-#include "adrv9001_reg_addr_macros.h"
-#include "adrv9001_bf_nvs_pll_mem_map.h"
-#include "adrv9001_bf_nvs_regmap_core.h"
-#include "adrv9001_hal_sw_only.h"
-
-
-/* Header files related to libraries */
-
-
-/* System header files */
-#ifdef __KERNEL__
-#include <linux/kernel.h>
-#else
-#include <stdio.h>
-#endif
 
 /*********************************************************************************************************/
 int32_t adi_adrv9001_spi_DataPack(adi_adrv9001_Device_t *device,
@@ -85,17 +54,6 @@ int32_t adi_adrv9001_spi_DataPack(adi_adrv9001_Device_t *device,
     }
     else
     {
-        if (device->common.cacheInfo.HW_RMW_Enabled == false)
-        {
-            /* Generate an error if HW_RMW is not enabled yet */
-            ADI_ERROR_REPORT(&device->common,
-                             ADI_COMMON_ERRSRC_ADI_HAL,
-                             ADI_COMMON_ERR_INV_PARAM,
-                             ADI_COMMON_ACT_ERR_CHECK_PARAM,
-                             device->common.cacheInfo.HW_RMW_Enabled,
-                             "Cannot use HW_RMW functionality to write a field in Spi register because HW_RMW_Enabled is not available");
-            ADI_ERROR_RETURN(device->common.error.newAction);
-        }
         if ((*numWrBytes + ADRV9001_HW_RMW_BYTES) >= HAL_SPIWRITEARRAY_BUFFERSIZE)
         {
             ADI_ERROR_REPORT(&device->common,
@@ -135,19 +93,14 @@ int32_t adi_adrv9001_spi_DataPack(adi_adrv9001_Device_t *device,
 int32_t adi_adrv9001_spi_Byte_Write(adi_adrv9001_Device_t *device, uint16_t addr, uint8_t data)
 {
     int32_t halError = 0;
-#if !ADI_ADRV9001_DEVICE_NOT_CONNECTED
     int32_t i = 0;
     uint16_t numTxBytes = 0;
     uint8_t txData[ADRV9001_SPI_BYTES] = { 0 };
-#endif
 
     ADI_NULL_DEVICE_PTR_RETURN(device);
 
     ADI_FUNCTION_ENTRY_VARIABLE_LOG(&device->common, ADI_COMMON_LOG_SPI, "%s(0x%04X, 0x%02X)", addr, data);
 
-#if ADI_ADRV9001_DEVICE_NOT_CONNECTED
-    halError = hal_sw_SpiWrite(device, addr, data);
-#else
     ADI_EXPECT(adi_adrv9001_spi_DataPack, device, &txData[0], &numTxBytes, addr, 0xFF, data, ADRV9001_SPI_WRITE_POLARITY);
 
     for (i = 0; i < ADI_ADRV9001_NUMBER_SPI_RETRY; i++)
@@ -158,7 +111,6 @@ int32_t adi_adrv9001_spi_Byte_Write(adi_adrv9001_Device_t *device, uint16_t addr
             break;
         }
     }
-#endif
     ADI_ERROR_REPORT(&device->common,
                      ADI_COMMON_ERRSRC_DEVICEHAL,
                      (adi_common_ErrSources_e)halError,
@@ -172,10 +124,8 @@ int32_t adi_adrv9001_spi_Bytes_Write(adi_adrv9001_Device_t *device, const uint16
 {
     int32_t halError = 0;
     uint32_t i = 0;
-#if !ADI_ADRV9001_DEVICE_NOT_CONNECTED
     uint16_t numWrBytes = 0;
     uint8_t wrData[HAL_SPIWRITEARRAY_BUFFERSIZE] = { 0 };
-#endif
 
     ADI_NULL_DEVICE_PTR_RETURN(device);
 
@@ -188,16 +138,6 @@ int32_t adi_adrv9001_spi_Bytes_Write(adi_adrv9001_Device_t *device, const uint16
 
     ADI_NULL_PTR_RETURN(&device->common, data);
 
-#if ADI_ADRV9001_DEVICE_NOT_CONNECTED
-    for (i = 0; i < count; i++)
-    {
-        halError = hal_sw_SpiWrite(device, addr[i], data[i]);
-        if (halError != ADI_COMMON_HAL_OK)
-        {
-            break;
-        }
-    }
-#else
     for (i = 0; i < count; i++)
     {
         ADI_EXPECT(adi_adrv9001_spi_DataPack, device, &wrData[0], &numWrBytes, addr[i], 0xFF, data[i], ADRV9001_SPI_WRITE_POLARITY);
@@ -211,7 +151,6 @@ int32_t adi_adrv9001_spi_Bytes_Write(adi_adrv9001_Device_t *device, const uint16
             break;
         }
     }
-#endif
     ADI_ERROR_REPORT(&device->common,
                      ADI_COMMON_ERRSRC_DEVICEHAL,
                      (adi_common_ErrSources_e)halError,
@@ -221,28 +160,6 @@ int32_t adi_adrv9001_spi_Bytes_Write(adi_adrv9001_Device_t *device, const uint16
     ADI_API_RETURN(device);
 }
 
-#if ADI_ADRV9001_DEVICE_NOT_CONNECTED
-int32_t adi_adrv9001_spi_Byte_Read(adi_adrv9001_Device_t *device, uint16_t addr, uint8_t *readData)
-{
-    int32_t halError = 0;
-   
-    ADI_ENTRY_PTR_EXPECT(device, ADI_COMMON_LOG_HAL, readData);
-
-    halError = hal_sw_SpiRead(device, addr, readData);
-    
-    ADI_ERROR_REPORT(&device->common,
-        ADI_COMMON_ERRSRC_DEVICEHAL,
-        (adi_common_ErrSources_e)halError,
-        ADI_COMMON_ACT_ERR_RESET_INTERFACE,
-        NULL,
-        "SPI write error");
-    ADI_ERROR_RETURN(device->common.error.newAction);
-
-    ADI_FUNCTION_ENTRY_VARIABLE_LOG(&device->common, ADI_COMMON_LOG_SPI, "%s(0x%04X, 0x%02X)", addr, *readData);
-
-    ADI_API_RETURN(device);
-}
-#else
 int32_t adi_adrv9001_spi_Byte_Read(adi_adrv9001_Device_t *device, uint16_t addr, uint8_t *readData)
 {
     int32_t halError = 0;
@@ -253,17 +170,6 @@ int32_t adi_adrv9001_spi_Byte_Read(adi_adrv9001_Device_t *device, uint16_t addr,
     uint8_t regData[ADRV9001_SPI_BYTES] = { 0 };
    
     ADI_ENTRY_PTR_EXPECT(device, ADI_COMMON_LOG_HAL, readData);
-
-    if (device->common.cacheInfo.wrByteOnly == true)
-    {
-        ADI_ERROR_REPORT(&device->common,
-                         ADI_COMMON_ERRSRC_ADI_HAL,
-                         ADI_COMMON_ERR_INV_PARAM,
-                         ADI_COMMON_ACT_ERR_CHECK_PARAM,
-                         device->common.cacheInfo.wrOnly,
-                         "Read Operations cannot be called when wrOnly is enabled");
-        ADI_ERROR_RETURN(device->common.error.newAction);
-    }
 
     ADI_EXPECT(adi_adrv9001_spi_DataPack, device, &wrData[0], &numWrBytes, addr, 0xFF, regVal, ~ADRV9001_SPI_WRITE_POLARITY);
 
@@ -289,48 +195,7 @@ int32_t adi_adrv9001_spi_Byte_Read(adi_adrv9001_Device_t *device, uint16_t addr,
 
     ADI_API_RETURN(device);
 }
-#endif
 
-#if ADI_ADRV9001_DEVICE_NOT_CONNECTED
-int32_t adi_adrv9001_spi_Bytes_Read(adi_adrv9001_Device_t *device, 
-                                  const uint16_t addr[], 
-                                  uint8_t readData[], 
-                                  uint32_t count)
-{
-    uint32_t i = 0;
-    int32_t halError = 0;
-    
-    ADI_ENTRY_EXPECT(device, ADI_COMMON_LOG_HAL);
-
-    ADI_NULL_PTR_RETURN(&device->common, addr);
-
-    ADI_NULL_PTR_RETURN(&device->common, readData);
-
-    for (i = 0; i < count; i++)
-    {
-        halError = hal_sw_SpiRead(device, addr[i], &readData[i]);
-        if (halError != ADI_COMMON_HAL_OK)
-        {
-            break;
-        }
-    }
-
-    for (i = 0; i < count; i++)
-    {
-        ADI_FUNCTION_ENTRY_VARIABLE_LOG(&device->common, ADI_COMMON_LOG_SPI, "%s(0x%04X, 0x%02X)", addr[i], readData[i]);
-    }
-
-    ADI_ERROR_REPORT(&device->common,
-        ADI_COMMON_ERRSRC_DEVICEHAL,
-        (adi_common_ErrSources_e)halError,
-        ADI_COMMON_ACT_ERR_RESET_INTERFACE,
-        NULL,
-        "SPI write error");
-    ADI_ERROR_RETURN(device->common.error.newAction);
-
-    ADI_API_RETURN(device);
-}
-#else
 int32_t adi_adrv9001_spi_Bytes_Read(adi_adrv9001_Device_t *device, 
                                   const uint16_t addr[], 
                                   uint8_t readData[], 
@@ -350,17 +215,6 @@ int32_t adi_adrv9001_spi_Bytes_Read(adi_adrv9001_Device_t *device,
     ADI_NULL_PTR_RETURN(&device->common, addr);
 
     ADI_NULL_PTR_RETURN(&device->common, readData);
-
-    if (device->common.cacheInfo.wrByteOnly == true)
-    {
-        ADI_ERROR_REPORT(&device->common,
-                         ADI_COMMON_ERRSRC_ADI_HAL,
-                         ADI_COMMON_ERR_INV_PARAM,
-                         ADI_COMMON_ACT_ERR_CHECK_PARAM,
-                         device->common.cacheInfo.wrOnly,
-                         "Read Operations cannot be called when wrOnly is enabled");
-        ADI_ERROR_RETURN(device->common.error.newAction);
-    }
 
     for (i = 0; i < count; i++)
     {
@@ -396,47 +250,7 @@ int32_t adi_adrv9001_spi_Bytes_Read(adi_adrv9001_Device_t *device,
     }
     return recoveryAction;
 }
-#endif
 
-#if ADI_ADRV9001_DEVICE_NOT_CONNECTED
-int32_t adi_adrv9001_spi_Field_Write(adi_adrv9001_Device_t *device, 
-                                   uint16_t addr, 
-                                   uint8_t  fieldVal, 
-                                   uint8_t mask, 
-                                   uint8_t startBit)
-{
-    int32_t halError = 0;
-    uint8_t registerVal = 0;
-    uint8_t regVal = ((fieldVal << startBit) & mask);
-    uint8_t newRegVal = 0;
-
-    ADI_NULL_DEVICE_PTR_RETURN(device);
-
-    ADI_FUNCTION_ENTRY_VARIABLE_LOG(&device->common, ADI_COMMON_LOG_SPI, "%s(0x%04X, 0x%02X)", addr, regVal);
-        
-    halError = hal_sw_SpiRead(device, addr, &registerVal);
-    ADI_ERROR_REPORT(&device->common,
-                     ADI_COMMON_ERRSRC_DEVICEHAL,
-                     (adi_common_ErrSources_e)halError,
-                     ADI_COMMON_ACT_ERR_RESET_INTERFACE,
-                     NULL,
-                     "SPI read error");
-    ADI_ERROR_RETURN(device->common.error.newAction);
-
-    newRegVal = (registerVal & ~mask) | (regVal & mask);
-
-    halError = hal_sw_SpiWrite(device, addr, newRegVal);
-    ADI_ERROR_REPORT(&device->common,
-                        ADI_COMMON_ERRSRC_DEVICEHAL,
-                        (adi_common_ErrSources_e)halError,
-                        ADI_COMMON_ACT_ERR_RESET_INTERFACE,
-                        NULL,
-                        "SPI write error");
-    ADI_ERROR_RETURN(device->common.error.newAction);
-
-    ADI_API_RETURN(device);
-}
-#else
 int32_t adi_adrv9001_spi_Field_Write(adi_adrv9001_Device_t *device, 
                                    uint16_t addr, 
                                    uint8_t  fieldVal, 
@@ -455,110 +269,47 @@ int32_t adi_adrv9001_spi_Field_Write(adi_adrv9001_Device_t *device,
     ADI_NULL_DEVICE_PTR_RETURN(device);
 
     ADI_FUNCTION_ENTRY_VARIABLE_LOG(&device->common, ADI_COMMON_LOG_SPI, "%s(0x%04X, 0x%02X)", addr, regVal);
-    
-    if (device->common.cacheInfo.HW_RMW_Enabled)
+            
+    ADI_EXPECT(adi_adrv9001_spi_DataPack, device, &wrData[0], &numWrBytes, addr, 0xFF, regVal, ~ADRV9001_SPI_WRITE_POLARITY);
+    for (i = 0; i < ADI_ADRV9001_NUMBER_SPI_RETRY; i++)
     {
-        /* Write with mask(with 12 byte packages) when HW_RMW_Enabled is available */
-        ADI_EXPECT(adi_adrv9001_spi_DataPack, device, &wrData[0], &numWrBytes, addr, mask, regVal, ADRV9001_SPI_WRITE_POLARITY);
-        for (i = 0; i < ADI_ADRV9001_NUMBER_SPI_RETRY; i++)
+        halError = adi_hal_SpiRead(device->common.devHalInfo, &wrData[0], &registerVal[0], numWrBytes);
+        if (halError == ADI_COMMON_HAL_OK)
         {
-            halError = adi_hal_SpiWrite(device->common.devHalInfo, &wrData[0], numWrBytes);
-            if (halError == ADI_COMMON_HAL_OK)
-            {
-                break;
-            }
+            break;
         }
     }
-    else
-    {
-        /* Generate an error if wrOnly is TRUE, since rest of the code will perform manual read/modify/write */
-        if (device->common.cacheInfo.wrByteOnly == true)
-        {
-            ADI_ERROR_REPORT(&device->common,
-                             ADI_COMMON_ERRSRC_ADI_HAL,
-                             ADI_COMMON_ERR_INV_PARAM,
-                             ADI_COMMON_ACT_ERR_CHECK_PARAM,
-                             device->common.cacheInfo.wrOnly,
-                             "Cannot write to spi field when wrOnly is true and HW_RMW is not enabled");
-            ADI_ERROR_RETURN(device->common.error.newAction);
-        }
-        
-        ADI_EXPECT(adi_adrv9001_spi_DataPack, device, &wrData[0], &numWrBytes, addr, 0xFF, regVal, ~ADRV9001_SPI_WRITE_POLARITY);
-        for (i = 0; i < ADI_ADRV9001_NUMBER_SPI_RETRY; i++)
-        {
-            halError = adi_hal_SpiRead(device->common.devHalInfo, &wrData[0], &registerVal[0], numWrBytes);
-            if (halError == ADI_COMMON_HAL_OK)
-            {
-                break;
-            }
-        }
-        ADI_ERROR_REPORT(&device->common,
-                         ADI_COMMON_ERRSRC_DEVICEHAL,
-                         (adi_common_ErrSources_e)halError,
-                         ADI_COMMON_ACT_ERR_RESET_INTERFACE,
-                         NULL,
-                         "SPI read error");
-        ADI_ERROR_RETURN(device->common.error.newAction);
-
-        newRegVal = (registerVal[2] & ~mask) | (regVal & mask);
-        numWrBytes = 0;
-
-        ADI_EXPECT(adi_adrv9001_spi_DataPack, device, &wrData[0], &numWrBytes, addr, 0xFF, newRegVal, ADRV9001_SPI_WRITE_POLARITY);
-
-        for (i = 0; i < ADI_ADRV9001_NUMBER_SPI_RETRY; i++)
-        {
-            halError = adi_hal_SpiWrite(device->common.devHalInfo, &wrData[0], numWrBytes);
-            if (halError == ADI_COMMON_HAL_OK)
-            {
-                break;
-            }
-        }
-        ADI_ERROR_REPORT(&device->common,
-                         ADI_COMMON_ERRSRC_DEVICEHAL,
-                         (adi_common_ErrSources_e)halError,
-                         ADI_COMMON_ACT_ERR_RESET_INTERFACE,
-                         NULL,
-                         "SPI write error");
-        ADI_ERROR_RETURN(device->common.error.newAction);
-    }
-
-    ADI_API_RETURN(device);
-}
-#endif
-
-#if ADI_ADRV9001_DEVICE_NOT_CONNECTED
-int32_t adi_adrv9001_spi_Field_Read(adi_adrv9001_Device_t *device, 
-                                  uint16_t addr, 
-                                  uint8_t *fieldVal, 
-                                  uint8_t mask, 
-                                  uint8_t startBit)
-{
-    /* only use if caching is off */
-    int32_t halError = 0;
-    uint8_t regVal = 0;
-
-    ADI_ENTRY_EXPECT(device, ADI_COMMON_LOG_HAL);
-
-    ADI_NULL_PTR_RETURN(&device->common, fieldVal);
-
-    halError = hal_sw_SpiRead(device, addr, &regVal);
     ADI_ERROR_REPORT(&device->common,
-                     ADI_COMMON_ERRSRC_DEVICEHAL,
-                     (adi_common_ErrSources_e)halError,
-                     ADI_COMMON_ACT_ERR_RESET_INTERFACE,
-                     NULL,
-                     "SPI write error");
+                        ADI_COMMON_ERRSRC_DEVICEHAL,
+                        (adi_common_ErrSources_e)halError,
+                        ADI_COMMON_ACT_ERR_RESET_INTERFACE,
+                        NULL,
+                        "SPI read error");
     ADI_ERROR_RETURN(device->common.error.newAction);
 
-    startBit = startBit & 0x0F;
+    newRegVal = (registerVal[2] & ~mask) | (regVal & mask);
+    numWrBytes = 0;
 
-    *fieldVal = (uint8_t)((regVal & mask) >> startBit);
+    ADI_EXPECT(adi_adrv9001_spi_DataPack, device, &wrData[0], &numWrBytes, addr, 0xFF, newRegVal, ADRV9001_SPI_WRITE_POLARITY);
 
-    ADI_FUNCTION_ENTRY_VARIABLE_LOG(&device->common, ADI_COMMON_LOG_SPI, "%s(0x%04X, 0x%02X)", addr, regVal);
+    for (i = 0; i < ADI_ADRV9001_NUMBER_SPI_RETRY; i++)
+    {
+        halError = adi_hal_SpiWrite(device->common.devHalInfo, &wrData[0], numWrBytes);
+        if (halError == ADI_COMMON_HAL_OK)
+        {
+            break;
+        }
+    }
+    ADI_ERROR_REPORT(&device->common,
+                        ADI_COMMON_ERRSRC_DEVICEHAL,
+                        (adi_common_ErrSources_e)halError,
+                        ADI_COMMON_ACT_ERR_RESET_INTERFACE,
+                        NULL,
+                        "SPI write error");
 
     ADI_API_RETURN(device);
 }
-#else
+
 int32_t adi_adrv9001_spi_Field_Read(adi_adrv9001_Device_t *device, 
                                   uint16_t addr, 
                                   uint8_t *fieldVal, 
@@ -576,17 +327,6 @@ int32_t adi_adrv9001_spi_Field_Read(adi_adrv9001_Device_t *device,
     ADI_ENTRY_EXPECT(device, ADI_COMMON_LOG_HAL);
 
     ADI_NULL_PTR_RETURN(&device->common, fieldVal);
-    
-    if (device->common.cacheInfo.wrByteOnly == true)
-    {
-        ADI_ERROR_REPORT(&device->common,
-                         ADI_COMMON_ERRSRC_ADI_HAL,
-                         ADI_COMMON_ERR_INV_PARAM,
-                         ADI_COMMON_ACT_ERR_CHECK_PARAM,
-                         device->common.cacheInfo.wrOnly,
-                         "Read Operations cannot be called when wrOnly is enabled");
-        ADI_ERROR_RETURN(device->common.error.newAction);
-    }
 
     ADI_EXPECT(adi_adrv9001_spi_DataPack, device, &wrData[0], &numWrBytes, addr, 0xFF, regVal, ~ADRV9001_SPI_WRITE_POLARITY);
 
@@ -615,7 +355,11 @@ int32_t adi_adrv9001_spi_Field_Read(adi_adrv9001_Device_t *device,
 
     ADI_API_RETURN(device);
 }
-#endif
+
+int32_t adi_adrv9001_spi_Mask_Write(adi_adrv9001_Device_t *device, uint16_t addr, uint8_t data, uint8_t mask)
+{
+    ADI_API_RETURN(device);
+}
 
 int32_t adi_adrv9001_spi_Cache_Write(adi_adrv9001_Device_t *device, 
                                    const uint32_t wrCache[], 
@@ -686,17 +430,6 @@ int32_t adi_adrv9001_spi_Cache_Read(adi_adrv9001_Device_t *device,
     ADI_NULL_PTR_RETURN(&device->common, rdCache);
 
     ADI_NULL_PTR_RETURN(&device->common, readData);
-    
-    if (device->common.cacheInfo.wrByteOnly == true)
-    {
-        ADI_ERROR_REPORT(&device->common,
-                         ADI_COMMON_ERRSRC_ADI_HAL,
-                         ADI_COMMON_ERR_INV_PARAM,
-                         ADI_COMMON_ACT_ERR_CHECK_PARAM,
-                         device->common.cacheInfo.wrOnly,
-                         "Read Operations cannot be called when wrOnly is enabled");
-        ADI_ERROR_RETURN(device->common.error.newAction);
-    }
 
     for (i = 0; i < count; i++)
     {

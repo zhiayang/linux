@@ -24,8 +24,8 @@
 #include "adrv9001_init.h"
 #include "adrv9001_reg_addr_macros.h"
 
+#include "adi_fpga9001_ssi_types.h"
 #include "fpga9001_utilities.h"
-#include "fpga9001_bf_axi_adrv9001.h"
 
 int32_t adi_adrv9001Ee01_SelectFpgaBin(adi_adrv9001Ee01_Board_t *adrv9001Ee01, adi_adrv9001_Init_t *adrv9001Init)
 {
@@ -67,59 +67,6 @@ int32_t adi_adrv9001Ee01_SelectFpgaBin(adi_adrv9001Ee01_Board_t *adrv9001Ee01, a
     ADI_API_RETURN(adrv9001Ee01->fpga9001Device);
 }
 
-static int32_t adi_fpga9001_CalculateLcmInterfaceSamplingRate_Hz(adi_fpga9001_Device_t *fpga9001Device,
-                                                                 adi_adrv9001_Init_t *init,
-                                                                 uint32_t *lcmInterfaceSampleRate_Hz)
-{
-    int32_t i = 0;
-    uint32_t rxChannels[] = { ADI_ADRV9001_RX1, ADI_ADRV9001_RX2 };
-    uint32_t txChannels[] = { ADI_ADRV9001_TX1, ADI_ADRV9001_TX2 };
-
-    *lcmInterfaceSampleRate_Hz = 1;
-
-    for (i = 0; i < ADI_ADRV9001_MAX_RX_ONLY; i++)
-    {
-        if (ADRV9001_BF_EQUAL(init->rx.rxInitChannelMask, rxChannels[i]))
-        {
-            if (init->rx.rxChannelCfg[i].profile.rxInterfaceSampleRate_Hz > *lcmInterfaceSampleRate_Hz)
-            {
-                ADI_EXPECT(fpga9001_Utilities_CalculateLcm,
-                           fpga9001Device,
-                           init->rx.rxChannelCfg[i].profile.rxInterfaceSampleRate_Hz,
-                           *lcmInterfaceSampleRate_Hz,
-                           lcmInterfaceSampleRate_Hz);
-            }
-        }
-    }
-
-    for (i = 0; i < ADI_ADRV9001_MAX_TXCHANNELS; i++)
-    {
-        if (ADRV9001_BF_EQUAL(init->tx.txInitChannelMask, txChannels[i]))
-        {
-            if (init->tx.txProfile[i].txInterfaceSampleRate_Hz > *lcmInterfaceSampleRate_Hz)
-            {
-                ADI_EXPECT(fpga9001_Utilities_CalculateLcm,
-                           fpga9001Device,
-                           init->tx.txProfile[i].txInterfaceSampleRate_Hz,
-                           *lcmInterfaceSampleRate_Hz,
-                           lcmInterfaceSampleRate_Hz);
-            }
-        }
-    }
-
-    if (*lcmInterfaceSampleRate_Hz == 1)
-    {
-        ADI_ERROR_REPORT(&fpga9001Device->common,
-            ADI_COMMON_ERRSRC_API,
-            ADI_COMMON_ERR_INV_PARAM,
-            ADI_COMMON_ACT_ERR_CHECK_PARAM,
-            lcmInterfaceSampleRate_Hz,
-            "No channels are enabled.");
-    }
-
-    ADI_API_RETURN(fpga9001Device);
-}
-
 /* The hard-coded values are specific to the FPGA9001/Zc706 platform. */
 static void ssiDelayConfigInitDefault(adi_fpga9001_SsiCalibrationCfg_t *ssiCalibration)
 {
@@ -145,85 +92,355 @@ int32_t adi_fpga9001_Initialize(adi_fpga9001_Device_t *fpga9001Device,
                                 adi_adrv9001_Init_t *init,
                                 adi_fpga9001_Mmcm_ClockOutput_Divisor_e adrv9001DeviceClockDivisor)
 {
-    uint8_t i = 0;
-    uint8_t rxClkRate = 0;
-    adi_fpga9001_Version_t version = { 0 };
-    uint32_t targetInterfaceSampleRate_Hz = 0;
+    uint8_t i, k;
+    bool ssi_ddr[ADI_ADRV9001_NUM_TXRX_CHANNELS] = { 0 };
+    uint32_t version;
+    uint32_t locked;
+    uint32_t ssi_id[ADI_ADRV9001_NUM_TXRX_CHANNELS] = { 0 };
+    uint32_t ssi_clk_freq[ADI_ADRV9001_NUM_TXRX_CHANNELS] = { 0 };
+    uint32_t ssi_clk_ratio[ADI_ADRV9001_NUM_TXRX_CHANNELS] = { 0 };
+    uint32_t ssi_sample_freq[ADI_ADRV9001_NUM_TXRX_CHANNELS] = { 0 } ;
+    uint32_t axi_adrv9001_ssi_mode[ADI_ADRV9001_NUM_TXRX_CHANNELS] = { SSI_MODE_UNDEFINED, SSI_MODE_UNDEFINED, SSI_MODE_UNDEFINED, SSI_MODE_UNDEFINED };
+    struct axi_adrv9001_clk_params clk_params = { 0 };
+    struct axi_adrv9001_ssi_params ssi_params = { 0 };
+    adi_adrv9001_SsiType_e ssi_type[ADI_ADRV9001_NUM_TXRX_CHANNELS];
+    adi_adrv9001_SsiDataFormat_e ssi_num_of_bits[ADI_ADRV9001_NUM_TXRX_CHANNELS];
+    adi_adrv9001_SsiNumLane_e ssi_num_of_lanes[ADI_ADRV9001_NUM_TXRX_CHANNELS];
+    adi_adrv9001_SsiStrobeType_e ssi_strobe_type[ADI_ADRV9001_NUM_TXRX_CHANNELS];
 
-    static const adi_common_ChannelNumber_e channels[] = { ADI_CHANNEL_1, ADI_CHANNEL_2 };
-    uint32_t rxChannels[] = { ADI_ADRV9001_RX1, ADI_ADRV9001_RX2 };
-    uint32_t txChannels[] = { ADI_ADRV9001_TX1, ADI_ADRV9001_TX2 };
+    uint32_t RX_CHANNELS[] = {
+        ADI_ADRV9001_RX1,
+        ADI_ADRV9001_RX2,
+        ADI_ADRV9001_ORX1,
+        ADI_ADRV9001_ORX2,
+        ADI_ADRV9001_ILB1,
+        ADI_ADRV9001_ILB2,
+        ADI_ADRV9001_ELB1,
+        ADI_ADRV9001_ELB2
+    };
 
+    bool ssiDelayConfigured = false;
+
+    /* Check device info is valid */
     ADI_API_ENTRY_EXPECT(fpga9001Device);
 
-    ADI_EXPECT(adi_fpga9001_VersionGet, fpga9001Device, &version);
-
-    adi_adrv9001_SsiType_e ssiType = init->rx.rxChannelCfg[0].profile.rxSsiConfig.ssiType |
-        init->rx.rxChannelCfg[1].profile.rxSsiConfig.ssiType | 
-        init->tx.txProfile[0].txSsiConfig.ssiType |
-        init->tx.txProfile[1].txSsiConfig.ssiType;
     adi_fpga9001_SsiCalibrationCfg_t ssiCalibration = { { 0 } };
     ssiDelayConfigInitDefault(&ssiCalibration);
 
-    /* Checking only major and minor; ignoring patch version check */
-    if (version.major == 0 && version.minor >= 3 )
+    for (i = 0; ((i < ADI_ADRV9001_MAX_RXCHANNELS) && (ssiDelayConfigured == false)); i++)
     {
-        ADI_EXPECT(fpga9001_AxiAdrv9001ResetbBfSet, fpga9001Device, FPGA9001_BF_AXI_ADRV9001_TOP, 0x1);
-
-        ADI_EXPECT(adi_fpga9001_CalculateLcmInterfaceSamplingRate_Hz, fpga9001Device, init, &targetInterfaceSampleRate_Hz);
-
-        /* Configure MMCM registers; THis function will reset the FPGA at the end */
-        /* TODO: For now, sample rate of RX1 is used. Mick to confirm the right value to use */
-        ADI_EXPECT(adi_fpga9001_Mmcm_Configure,
-                   fpga9001Device,
-                   init->clocks.deviceClock_kHz,
-                   targetInterfaceSampleRate_Hz,
-                   adrv9001DeviceClockDivisor);
-
-        ADI_EXPECT(adi_fpga9001_Ssi_Delay_Configure,
-                   fpga9001Device,
-                   (adi_fpga9001_SsiType_e)ssiType,
-                   &ssiCalibration);
-
-        for (i = 0; i < ADI_ADRV9001_MAX_RX_ONLY; i++)
+        if (ADRV9001_BF_EQUAL(init->rx.rxInitChannelMask, RX_CHANNELS[i]))
         {
-            if (ADRV9001_BF_EQUAL(init->rx.rxInitChannelMask, rxChannels[i]))
-            {
-                ADI_EXPECT(adi_fpga9001_ssi_Mode_Set, 
-                           fpga9001Device,
-                           ADI_RX,
-                           channels[i],
-                           (ADI_ADRV9001_SSI_TYPE_CMOS == ssiType) && !init->rx.rxChannelCfg[i].profile.rxSsiConfig.cmosDdrEn,
-                           init->rx.rxChannelCfg[i].profile.rxSsiConfig.numLaneSel != ADI_ADRV9001_SSI_1_LANE,
-                           (adi_fpga9001_SsiFormat_e)init->rx.rxChannelCfg[i].profile.rxSsiConfig.ssiDataFormatSel);
+            ADI_EXPECT(adi_fpga9001_Ssi_Delay_Configure,
+                fpga9001Device,
+                (adi_fpga9001_SsiType_e)(init->rx.rxChannelCfg[i].profile.rxSsiConfig.ssiType),
+                &ssiCalibration);
 
-                /* TODO: Add new parameter to explicitly determine clock divisor.  It's really an ORx over-sampling ratio.*/
-                /* 0: clkRate; 1: clkRate/2, 2: clkRate/4, ... */
-                rxClkRate = 0;
-
-                ADI_EXPECT(adi_fpga9001_DataChain_RxClkRate_Set, fpga9001Device, channels[i], rxClkRate);
-            }
-        }
-
-        for (i = 0; i < ADI_ADRV9001_MAX_TXCHANNELS; i++)
-        {
-            if (ADRV9001_BF_EQUAL(init->tx.txInitChannelMask, txChannels[i]))
-            {
-                ADI_EXPECT(adi_fpga9001_ssi_Mode_Set, 
-                           fpga9001Device,
-                           ADI_TX,
-                           channels[i],
-                           (ADI_ADRV9001_SSI_TYPE_CMOS == ssiType) && !init->tx.txProfile[i].txSsiConfig.cmosDdrEn,
-                           init->tx.txProfile[i].txSsiConfig.numLaneSel != ADI_ADRV9001_SSI_1_LANE,
-                           (adi_fpga9001_SsiFormat_e)init->tx.txProfile[i].txSsiConfig.ssiDataFormatSel);
-            }
+            ssiDelayConfigured = true;
         }
     }
-    else
+
+    /* Set FPGA Tx delay to 0x1A for SSI DDR */
+    if (true == init->tx.txProfile[0].txSsiConfig.cmosDdrEn)
     {
-        ADI_ERROR_REPORT(&fpga9001Device->common, ADI_COMMON_ERRSRC_API, ADI_COMMON_ERR_INV_PARAM, ADI_COMMON_ACT_ERR_CHECK_PARAM, NULL, "Unrecognized FPGA version");
+        adi_hal_BbicRegisterWrite(fpga9001Device->common.devHalInfo, 0x430160A4, 0x1A);
+    }
+
+    /* ideally you want application to report versions, this is meant to be a */
+    /* developer friendly api, and users are free to use any version at their own risk */
+    /* do not block, simply inform -- better to change it to a NOTE. */
+
+    axi_sysid_sys_version_get((void *)fpga9001Device, AXI_SYSID_ID, &version);
+    ADI_ERROR_REPORT(&fpga9001Device->common, ADI_COMMON_ERRSRC_API,
+        0, 0, version, "INFO: Platform FPGA version.");
+    
+    /* deassert reset to the device */
+
+    axi_adrv9001_reset_set((void *)fpga9001Device, AXI_ADRV9001_ID, 0x1);
+
+    /* get the ssi based info for Rx channels from the Rx profiles */
+    for (i = 0; i < ADI_ADRV9001_NUM_RX_CHANNELS; i++) 
+    {
+        if (i == 0) 
+            ssi_id[i] = AXI_ADRV9001_SSI_RX0_ID;
+        else 
+            ssi_id[i] = AXI_ADRV9001_SSI_RX1_ID;
+        ssi_sample_freq[i] = init->rx.rxChannelCfg[i].profile.rxInterfaceSampleRate_Hz;
+        ssi_type[i] = init->rx.rxChannelCfg[i].profile.rxSsiConfig.ssiType;
+        ssi_num_of_bits[i] = init->rx.rxChannelCfg[i].profile.rxSsiConfig.ssiDataFormatSel;
+        ssi_num_of_lanes[i] = init->rx.rxChannelCfg[i].profile.rxSsiConfig.numLaneSel;
+        ssi_strobe_type[i] = init->rx.rxChannelCfg[i].profile.rxSsiConfig.strobeType;
+        ssi_ddr[i] = (init->rx.rxChannelCfg[i].profile.rxSsiConfig.ssiType == ADI_ADRV9001_SSI_TYPE_LVDS) ? true :
+            init->rx.rxChannelCfg[i].profile.rxSsiConfig.cmosDdrEn;
+        if (0 != init->rx.rxChannelCfg[i].profile.rxOutputRate_Hz &&
+            0 != init->rx.rxChannelCfg[i].profile.rxInterfaceSampleRate_Hz)
+        {
+            ssi_clk_ratio[i] = init->rx.rxChannelCfg[i].profile.rxOutputRate_Hz /
+                init->rx.rxChannelCfg[i].profile.rxInterfaceSampleRate_Hz;
+        }
+        else
+        {
+            ssi_clk_ratio[i] = 1;
+        }
+    }
+
+    /* get the ssi based info for Tx channels from the Tx profiles */
+    for (i = 0; i < ADI_ADRV9001_NUM_TX_CHANNELS; i++) {
+        k = i + ADI_ADRV9001_NUM_RX_CHANNELS;
+        if (i == 0) 
+            ssi_id[k] = AXI_ADRV9001_SSI_TX0_ID;
+        else
+            ssi_id[k] = AXI_ADRV9001_SSI_TX1_ID;
+        ssi_sample_freq[k] = init->tx.txProfile[i].txInterfaceSampleRate_Hz;
+        ssi_type[k] = init->tx.txProfile[i].txSsiConfig.ssiType;
+        ssi_num_of_bits[k] = init->tx.txProfile[i].txSsiConfig.ssiDataFormatSel;
+        ssi_num_of_lanes[k] = init->tx.txProfile[i].txSsiConfig.numLaneSel;
+        ssi_strobe_type[k] = init->tx.txProfile[i].txSsiConfig.strobeType;
+        ssi_ddr[k] = (init->tx.txProfile[i].txSsiConfig.ssiType == ADI_ADRV9001_SSI_TYPE_LVDS) ? true :
+            init->tx.txProfile[i].txSsiConfig.cmosDdrEn;
+        ssi_clk_ratio[k] = 1;
+    }
+    
+    /* get the ssi mode for each of the channels */  
+    for (i = 0; i < ADI_ADRV9001_NUM_TXRX_CHANNELS; i++) 
+    {
+        if (ADI_ADRV9001_SSI_TYPE_DISABLE == ssi_type[i])
+        {
+            continue;
+        }
+        
+        axi_adrv9001_ssi_mode[i] = SSI_MODE_UNDEFINED;
+
+        if ((ssi_type[i] == ADI_ADRV9001_SSI_TYPE_CMOS) &&
+            (ssi_num_of_bits[i] == ADI_ADRV9001_SSI_FORMAT_16_BIT_I_Q_DATA) &&
+            (ssi_num_of_lanes[i] == ADI_ADRV9001_SSI_1_LANE) &&
+            (ssi_strobe_type[i] == ADI_ADRV9001_SSI_LONG_STROBE) &&
+            (ssi_clk_ratio[i] == 1)) {
+            axi_adrv9001_ssi_mode[i] = CMOS_1L_LS_32X1;
+            ssi_clk_freq[i] = (ssi_sample_freq[i]*32*1)/(1*1*4);
+        }
+        if ((ssi_type[i] == ADI_ADRV9001_SSI_TYPE_CMOS) &&
+            (ssi_num_of_bits[i] == ADI_ADRV9001_SSI_FORMAT_16_BIT_SYMBOL_DATA) &&
+            (ssi_num_of_lanes[i] == ADI_ADRV9001_SSI_1_LANE) &&
+            (ssi_strobe_type[i] == ADI_ADRV9001_SSI_SHORT_STROBE) &&
+            (ssi_clk_ratio[i] == 1)) {
+            axi_adrv9001_ssi_mode[i] = CMOS_1L_PS_16X1;
+            ssi_clk_freq[i] = (ssi_sample_freq[i]*16*1)/(1*1*4);
+        }
+        if ((ssi_type[i] == ADI_ADRV9001_SSI_TYPE_CMOS) &&
+            (ssi_num_of_bits[i] == ADI_ADRV9001_SSI_FORMAT_8_BIT_SYMBOL_DATA) &&
+            (ssi_num_of_lanes[i] == ADI_ADRV9001_SSI_1_LANE) &&
+            (ssi_strobe_type[i] == ADI_ADRV9001_SSI_SHORT_STROBE) &&
+            (ssi_clk_ratio[i] == 1)) {
+            axi_adrv9001_ssi_mode[i] = CMOS_1L_PS_08X1;
+            ssi_clk_freq[i] = (ssi_sample_freq[i]*8*1)/(1*1*4);
+        }
+        if ((ssi_type[i] == ADI_ADRV9001_SSI_TYPE_CMOS) &&
+            (ssi_num_of_bits[i] == ADI_ADRV9001_SSI_FORMAT_2_BIT_SYMBOL_DATA) &&
+            (ssi_num_of_lanes[i] == ADI_ADRV9001_SSI_1_LANE) &&
+            (ssi_strobe_type[i] == ADI_ADRV9001_SSI_SHORT_STROBE) &&
+            (ssi_clk_ratio[i] == 1)) {
+            axi_adrv9001_ssi_mode[i] = CMOS_1L_PS_02X1;
+            ssi_clk_freq[i] = (ssi_sample_freq[i]*2*1)/(1*1*4);
+        }
+        if ((ssi_type[i] == ADI_ADRV9001_SSI_TYPE_CMOS) &&
+            (ssi_num_of_bits[i] == ADI_ADRV9001_SSI_FORMAT_16_BIT_I_Q_DATA) &&
+            (ssi_num_of_lanes[i] == ADI_ADRV9001_SSI_1_LANE) &&
+            (ssi_strobe_type[i] == ADI_ADRV9001_SSI_SHORT_STROBE) &&
+            (ssi_clk_ratio[i] == 1)) {
+            axi_adrv9001_ssi_mode[i] = CMOS_1L_PS_32X1;
+            ssi_clk_freq[i] = (ssi_sample_freq[i]*32*1)/(1*1*4);
+        }
+        if ((ssi_type[i] == ADI_ADRV9001_SSI_TYPE_CMOS) &&
+            (ssi_num_of_bits[i] == ADI_ADRV9001_SSI_FORMAT_16_BIT_I_Q_DATA) &&
+            (ssi_num_of_lanes[i] == ADI_ADRV9001_SSI_1_LANE) &&
+            (ssi_strobe_type[i] == ADI_ADRV9001_SSI_LONG_STROBE) &&
+            (ssi_clk_ratio[i] == 2)) {
+            axi_adrv9001_ssi_mode[i] = CMOS_1L_LS_32X2;
+            ssi_clk_freq[i] = (ssi_sample_freq[i]*32*2)/(1*1*4);
+        }
+        if ((ssi_type[i] == ADI_ADRV9001_SSI_TYPE_CMOS) &&
+            (ssi_num_of_bits[i] == ADI_ADRV9001_SSI_FORMAT_16_BIT_I_Q_DATA) &&
+            (ssi_num_of_lanes[i] == ADI_ADRV9001_SSI_1_LANE) &&
+            (ssi_strobe_type[i] == ADI_ADRV9001_SSI_LONG_STROBE) &&
+            (ssi_clk_ratio[i] == 4)) {
+            axi_adrv9001_ssi_mode[i] = CMOS_1L_LS_32X4;
+            ssi_clk_freq[i] = (ssi_sample_freq[i]*32*4)/(1*1*4);
+        }
+        if ((ssi_type[i] == ADI_ADRV9001_SSI_TYPE_CMOS) &&
+            (ssi_num_of_bits[i] == ADI_ADRV9001_SSI_FORMAT_16_BIT_I_Q_DATA) &&
+            (ssi_num_of_lanes[i] == ADI_ADRV9001_SSI_1_LANE) &&
+            (ssi_strobe_type[i] == ADI_ADRV9001_SSI_LONG_STROBE) &&
+            (ssi_clk_ratio[i] == 8)) {
+            axi_adrv9001_ssi_mode[i] = CMOS_1L_LS_32X8;
+            ssi_clk_freq[i] = (ssi_sample_freq[i]*32*8)/(1*1*4);
+        }
+        if ((ssi_type[i] == ADI_ADRV9001_SSI_TYPE_CMOS) &&
+            (ssi_num_of_bits[i] == ADI_ADRV9001_SSI_FORMAT_16_BIT_SYMBOL_DATA) &&
+            (ssi_num_of_lanes[i] == ADI_ADRV9001_SSI_1_LANE) &&
+            (ssi_strobe_type[i] == ADI_ADRV9001_SSI_SHORT_STROBE) &&
+            (ssi_clk_ratio[i] == 2)) {
+            axi_adrv9001_ssi_mode[i] = CMOS_1L_PS_16X2;
+            ssi_clk_freq[i] = (ssi_sample_freq[i]*16*2)/(1*1*4);
+        }
+        if ((ssi_type[i] == ADI_ADRV9001_SSI_TYPE_CMOS) &&
+            (ssi_num_of_bits[i] == ADI_ADRV9001_SSI_FORMAT_16_BIT_SYMBOL_DATA) &&
+            (ssi_num_of_lanes[i] == ADI_ADRV9001_SSI_1_LANE) &&
+            (ssi_strobe_type[i] == ADI_ADRV9001_SSI_SHORT_STROBE) &&
+            (ssi_clk_ratio[i] == 4)) {
+            axi_adrv9001_ssi_mode[i] = CMOS_1L_PS_16X4;
+            ssi_clk_freq[i] = (ssi_sample_freq[i]*16*4)/(1*1*4);
+        }
+        if ((ssi_type[i] == ADI_ADRV9001_SSI_TYPE_CMOS) &&
+            (ssi_num_of_bits[i] == ADI_ADRV9001_SSI_FORMAT_16_BIT_SYMBOL_DATA) &&
+            (ssi_num_of_lanes[i] == ADI_ADRV9001_SSI_1_LANE) &&
+            (ssi_strobe_type[i] == ADI_ADRV9001_SSI_SHORT_STROBE) &&
+            (ssi_clk_ratio[i] == 8)) {
+            axi_adrv9001_ssi_mode[i] = CMOS_1L_PS_16X8;
+            ssi_clk_freq[i] = (ssi_sample_freq[i]*16*8)/(1*1*4);
+        }
+        if ((ssi_type[i] == ADI_ADRV9001_SSI_TYPE_CMOS) &&
+            (ssi_num_of_bits[i] == ADI_ADRV9001_SSI_FORMAT_8_BIT_SYMBOL_DATA) &&
+            (ssi_num_of_lanes[i] == ADI_ADRV9001_SSI_1_LANE) &&
+            (ssi_strobe_type[i] == ADI_ADRV9001_SSI_SHORT_STROBE) &&
+            (ssi_clk_ratio[i] == 2)) {
+            axi_adrv9001_ssi_mode[i] = CMOS_1L_PS_08X2;
+            ssi_clk_freq[i] = (ssi_sample_freq[i]*8*2)/(1*1*4);
+        }
+        if ((ssi_type[i] == ADI_ADRV9001_SSI_TYPE_CMOS) &&
+            (ssi_num_of_bits[i] == ADI_ADRV9001_SSI_FORMAT_8_BIT_SYMBOL_DATA) &&
+            (ssi_num_of_lanes[i] == ADI_ADRV9001_SSI_1_LANE) &&
+            (ssi_strobe_type[i] == ADI_ADRV9001_SSI_SHORT_STROBE) &&
+            (ssi_clk_ratio[i] == 4)) {
+            axi_adrv9001_ssi_mode[i] = CMOS_1L_PS_08X4;
+            ssi_clk_freq[i] = (ssi_sample_freq[i]*8*4)/(1*1*4);
+        }
+        if ((ssi_type[i] == ADI_ADRV9001_SSI_TYPE_CMOS) &&
+            (ssi_num_of_bits[i] == ADI_ADRV9001_SSI_FORMAT_8_BIT_SYMBOL_DATA) &&
+            (ssi_num_of_lanes[i] == ADI_ADRV9001_SSI_1_LANE) &&
+            (ssi_strobe_type[i] == ADI_ADRV9001_SSI_SHORT_STROBE) &&
+            (ssi_clk_ratio[i] == 8)) {
+            axi_adrv9001_ssi_mode[i] = CMOS_1L_PS_08X8;
+            ssi_clk_freq[i] = (ssi_sample_freq[i]*8*8)/(1*1*4);
+        }
+        if ((ssi_type[i] == ADI_ADRV9001_SSI_TYPE_CMOS) &&
+            (ssi_num_of_bits[i] == ADI_ADRV9001_SSI_FORMAT_2_BIT_SYMBOL_DATA) &&
+            (ssi_num_of_lanes[i] == ADI_ADRV9001_SSI_1_LANE) &&
+            (ssi_strobe_type[i] == ADI_ADRV9001_SSI_SHORT_STROBE) &&
+            (ssi_clk_ratio[i] == 2)) {
+            axi_adrv9001_ssi_mode[i] = CMOS_1L_PS_02X2;
+            ssi_clk_freq[i] = (ssi_sample_freq[i]*2*2)/(1*1*4);
+        }
+        if ((ssi_type[i] == ADI_ADRV9001_SSI_TYPE_CMOS) &&
+            (ssi_num_of_bits[i] == ADI_ADRV9001_SSI_FORMAT_2_BIT_SYMBOL_DATA) &&
+            (ssi_num_of_lanes[i] == ADI_ADRV9001_SSI_1_LANE) &&
+            (ssi_strobe_type[i] == ADI_ADRV9001_SSI_SHORT_STROBE) &&
+            (ssi_clk_ratio[i] == 4)) {
+            axi_adrv9001_ssi_mode[i] = CMOS_1L_PS_02X4;
+            ssi_clk_freq[i] = (ssi_sample_freq[i]*2*4)/(1*1*4);
+        }
+        if ((ssi_type[i] == ADI_ADRV9001_SSI_TYPE_CMOS) &&
+            (ssi_num_of_bits[i] == ADI_ADRV9001_SSI_FORMAT_2_BIT_SYMBOL_DATA) &&
+            (ssi_num_of_lanes[i] == ADI_ADRV9001_SSI_1_LANE) &&
+            (ssi_strobe_type[i] == ADI_ADRV9001_SSI_SHORT_STROBE) &&
+            (ssi_clk_ratio[i] == 8)) {
+            axi_adrv9001_ssi_mode[i] = CMOS_1L_PS_02X8;
+            ssi_clk_freq[i] = (ssi_sample_freq[i]*2*8)/(1*1*4);
+        }
+        if ((ssi_type[i] == ADI_ADRV9001_SSI_TYPE_CMOS) &&
+            (ssi_num_of_bits[i] == ADI_ADRV9001_SSI_FORMAT_16_BIT_I_Q_DATA) &&
+            (ssi_num_of_lanes[i] == ADI_ADRV9001_SSI_1_LANE) &&
+            (ssi_strobe_type[i] == ADI_ADRV9001_SSI_SHORT_STROBE) &&
+            (ssi_clk_ratio[i] == 2)) {
+            axi_adrv9001_ssi_mode[i] = CMOS_1L_PS_32X2;
+            ssi_clk_freq[i] = (ssi_sample_freq[i]*32*2)/(1*1*4);
+        }
+        if ((ssi_type[i] == ADI_ADRV9001_SSI_TYPE_CMOS) &&
+            (ssi_num_of_bits[i] == ADI_ADRV9001_SSI_FORMAT_16_BIT_I_Q_DATA) &&
+            (ssi_num_of_lanes[i] == ADI_ADRV9001_SSI_1_LANE) &&
+            (ssi_strobe_type[i] == ADI_ADRV9001_SSI_SHORT_STROBE) &&
+            (ssi_clk_ratio[i] == 4)) {
+            axi_adrv9001_ssi_mode[i] = CMOS_1L_PS_32X4;
+            ssi_clk_freq[i] = (ssi_sample_freq[i]*32*4)/(1*1*4);
+        }
+        if ((ssi_type[i] == ADI_ADRV9001_SSI_TYPE_CMOS) &&
+            (ssi_num_of_bits[i] == ADI_ADRV9001_SSI_FORMAT_16_BIT_I_Q_DATA) &&
+            (ssi_num_of_lanes[i] == ADI_ADRV9001_SSI_1_LANE) &&
+            (ssi_strobe_type[i] == ADI_ADRV9001_SSI_SHORT_STROBE) &&
+            (ssi_clk_ratio[i] == 8)) {
+            axi_adrv9001_ssi_mode[i] = CMOS_1L_PS_32X8;
+            ssi_clk_freq[i] = (ssi_sample_freq[i]*32*8)/(1*1*4);
+        }
+        if ((ssi_type[i] == ADI_ADRV9001_SSI_TYPE_CMOS) &&
+            (ssi_num_of_bits[i] == ADI_ADRV9001_SSI_FORMAT_16_BIT_I_Q_DATA) &&
+            (ssi_num_of_lanes[i] == ADI_ADRV9001_SSI_4_LANE) &&
+            (ssi_strobe_type[i] == ADI_ADRV9001_SSI_SHORT_STROBE) &&
+            (ssi_clk_ratio[i] == 1)) {
+            axi_adrv9001_ssi_mode[i] = CMOS_4L_PS_32X1;
+            ssi_clk_freq[i] = (ssi_sample_freq[i]*32*1)/(4*1*4);
+        }
+        if ((ssi_type[i] == ADI_ADRV9001_SSI_TYPE_LVDS) &&
+            (ssi_num_of_bits[i] == ADI_ADRV9001_SSI_FORMAT_16_BIT_I_Q_DATA) &&
+            (ssi_num_of_lanes[i] == ADI_ADRV9001_SSI_2_LANE) &&
+            (ssi_strobe_type[i] == ADI_ADRV9001_SSI_SHORT_STROBE) &&
+            (ssi_clk_ratio[i] == 1)) {
+            axi_adrv9001_ssi_mode[i] = LVDS_2L_PS_32X1;
+            ssi_clk_freq[i] = (ssi_sample_freq[i]*32*1)/(2*1*4);
+        }
+
+        if (axi_adrv9001_ssi_mode[i] == SSI_MODE_UNDEFINED) {
+            ADI_ERROR_REPORT(&fpga9001Device->common,
+                ADI_COMMON_ERRSRC_API,
+                ADI_COMMON_ERR_API_FAIL,
+                ADI_COMMON_ACT_ERR_API_NOT_IMPLEMENTED,
+                0,
+                "Unsupported interface mode");
+            ADI_API_RETURN(fpga9001Device);
+        }
+
+        axi_adrv9001_ssi_init_param((void *)fpga9001Device, AXI_ADRV9001_ID, &ssi_params, axi_adrv9001_ssi_mode[i]);
+        ssi_params.sdr1_ddr0 = (ssi_ddr[i] == true) ? 0 : 1;
+        if (ssi_ddr[i] == true) ssi_clk_freq[i] = ssi_clk_freq[i]/2;
+        if (axi_adrv9001_ssi_config((void *)fpga9001Device, AXI_ADRV9001_ID, ssi_id[i], &ssi_params) != 0) {			
+            ADI_ERROR_REPORT(&fpga9001Device->common,
+                ADI_COMMON_ERRSRC_API,
+                ADI_COMMON_ERR_API_FAIL,
+                ADI_COMMON_ACT_ERR_API_NOT_IMPLEMENTED,
+                0,
+                "function axi_adrv9001_ssi_config has failed");
+            ADI_API_RETURN(fpga9001Device);
+        }
+    }
+
+    clk_params.ref_clk_freq_hz = (1000*init->clocks.deviceClock_kHz) >> adrv9001DeviceClockDivisor;
+    clk_params.dev_clk_freq_hz = (1000*init->clocks.deviceClock_kHz);
+    clk_params.ssi_rx0_clk_freq_hz = ssi_clk_freq[0];
+    clk_params.ssi_rx1_clk_freq_hz = ssi_clk_freq[1];
+    clk_params.ssi_tx0_clk_freq_hz = ssi_clk_freq[2];
+    clk_params.ssi_tx1_clk_freq_hz = ssi_clk_freq[3];
+
+    if (axi_adrv9001_clk_config((void *)fpga9001Device, AXI_ADRV9001_ID, &clk_params, &locked) != 0) {
+        ADI_ERROR_REPORT(&fpga9001Device->common,
+            ADI_COMMON_ERRSRC_API,
+            ADI_COMMON_ERR_API_FAIL,
+            ADI_COMMON_ACT_ERR_API_NOT_IMPLEMENTED,
+            0,
+            "function axi_adrv9001_clk_config has failed");
         ADI_API_RETURN(fpga9001Device);
     }
 
+    if (locked != 1) {
+        ADI_ERROR_REPORT(&fpga9001Device->common,
+            ADI_COMMON_ERRSRC_API,
+            ADI_COMMON_ERR_API_FAIL,
+            ADI_COMMON_ACT_ERR_API_NOT_IMPLEMENTED,
+            0,
+            "platform VCO clock NOT locked");
+        ADI_API_RETURN(fpga9001Device);
+    }
+    
+    axi_adrv9001_trig_out_enable_set((void *)fpga9001Device, AXI_ADRV9001_ID, 0x3);
+
     ADI_API_RETURN(fpga9001Device);
 }
+

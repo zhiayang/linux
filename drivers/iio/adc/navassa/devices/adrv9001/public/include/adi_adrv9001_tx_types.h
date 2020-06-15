@@ -24,11 +24,7 @@ extern "C" {
 #include "adi_adrv9001_gpio_types.h"
 
 
-#ifdef SI_REV_A0
-#define ADRV9001_TX_ATTEN_TABLE_MAX 841
-#else
 #define ADRV9001_TX_ATTEN_TABLE_MAX 960
-#endif
 
 #define ADI_ADRV9001_MAX_TXCHANNELS           2
 #define ADI_ADRV9001_MAX_TX_CHANNEL_START     0
@@ -99,7 +95,6 @@ typedef struct adi_adrv9001_TxAttenuationConfig_t
     bool disableTxOnPllUnlock;                          /*!< If true, the PA will ramp down to the max attenuation if
                                                          *   an RF1 or RF2 PLL unlock occurs
                                                          *   NOTE: Currently read-only */
-    bool dacFullScaleBoostEnable;                       /*!< Enables DAC full scale boost, increasing DAC output power by 3 dB */
     adi_adrv9001_TxAttenStepSize_e txAttenStepSize;	    /*!< Tx Attenuation step size */
     adi_adrv9001_TxAttenuationControlMode_e attenMode;  /*!< The mode to control Tx attenuation */
 } adi_adrv9001_TxAttenuationConfig_t;
@@ -120,19 +115,19 @@ typedef struct adi_adrv9001_TxAttenTableRow
 */
 typedef struct adi_adrv9001_TxPaProtectCfg
 {
-    uint8_t avgDuration;                 /*!< PA Protection Average Power Measurement Duration. */
-    uint8_t peakDuration;                /*!< PA Protection Peak Power Measurement Duration */
-    uint8_t txAttenStep;                 /*!< PA Protection Attenuation gain step. Gain step down is not allowed for Tokelau device. This field is not being used actively. */
-    uint8_t gainStepDownEn;              /*!< PA Protection Gain Step Down Enable. Gain step down is not allowed for Tokelau device. This field is not being used actively.*/
-    uint16_t powerThreshold;             /*!< PA Protection Average Power Threshold. */
-    uint16_t peakThreshold; /*!< PA Protection Peak Power Threshold. Max value for Silicon A: 255  Max Value for Silicon B: 8191 */
-    uint8_t peakCount;                   /*!< Peak Count Causing PA Error. */
-    uint8_t rampStepDuration;            /*!< PA Protection Ramp Step duration. This field is not being used actively. It is set to a hardcoded value by PaPllDfrmEventRampDownEnableSet API */
-    uint8_t rampStepSize;                /*!< PA Protection Ramp Step Size. This field is not being used actively. It is set to a hardcoded value by PaPllDfrmEventRampDownEnableSet API */
-    uint8_t rampMaxAtten;                /*!< PA Protection Ramp Max Attenuation. This field is not being used actively. It is set to a hardcoded value by PaPllDfrmEventRampDownEnableSet API */
-    uint8_t avgPowerEnable;              /*!< This enables average power measurement block. If enabled, PA error is flagged when average power measurement is above average power threshold */
-    uint8_t peakPowerEnable;             /*!< This enables peak power measurement block. If enabled, PA error is flagged when peak power count is above peak count threshold */
-    uint8_t avgPeakRatioEnable; /*!< This enables average to peak power ratio calculation block, both avgPower and peakPower calculations must be enabled before enabling ratio calculation */
+    uint8_t avgDuration;                /*!< PA Protection Average Power Measurement Duration. */
+    uint8_t peakDuration;               /*!< PA Protection Peak Power Measurement Duration */
+    uint8_t txAttenStep;                /*!< PA Protection Attenuation gain step. Gain step down is not allowed for Tokelau device. This field is not being used actively. */
+    bool gainStepDownEn;                /*!< PA Protection Gain Step Down Enable. Gain step down is not allowed for Tokelau device. This field is not being used actively.*/
+    uint16_t powerThreshold;            /*!< PA Protection Average Power Threshold. */
+    uint16_t peakThreshold;             /*!< PA Protection Peak Power Threshold (Valid: 0 to 8191) */
+    uint8_t peakCount;                  /*!< Peak Count Causing PA Error. */
+    uint8_t rampStepDuration;           /*!< PA Protection Ramp Step duration. This field is not being used actively. It is set to a hardcoded value by PaPllDfrmEventRampDownEnableSet API */
+    uint8_t rampStepSize;               /*!< PA Protection Ramp Step Size. This field is not being used actively. It is set to a hardcoded value by PaPllDfrmEventRampDownEnableSet API */
+    uint8_t rampMaxAtten;               /*!< PA Protection Ramp Max Attenuation. This field is not being used actively. It is set to a hardcoded value by PaPllDfrmEventRampDownEnableSet API */
+    bool avgPowerEnable;                /*!< This enables average power measurement block. If enabled, PA error is flagged when average power measurement is above average power threshold */
+    bool peakPowerEnable;               /*!< This enables peak power measurement block. If enabled, PA error is flagged when peak power count is above peak count threshold */
+    bool avgPeakRatioEnable; /*!< This enables average to peak power ratio calculation block, both avgPower and peakPower calculations must be enabled before enabling ratio calculation */
     adi_adrv9001_PaProtectionInputSel_e inputSel; /*!< This selects the source of input signal for Pa protection block */
 } adi_adrv9001_TxPaProtectCfg_t;
 
@@ -161,9 +156,9 @@ typedef struct adi_adrv9001_PaRampCfg
     adi_adrv9001_GpioPin_e     gpioSource;             /*!< Desired GPIO pin to be used as source of trigger if gpioTriggered = True */
     uint8_t  upEndIndex;                               /*!< 8-bit look-up-table index. This index indicates the end of the ramp up waveform. */
     bool     asymmetricRamp;                           /*!< False = symmetric, True = Ramp-down waveform is asymmetric to the Ramp-up waveform */
-    uint8_t  downEndIndex;                             /*!< 8-bit look-up-table index. This index indicates the start of the ramp down waveform.
+    uint8_t  downEndIndex;                             /*!< 8-bit look-up-table index. This index indicates the start of the ramp down waveform. 
                                                           Valid only when asymmetricRamp=1 */
-    adi_adrv9001_AuxDacs_e  auxDacChannelSelect;       /*!< Choose the AuxDacChannel [0, 1, 2, 3] to ouptut the Ramp or SPI signal */
+    adi_adrv9001_AuxDac_e  auxDacChannelSelect;        /*!< Choose the AuxDacChannel [0, 1, 2, 3] to ouptut the Ramp or SPI signal */
     uint16_t paRampLUT[ADRV9001_TX_PA_RAMP_LUT_SIZE];  /*!< PA Ramp look-up-table. 256 depth Array of LUT elements */
 } adi_adrv9001_PaRampCfg_t;
 
@@ -172,10 +167,10 @@ typedef struct adi_adrv9001_PaRampCfg
  */
 typedef struct adi_adrv9001_TxAttenuationPinControlCfg
 {
-    uint16_t stepSize_mdB;                  /*!< Step size of change in txAttenuation when a rising edge occurs on on either incrementPin or decrementPin. Range: 0 mdB to 1550 mdB, LSB =50 mdB */
-    adi_adrv9001_GpioPin_e incrementPin;    /*!< When a rising edge occurs on this GPIO pin, txAttenuation will increment by stepSize_mdB .
+    uint16_t stepSize_mdB;                  /*!< Step size of change in txAttenuation when a rising edge occurs on on either incrementPin or decrementPin. Range: 0 mdB to 1550 mdB, LSB =50 mdB */ 
+    adi_adrv9001_GpioPin_e incrementPin;    /*!< When a rising edge occurs on this GPIO pin, txAttenuation will increment by stepSize_mdB . 
                                                  Once txAttenuation has reached index 839(2094 mdB) subsequent rising edges on incrementPin will not change the txAttenuation */
-    adi_adrv9001_GpioPin_e decrementPin;    /*!< When a rising edge occurs on this GPIO pin, txAttenuation will decrement by stepSize_mdB .
+    adi_adrv9001_GpioPin_e decrementPin;    /*!< When a rising edge occurs on this GPIO pin, txAttenuation will decrement by stepSize_mdB . 
                                                  Once txAttenuation has reached index 0 subsequent rising edges on decrementPin will not change the txAttenuation */
 } adi_adrv9001_TxAttenuationPinControlCfg_t;
 

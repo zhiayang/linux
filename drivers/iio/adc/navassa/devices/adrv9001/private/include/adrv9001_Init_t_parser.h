@@ -8,7 +8,7 @@
  * working in tandem with the common PMAG macros in adi_pmag_macros.h
  */
 
-/**
+/** 
  * Copyright 2019 Analog Devices Inc.
  */
 
@@ -291,6 +291,7 @@ ADI_PROCESS_INT      (tokenArray, tokenIndex, jsonBuffer, parsingBuffer, adi_adr
 ADI_PROCESS_INT      (tokenArray, tokenIndex, jsonBuffer, parsingBuffer, adi_adrv9001_TxProfile_tInstance.frequencyDeviation_Hz,          "frequencyDeviation_Hz"); \
 ADI_PROCESS_STRUCT_ADI_ADRV9001_TXDPPROFILE_T                      (tokenArray, tokenIndex, jsonBuffer, parsingBuffer, adi_adrv9001_TxProfile_tInstance.txDpProfile,                    "txDpProfile"); \
 ADI_PROCESS_STRUCT_ADI_ADRV9001_SSICONFIG_T                        (tokenArray, tokenIndex, jsonBuffer, parsingBuffer, adi_adrv9001_TxProfile_tInstance.txSsiConfig,                    "txSsiConfig"); \
+ADI_PROCESS_STRUCT_ADI_ADRV9001_CHANNELENABLEDELAY_T               (tokenArray, tokenIndex, jsonBuffer, parsingBuffer, adi_adrv9001_TxProfile_tInstance.txEnableDelay,                  "txEnableDelay"); \
 
 #define ADI_PROCESS_STRUCT_ADI_ADRV9001_TXPROFILE_T(tokenArray, tokenIndex, jsonBuffer, parsingBuffer, adi_adrv9001_TxProfile_tInstance, adi_adrv9001_TxProfile_tName) \
 ADI_PROCESS_STRUCT_X(ADI_ADRV9001_TXPROFILE_T(tokenArray, tokenIndex, jsonBuffer, parsingBuffer, adi_adrv9001_TxProfile_tInstance), tokenArray, tokenIndex, jsonBuffer, parsingBuffer, adi_adrv9001_TxProfile_tName);
@@ -569,6 +570,7 @@ ADI_PROCESS_INT      (tokenArray, tokenIndex, jsonBuffer, parsingBuffer, adi_adr
 ADI_PROCESS_INT      (tokenArray, tokenIndex, jsonBuffer, parsingBuffer, adi_adrv9001_RxProfile_tInstance.lpAdcCalMode,                   "lpAdcCalMode"); \
 ADI_PROCESS_STRUCT_ADI_ADRV9001_RXDPPROFILE_T                      (tokenArray, tokenIndex, jsonBuffer, parsingBuffer, adi_adrv9001_RxProfile_tInstance.rxDpProfile,                    "rxDpProfile"); \
 ADI_PROCESS_STRUCT_ADI_ADRV9001_SSICONFIG_T                        (tokenArray, tokenIndex, jsonBuffer, parsingBuffer, adi_adrv9001_RxProfile_tInstance.rxSsiConfig,                    "rxSsiConfig"); \
+ADI_PROCESS_STRUCT_ADI_ADRV9001_CHANNELENABLEDELAY_T               (tokenArray, tokenIndex, jsonBuffer, parsingBuffer, adi_adrv9001_RxProfile_tInstance.rxEnableDelay,                  "rxEnableDelay"); \
 
 #define ADI_PROCESS_STRUCT_ADI_ADRV9001_RXPROFILE_T(tokenArray, tokenIndex, jsonBuffer, parsingBuffer, adi_adrv9001_RxProfile_tInstance, adi_adrv9001_RxProfile_tName) \
 ADI_PROCESS_STRUCT_X(ADI_ADRV9001_RXPROFILE_T(tokenArray, tokenIndex, jsonBuffer, parsingBuffer, adi_adrv9001_RxProfile_tInstance), tokenArray, tokenIndex, jsonBuffer, parsingBuffer, adi_adrv9001_RxProfile_tName);

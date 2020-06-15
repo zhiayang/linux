@@ -19,13 +19,7 @@
 #include "adrv9001_init_types.h"
 #include "adrv9001_reg_addr_macros.h"
 #include "adrv9001_arm_macros.h"
-#include "adrv9001_bf_nvs_pll_mem_map.h"
-#include "adrv9001_bf_nvs_regmap_core.h"
-#include "adrv9001_bf_nvs_regmap_core_1.h"
-
-#ifdef SI_REV_B0
-#include "adrv9001_bf_nvs_regmap_core_3.h"
-#endif
+#include "adrv9001_bf.h"
 
 /*
 Set Master Bias
@@ -114,7 +108,7 @@ static int32_t adrv9001_ClockVerify(adi_adrv9001_Device_t *device, adi_adrv9001_
     static const uint32_t CMOS_CLOCK_MAX_KHZ                        = 80000;
 
     /* Get the power-up reference clock */
-    ADI_EXPECT(adrv9001_NvsRegmapCore1ModeAdcThermBfGet, device, ADRV9001_BF_CORE_1, modeAdc);
+    ADI_EXPECT(adrv9001_NvsRegmapCore1_ModeAdcTherm_Get, device, modeAdc);
 
     if ((*modeAdc != 0) && (*modeAdc != 1) && (*modeAdc != 3) && (*modeAdc != 7) && (*modeAdc != 15))
     {
@@ -159,24 +153,6 @@ static int32_t adrv9001_ClockVerify(adi_adrv9001_Device_t *device, adi_adrv9001_
     ADI_API_RETURN(device);
 }
 
-#ifdef SI_REV_A0
-static uint32_t adrv9001_ClockDiv(uint32_t clock, uint32_t clock_max)
-{
-    uint32_t div = 0;
-    static const uint32_t ADRV9001_POWER2_MAX = 8;
-
-    for (div = 0; div < ADRV9001_POWER2_MAX; div++)
-    {
-        if (clock <= (clock_max << div))
-        {
-            return div;
-        }
-    }
-
-    return div;
-}
-#endif
-
 static int32_t adrv9001_ClocksSet(adi_adrv9001_Device_t *device,
                                   adi_adrv9001_Init_t *init,
                                   adi_adrv9001_DeviceClockDivisor_e adrv9001DeviceClockOutDivisor)
@@ -185,29 +161,6 @@ static int32_t adrv9001_ClocksSet(adi_adrv9001_Device_t *device,
 
     int32_t recoveryAction = ADI_COMMON_ACT_NO_ACTION;
     uint8_t modeAdc = 0;
-#ifdef SI_REV_A0
-    uint32_t digDeviceClockDiv = 0;
-    uint32_t regDeviceClockDiv = 0;
-    uint32_t armDeviceClockDiv = 0;
-    uint32_t agcDeviceClockDiv = 0;
-    uint32_t txAttenDeviceClockDiv = 0;
-    uint32_t refClockDiv = 0;
-    uint8_t deviceClkControl3 = 0;
-    uint8_t refClkByte0 = 0;
-    uint8_t clkPllLp = 0;
-    adrv9001_BfNvsPllMemMapChanAddr_e baseAddr = ADRV9001_BF_CLK_PLL_LP;
-
-    static const uint32_t DIG_CLOCK_MAX_KHZ = 250000;
-    static const uint32_t DIG_DEVICE_CLOCK_DIV_MAX = 3;
-    static const uint32_t REF_CLOCK_DIV_MAX = 3;
-    static const uint32_t REG_DEVICE_CLOCK_DIV_MAX = 5;
-
-    static const uint8_t DEVICE_CLK_DIVIDE_RATIO_MASK  = 0x07;
-    static const uint8_t DEVICE_CLK_DIVIDE_RATIO_SHIFT = 0;
-    static const uint8_t REF_CLK_DIVIDE_RATIO_MASK     = 0x03;
-    static const uint8_t REF_CLK_DIVIDE_RATIO_SHIFT    = 0;
-    static const uint32_t REF_CLOCK_MAX_KHZ = 80000;
-#endif
     static const uint32_t DEV_CLOCK_MIN_KHZ = 10000;
     static const uint32_t DEV_CLOCK_MAX_KHZ = 1000000;
 
@@ -215,19 +168,6 @@ static int32_t adrv9001_ClocksSet(adi_adrv9001_Device_t *device,
     clocks = &init->clocks;
 
     ADI_RANGE_CHECK(device, clocks->deviceClock_kHz, DEV_CLOCK_MIN_KHZ, DEV_CLOCK_MAX_KHZ);
-
-#ifdef SI_REV_A0
-    if ((clocks->deviceClock_kHz >> adrv9001DeviceClockOutDivisor) > REF_CLOCK_MAX_KHZ)
-    {
-        ADI_ERROR_REPORT(&device->common,
-                         ADI_COMMON_ERRSRC_API,
-                         ADI_COMMON_ERR_INV_PARAM,
-                         ADI_COMMON_ACT_ERR_CHECK_PARAM,
-                         adrv9001DeviceClockOutDivisor,
-                         "Invalid ADRV9001 Device clock output divisor; (deviceClock_kHz / 2^DeviceClockOutDivisor) must be less than 80MHz");
-        ADI_ERROR_RETURN(device->common.error.newAction);
-    }
-#endif
 
 #if ADI_ADRV9001_PRE_MCS_BROADCAST_DISABLE > 0
     recoveryAction = adrv9001_ClockVerify(device, init, &modeAdc);
@@ -241,94 +181,18 @@ static int32_t adrv9001_ClocksSet(adi_adrv9001_Device_t *device,
     {
         /* Core1.analog_ref_clk_reg_1[D2:D0]
            0 => bypass 1 => div 2 2 => div 4 3 => div 8 4 => div 16 5 => div 32 6 => div 64 */
-        ADI_EXPECT(adrv9001_NvsRegmapCore1DigDevclkDivideRatioDiffRcvBfSet,
+        ADI_EXPECT(adrv9001_NvsRegmapCore1_DigDevclkDivideRatioDiffRcv_Set,
                    device,
-                   ADRV9001_BF_CORE_1,
                    (uint8_t)adrv9001DeviceClockOutDivisor);
     }
     else
     {
         /* Core1.analog_ref_clk_reg_1[D6:D4]
            0 => bypass 1 => div 2 2 => div 4 3 => div 8 4 => div 16 5 => div 32 6 => div 64 */
-        ADI_EXPECT(adrv9001_NvsRegmapCore1DigDevclkDivideRatioOscRcvBfSet,
+        ADI_EXPECT(adrv9001_NvsRegmapCore1_DigDevclkDivideRatioOscRcv_Set,
                    device,
-                   ADRV9001_BF_CORE_1,
                    (uint8_t)adrv9001DeviceClockOutDivisor);
     }
-#ifdef SI_REV_A0
-    /* Set Digital device clock divider */
-    digDeviceClockDiv = adrv9001_ClockDiv(clocks->deviceClock_kHz, DEV_CLOCK_MAX_KHZ);
-    if (digDeviceClockDiv > DIG_DEVICE_CLOCK_DIV_MAX)
-    {
-        ADI_ERROR_REPORT(&device->common,
-                         ADI_COMMON_ERRSRC_API,
-                         ADI_COMMON_ERR_INV_PARAM,
-                         ADI_COMMON_ACT_ERR_CHECK_PARAM,
-                         device,
-                         "Invalid clocks deviceClock_kHz");
-        ADI_ERROR_RETURN(device->common.error.newAction);
-    }
-
-    /* Set Digital Reg device clock divider  */
-    regDeviceClockDiv = adrv9001_ClockDiv(device->devStateInfo.hsDigClk_kHz, DIG_CLOCK_MAX_KHZ);
-    if (regDeviceClockDiv > REG_DEVICE_CLOCK_DIV_MAX)
-    {
-        ADI_ERROR_REPORT(&device->common,
-                         ADI_COMMON_ERRSRC_API,
-                         ADI_COMMON_ERR_INV_PARAM,
-                         ADI_COMMON_ACT_ERR_CHECK_PARAM,
-                         device,
-                         "Invalid clocks hsDigClk_kHz");
-        ADI_ERROR_RETURN(device->common.error.newAction);
-    }
-
-    armDeviceClockDiv = regDeviceClockDiv;
-    agcDeviceClockDiv = regDeviceClockDiv;
-    txAttenDeviceClockDiv = regDeviceClockDiv;
-
-    /* Set Ref clock divider  */
-    refClockDiv = adrv9001_ClockDiv((clocks->deviceClock_kHz >> digDeviceClockDiv), DEV_CLOCK_MAX_KHZ);
-    if (refClockDiv > REF_CLOCK_DIV_MAX)
-    {
-        ADI_ERROR_REPORT(&device->common,
-                         ADI_COMMON_ERRSRC_API,
-                         ADI_COMMON_ERR_INV_PARAM,
-                         ADI_COMMON_ACT_ERR_CHECK_PARAM,
-                         device,
-                         "Invalid clocks deviceClock_kHz");
-        ADI_ERROR_RETURN(device->common.error.newAction);
-    }
-
-    /* Set Device clock divider ratio */
-    deviceClkControl3 = 0;
-    deviceClkControl3 |= ADRV9001_BF_ENCODE(digDeviceClockDiv, DEVICE_CLK_DIVIDE_RATIO_MASK, DEVICE_CLK_DIVIDE_RATIO_SHIFT);
-    ADRV9001_SPIWRITEBYTE(device, "DEVICE_CLK_CONTROL_3", ADRV9001_ADDR_DEVICE_CLK_CONTROL_3, deviceClkControl3);
-
-    if (init->clocks.clkPllMode == ADI_ADRV9001_CLK_PLL_LP_MODE)
-    {
-        baseAddr = ADRV9001_BF_CLK_PLL_LP;
-        clkPllLp = 1;
-    }
-    else
-    {
-        baseAddr = ADRV9001_BF_CLK_PLL;
-        clkPllLp = 0;
-    }
-
-    /* clkpll.ref_clk_divide_ratio  */
-    refClkByte0 = ADRV9001_BF_ENCODE(refClockDiv, REF_CLK_DIVIDE_RATIO_MASK, REF_CLK_DIVIDE_RATIO_SHIFT);
-    ADRV9001_SPIWRITEBYTE(device, "CLK_PLL_REF_CLK_BYTE0",
-        baseAddr + ADRV9001_ADDR_CLK_PLL_REF_CLK_BYTE0_OFFSET, refClkByte0);
-
-    ADRV9001_SPIWRITEBYTE(device, "CLOCK_CONTROL_2", ADRV9001_ADDR_CLOCK_CONTROL_2, clkPllLp);
-
-    device->devStateInfo.clkDivideRatios.devClkDivideRatio = digDeviceClockDiv;
-    device->devStateInfo.clkDivideRatios.refClkDivideRatio = refClockDiv;
-    device->devStateInfo.clkDivideRatios.agcClkDivideRatio = agcDeviceClockDiv;
-    device->devStateInfo.clkDivideRatios.armClkDivideRatio = armDeviceClockDiv;
-    device->devStateInfo.clkDivideRatios.regClkDivideRatio = regDeviceClockDiv;
-    device->devStateInfo.clkDivideRatios.txAttenDeviceClockDivideRatio = txAttenDeviceClockDiv;
-#endif
 
     device->devStateInfo.clkPllMode = init->clocks.clkPllMode;
 
@@ -337,215 +201,6 @@ static int32_t adrv9001_ClocksSet(adi_adrv9001_Device_t *device,
 
     ADI_API_RETURN(device);
 }
-
-#ifdef SI_REV_A0
-static int32_t adrv9001_LdoEnable(adi_adrv9001_Device_t *device, adi_adrv9001_Init_t *init)
-{
-    int32_t halError = (int32_t)ADI_COMMON_HAL_OK;
-
-    adrv9001_BfNvsPllMemMapChanAddr_e baseAddr = ADRV9001_BF_CLK_PLL_LP;
-
-    static const uint8_t DEV_CLK_LDO_BYTE1_RESET     = 0x05;
-    static const uint8_t DEV_CLK_LDO_PD              = 0x08;
-    static const uint8_t CLK_SYNTH_LDO_BYTE2_RESET   = 0x23;
-    static const uint8_t CLK_PLL_VCO_LDO_PD          = 0x20;
-    static const uint8_t CLK_PLL_VCO_LDO_BYTE1_RESET = 0x05;
-    static const uint8_t CLK_SYNTH_LDO_BYTE1_RESET   = 0x05;
-    static const uint8_t CLK_PLL_VCO_LDO_BYTE2_RESET = 0x03;
-    static const uint8_t CLK_SYNTH_LDO_PD            = 0x08;
-    static const uint8_t VCO_CORE_BUF_PD_SET         = 0x00;
-    static const uint8_t VCO_CORE_SW_DISABLE_SET     = 0x00;
-    static const uint8_t SYNTH_VCO_PD_SET            = 0x00;
-    static const uint8_t LO_SYNC_DET_VCO_PD_SET      = 0xF1;
-
-    static const uint32_t WAIT_200_US                = 200;
-
-    /* - SPI : core_bf.dev_clk_ldo_pd    = 1'b0(Default) */
-    ADRV9001_SPIWRITEBYTE(device, "DEV_CLK_LDO_BYTE1",
-        ADRV9001_ADDR_DEV_CLK_LDO_BYTE1,
-        (DEV_CLK_LDO_BYTE1_RESET & ~DEV_CLK_LDO_PD));
-
-    if (init->clocks.clkPllMode == ADI_ADRV9001_CLK_PLL_LP_MODE)
-    {
-        baseAddr = ADRV9001_BF_CLK_PLL_LP;
-
-        /* Power down CLK PLL in case of LP CLK PLL*/
-        /* -SPI : core_bf.clk_pll_vco_ldo_pd */
-        ADRV9001_SPIWRITEBYTE(device,
-            "CLK_SYNTH_LDO_BYTE2",
-            ADRV9001_ADDR_CLK_SYNTH_LDO_BYTE2,
-            CLK_SYNTH_LDO_BYTE2_RESET);
-
-        /* CLK_SYNTH_LP_LDO_BYTE1(0x01B2) = 0x0D */
-        /* - VCO LDO output voltage = 1.075V */
-        /* - SPI: core_bf.lp_clk_pll_vco_ldo_pd = 1   (PLL)*/
-        ADRV9001_SPIWRITEBYTE(device,
-            "CLK_SYNTH_LDO_BYTE1",
-            ADRV9001_ADDR_CLK_SYNTH_LP_LDO_BYTE1,
-            (CLK_SYNTH_LDO_BYTE1_RESET | CLK_SYNTH_LDO_PD));
-
-        /* -SPI : core_bf.lp_clk_pll_vco_ldo_pd */
-        /* clk_synth_lp_ldo_vout_trim = 0x3 */
-        ADRV9001_SPIWRITEBYTE(device,
-            "CLK_SYNTH_LDO_BYTE2",
-            ADRV9001_ADDR_CLK_SYNTH_LP_LDO_BYTE2,
-            CLK_SYNTH_LDO_BYTE2_RESET);
-
-        /* - PLL LDO Power Up. */
-        /* - SPI: core_bf.lp_clk_synth_ldo_pd = 0   (PLL)*/
-        ADRV9001_SPIWRITEBYTE(device,
-            "CLK_SYNTH_LDO_BYTE1",
-            ADRV9001_ADDR_CLK_SYNTH_LP_LDO_BYTE1,
-            (CLK_SYNTH_LDO_BYTE1_RESET & ~CLK_SYNTH_LDO_PD));
-
-        /* Wait for 200us */
-        halError = adi_common_hal_Wait_us(&device->common, WAIT_200_US);
-        ADI_ERROR_REPORT(&device->common,
-            ADI_ADRV9001_SRC_INIT,
-            halError,
-            ADI_COMMON_ACT_ERR_CHECK_TIMER,
-            device,
-            "Timer not working in adrv9001_PllWaitForTemp()");
-        ADI_ERROR_RETURN(device->common.error.newAction);
-
-        /* Reset VCO LDO byte1 LSB */
-        ADRV9001_SPIWRITEBYTE(device,
-            "CLK_PLL_VCO_LDO_BYTE1_RESET",
-            baseAddr + ADRV9001_ADDR_CLK_PLL_VCO_LDO_BYTE1_OFFSET,
-            CLK_PLL_VCO_LDO_BYTE1_RESET);
-
-        /* Reset VCO LDO byte2 LSB */
-        ADRV9001_SPIWRITEBYTE(device,
-            "CLK_PLL_VCO_LDO_BYTE2_RESET",
-            baseAddr + ADRV9001_ADDR_CLK_PLL_VCO_LDO_BYTE2_OFFSET,
-            CLK_PLL_VCO_LDO_BYTE2_RESET);
-
-        /* -SPI : core_bf.clk_pll_vco_ldo_pd */
-        ADRV9001_SPIWRITEBYTE(device,
-            "CLK_SYNTH_LDO_BYTE2",
-            ADRV9001_ADDR_CLK_SYNTH_LP_LDO_BYTE2,
-            (CLK_SYNTH_LDO_BYTE2_RESET & ~CLK_PLL_VCO_LDO_PD));
-
-        /* Wait for 200us */
-        halError = adi_common_hal_Wait_us(&device->common, WAIT_200_US);
-        ADI_ERROR_REPORT(&device->common,
-            ADI_ADRV9001_SRC_INIT,
-            halError,
-            ADI_COMMON_ACT_ERR_CHECK_TIMER,
-            device,
-            "Timer not working in adrv9001_PllWaitForTemp()");
-        ADI_ERROR_RETURN(device->common.error.newAction);
-    }
-    else
-    {
-        baseAddr = ADRV9001_BF_CLK_PLL;
-
-        /* Power down LP CLK PLL in case of CLK PLL*/
-        /* -SPI : core_bf.lp_clk_pll_vco_ldo_pd */
-        ADRV9001_SPIWRITEBYTE(device,
-            "CLK_SYNTH_LDO_BYTE2",
-            ADRV9001_ADDR_CLK_SYNTH_LP_LDO_BYTE2,
-            CLK_SYNTH_LDO_BYTE2_RESET);
-
-        /* CLK_SYNTH_LDO_BYTE1(0x01AA) = 0x0D */
-        /* - VCO LDO output voltage = 1.075V */
-        /* - SPI: core_bf.clk_pll_vco_ldo_pd = 1   (PLL)*/
-        ADRV9001_SPIWRITEBYTE(device,
-            "CLK_SYNTH_LDO_BYTE1",
-            ADRV9001_ADDR_CLK_SYNTH_LDO_BYTE1,
-            (CLK_SYNTH_LDO_BYTE1_RESET | CLK_SYNTH_LDO_PD));
-
-        /* -SPI : core_bf.clk_pll_vco_ldo_pd */
-        /* clk_synth_ldo_vout_trim = 0x3 */
-        ADRV9001_SPIWRITEBYTE(device,
-            "CLK_SYNTH_LDO_BYTE2",
-            ADRV9001_ADDR_CLK_SYNTH_LDO_BYTE2,
-            CLK_SYNTH_LDO_BYTE2_RESET);
-
-        /* - PLL LDO Power Up. */
-        /* - SPI: core_bf.clk_synth_ldo_pd = 0   (PLL)*/
-        ADRV9001_SPIWRITEBYTE(device,
-            "CLK_SYNTH_LDO_BYTE1",
-            ADRV9001_ADDR_CLK_SYNTH_LDO_BYTE1,
-            (CLK_SYNTH_LDO_BYTE1_RESET & ~CLK_SYNTH_LDO_PD));
-
-        /* Wait for 200us */
-        halError = adi_common_hal_Wait_us(&device->common, WAIT_200_US);
-        ADI_ERROR_REPORT(&device->common,
-            ADI_ADRV9001_SRC_INIT,
-            halError,
-            ADI_COMMON_ACT_ERR_CHECK_TIMER,
-            device,
-            "Timer not working in adrv9001_PllWaitForTemp()");
-        ADI_ERROR_RETURN(device->common.error.newAction);
-
-        /* Reset VCO LDO byte1 LSB */
-        ADRV9001_SPIWRITEBYTE(device,
-            "CLK_PLL_VCO_LDO_BYTE1_RESET",
-            baseAddr + ADRV9001_ADDR_CLK_PLL_VCO_LDO_BYTE1_OFFSET,
-            CLK_PLL_VCO_LDO_BYTE1_RESET);
-
-        /* Reset VCO LDO byte2 LSB */
-        ADRV9001_SPIWRITEBYTE(device,
-            "CLK_PLL_VCO_LDO_BYTE2_RESET",
-            baseAddr + ADRV9001_ADDR_CLK_PLL_VCO_LDO_BYTE2_OFFSET,
-            CLK_PLL_VCO_LDO_BYTE2_RESET);
-
-        /* -SPI : core_bf.clk_pll_vco_ldo_pd */
-        ADRV9001_SPIWRITEBYTE(device,
-            "CLK_SYNTH_LDO_BYTE2",
-            ADRV9001_ADDR_CLK_SYNTH_LDO_BYTE2,
-            (CLK_SYNTH_LDO_BYTE2_RESET & ~CLK_PLL_VCO_LDO_PD));
-
-        /* Wait for 200us */
-        halError = adi_common_hal_Wait_us(&device->common, WAIT_200_US);
-        ADI_ERROR_REPORT(&device->common,
-            ADI_ADRV9001_SRC_INIT,
-            halError,
-            ADI_COMMON_ACT_ERR_CHECK_TIMER,
-            device,
-            "Timer not working in adrv9001_PllWaitForTemp()");
-        ADI_ERROR_RETURN(device->common.error.newAction);
-    }
-
-    /* Vco pd & vco_buf_pd */
-    /* - SPI : clk_pll_lp_bf.vco_pd =  4'd0 */
-    /* - SPI : clk_pll_lp_bf.vco_buf_pd = 0 */
-    ADRV9001_SPIWRITEBYTE(device, "CLK_PLL_VCO_CORE_BUF_PD",
-        baseAddr + ADRV9001_ADDR_CLK_PLL_VCO_CORE_BUF_PD_OFFSET,
-        VCO_CORE_BUF_PD_SET);
-
-    /* Core Sw Disable */
-    /* Prescaler_pd */
-    /* - SPI: clk_pll_bf.vco_core_sw_disable = 4'd0 */
-    /* - SPI: clk_pll_bf.prescaler_pd = 1'b0 */
-    ADRV9001_SPIWRITEBYTE(device, "CLK_PLL_VCO_CORE_SW_DISABLE",
-        baseAddr + ADRV9001_ADDR_CLK_PLL_VCO_CORE_SW_DISABLE_OFFSET,
-        VCO_CORE_SW_DISABLE_SET);
-
-    /* - SPI: clk_pll_bf.vco_ldo_pd = 1'b0 */
-    /* - SPI: clk_pll_bf.vco_peak_det_pd = 1'b0 */
-    /* - SPI: clk_pll_bf.vco_ptat_pd = 1'b0 */
-    /* - SPI: clk_pll_bf.vco_alc_pd = 1'b0 */
-    /* - SPI: clk_pll_bf.ref_clk_divider_pd = 1'b0 */
-    /* - SPI: clk_pll_bf.cp_leveldet_pd = 1'b0 */
-    /* - SPI: clk_pll_bf.synth_pd = 1'b0 */
-    ADRV9001_SPIWRITEBYTE(device, "CLK_PLL_SYNTH_VCO_PD",
-        baseAddr + ADRV9001_ADDR_CLK_PLL_SYNTH_VCO_PD_OFFSET,
-        SYNTH_VCO_PD_SET);
-
-    /* - SPI: clk_pll_bf.vco_tc_pd = 1'b0
-    - SPI: clk_pll_bf.vco_cal_tcf_pd = 1'b0
-    - SPI: clk_pll_bf.vco_bias_pd = 1'b0
-    - SPI: clk_pll_bf.vco_comp_pd = 1'b0
-    */
-    ADRV9001_SPIWRITEBYTE(device, "CLK_PLL_LO_SYNC_DET_VCO_PD",
-        baseAddr + ADRV9001_ADDR_CLK_PLL_LO_SYNC_DET_VCO_PD_OFFSET,
-        LO_SYNC_DET_VCO_PD_SET);
-
-    ADI_API_RETURN(device);
-}
-#endif // SI_REV_A0
 
 int32_t adrv9001_AnalogClockSet(adi_adrv9001_Device_t *device, adi_adrv9001_Init_t *init)
 {
@@ -715,25 +370,24 @@ int32_t adrv9001_AnalogClockSet(adi_adrv9001_Device_t *device, adi_adrv9001_Init
     ADI_API_RETURN(device);
 }
 
+static int32_t adrv9001_InitAnalog_Validate(adi_adrv9001_Device_t *device,
+                                            adi_adrv9001_Init_t *init,
+                                            adi_adrv9001_DeviceClockDivisor_e adrv9001DeviceClockOutDivisor)
+{
+    ADI_RANGE_CHECK(device, adrv9001DeviceClockOutDivisor, ADI_ADRV9001_DEVICECLOCKDIVISOR_BYPASS, ADI_ADRV9001_DEVICECLOCKDIVISOR_DISABLED);
+    ADI_API_RETURN(device);
+}
+
 int32_t adrv9001_InitAnalog(adi_adrv9001_Device_t *device,
                             adi_adrv9001_Init_t *init,
                             adi_adrv9001_DeviceClockDivisor_e adrv9001DeviceClockOutDivisor)
 {
-#ifdef __KERNEL__
     uint8_t i = 0;
     static const uint8_t refClockDivisor[7] = { 0, 1, 2, 3, 4, 5, 6};
     static const uint32_t REF_CLOCK_MAX_KHZ = 200000;
     adi_adrv9001_DeviceClockDivisor_e adrv9001ReferenceClockOutDivisor = ADI_ADRV9001_DEVICECLOCKDIVISOR_DISABLED;
-#endif
 
-    ADI_API_ENTRY_PTR_EXPECT(device, init);
-
-    /* Device clock divisor value should be between 0 and 6 */
-#ifdef SI_REV_A0
-    ADI_RANGE_CHECK(device, adrv9001DeviceClockOutDivisor, ADI_ADRV9001_DEVICECLOCKDIVISOR_BYPASS, ADI_ADRV9001_DEVICECLOCKDIVISOR_64);
-#else
-    ADI_RANGE_CHECK(device, adrv9001DeviceClockOutDivisor, ADI_ADRV9001_DEVICECLOCKDIVISOR_BYPASS, ADI_ADRV9001_DEVICECLOCKDIVISOR_DISABLED);
-#endif // SI_REV_A0
+    ADI_PERFORM_VALIDATION(adrv9001_InitAnalog_Validate, device, init, adrv9001DeviceClockOutDivisor);
 
     ADI_EXPECT(adrv9001_MasterBiasSet, device, init);
 
@@ -741,15 +395,6 @@ int32_t adrv9001_InitAnalog(adi_adrv9001_Device_t *device,
 
     ADI_EXPECT(adrv9001_ProfilesVerify, device, init);
 
-#ifdef SI_REV_A0
-    ADI_EXPECT(adrv9001_ClocksSet, device, init, adrv9001DeviceClockOutDivisor);
-#else
-#ifndef __KERNEL__
-    uint8_t i = 0;
-    static const uint8_t refClockDivisor[7] = { 0, 1, 2, 3, 4, 5, 6};
-    static const uint32_t REF_CLOCK_MAX_KHZ = 200000;
-    adi_adrv9001_DeviceClockDivisor_e adrv9001ReferenceClockOutDivisor = ADI_ADRV9001_DEVICECLOCKDIVISOR_DISABLED;
-#endif
     /* Maximize internal reference clock such that it does not exceed 200MHz */
     for (i = 0; i < ADI_ARRAY_LEN(refClockDivisor); i++)
     {
@@ -778,24 +423,16 @@ int32_t adrv9001_InitAnalog(adi_adrv9001_Device_t *device,
     {
         adrv9001DeviceClockOutDivisor = ADI_ADRV9001_DEVICECLOCKDIVISOR_BYPASS;
         ADI_EXPECT(adrv9001_ClocksSet, device, init, adrv9001DeviceClockOutDivisor);
-        ADI_EXPECT(adrv9001_NvsRegmapCore1RefclkPadOeBfSet, device, ADRV9001_BF_CORE_1, 0);
+        ADI_EXPECT(adrv9001_NvsRegmapCore1_RefclkPadOe_Set, device, 0);
     }
     else
     {
         ADI_EXPECT(adrv9001_ClocksSet, device, init, adrv9001DeviceClockOutDivisor);
     }
 
-    ADI_EXPECT(adrv9001_NvsRegmapCore3RefClkIntDevclkDivideRatioBfSet, device, ADRV9001_BF_CORE_3, (uint8_t)adrv9001ReferenceClockOutDivisor);
-
-#endif // SI_REV_A0
+    ADI_EXPECT(adrv9001_NvsRegmapCore3_RefClkIntDevclkDivideRatio_Set, device, (uint8_t)adrv9001ReferenceClockOutDivisor);
 
     ADI_EXPECT(adrv9001_PadConfigsSet, device, init);
-
-#ifdef SI_REV_A0
-    ADI_EXPECT(adrv9001_LdoEnable, device, init);
-
-    ADI_EXPECT(adrv9001_ProgramClkPll, device, init);
-#endif
 
     ADI_API_RETURN(device);
 }
@@ -1072,13 +709,14 @@ int32_t adrv9001_ProfilesVerify(adi_adrv9001_Device_t *device, adi_adrv9001_Init
     }
 
     // Validate Tx channels
+    device->devStateInfo.profilesValid |= ADI_ADRV9001_TX_PROFILE_VALID;
     for (i = 0; i < ADI_ADRV9001_MAX_TXCHANNELS; i++)
     {
         if (ADRV9001_BF_EQUAL(init->tx.txInitChannelMask, TX_CHANNELS[i]))
         {
             txProfile = &init->tx.txProfile[i];
             ADI_EXPECT(adrv9001_VerifyTxProfile, device, txProfile);
-	    device->devStateInfo.profilesValid |= ADI_ADRV9001_TX_PROFILE_VALID;
+
             // ILB for this Tx channel must be configured for Tx to be valid
             if (ADRV9001_BF_EQUAL(ilbValidForTxMask, TX_CHANNELS[i]))
             {

@@ -39,7 +39,6 @@
 #define ADI_ADRV9001_FRONT_END_GPIO_DOWNLOAD 0      /* Set this to '1' to download front end GPIO */
 #define	ADI_ADRV9001_SLEWRATE_CONFIG    1           /* Set this to '1' to enable slew rate configuration */
 #define ADI_ADRV9001_SW_TEST 0
-#define ADI_ADRV9001_DEVICE_NOT_CONNECTED 0
 #define ADI_ADRV9001_PROFILE_CHECKSUM_ENABLE 0
 
 #define ADRV9001_BITFIELD_LOG 0

@@ -14,10 +14,6 @@
 #ifndef _ADI_FPGA9001_CLK_TYPES_H_
 #define _ADI_FPGA9001_CLK_TYPES_H_
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <stdint.h>
 
 /**
@@ -44,9 +40,5 @@ typedef struct adi_fpga9001_MmcmCfg
     uint32_t observationGpiosClock_kHz; /*!< Target clock is the frequency at which gainTable updates the gainIndex */
     uint32_t tddClock_kHz;              /*!< TDD clock frequency to support TDD mode */
 } adi_fpga9001_MmcmCfg_t;
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif  /* _ADI_FPGA9001_CLK_TYPES_H_ */

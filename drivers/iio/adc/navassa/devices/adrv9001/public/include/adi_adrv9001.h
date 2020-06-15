@@ -141,25 +141,6 @@ int32_t adi_adrv9001_InitAnalog(adi_adrv9001_Device_t *adrv9001,
                                 adi_adrv9001_DeviceClockDivisor_e adrv9001DeviceClockOutDivisor);
 
 /**
- * \brief Initializes the ADRV9001 device based on the desired device settings.
- *
- * This function initializes the ADRV9001 device, digital clocks,
- * FIR Filters, digital filtering.  It does not load the ARM
- * or perform any of the ARM init calibrations.  It leaves the
- * ADRV9001 in a state ready for multichip sync, the
- * ARM to be loaded, and the init calibrations run.
- *
- * \pre This function is the second API to be called by the user to configure the device
- * after all dependent data structures have been initialized
- *
- * \param[in] adrv9001		Context variable - Pointer to the ADRV9001 device data structure
- * \param[in] init			Pointer to ADRV9001 initialization settings structures
- *
- * \returns A code indicating success (ADI_COMMON_ACT_NO_ACTION) or the required action to recover
- */
-int32_t adi_adrv9001_InitDigital(adi_adrv9001_Device_t *adrv9001, adi_adrv9001_Init_t *init);
-
-/**
  * \brief API To safely Shutdown ADRV9001
  *
  * The User should call this function to safely shutdown ADRV9001 Device.

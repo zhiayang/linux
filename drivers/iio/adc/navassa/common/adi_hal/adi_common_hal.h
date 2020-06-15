@@ -1,7 +1,7 @@
 /**
  * \file
  * \brief Contains ADI Hardware Abstraction layer function prototypes and type definitions for adi_common_hal.c
- *
+ * 
  * ADI common lib Version: $ADI_COMMON_LIB_VERSION$
  */
 
@@ -15,12 +15,7 @@
 #define _ADI_COMMON_HAL_H_
 
 /* include standard types and definitions */
-#ifdef __KERNEL__
-#include <linux/types.h>
-#else
 #include <stdint.h>
-#endif
-
 #include "adi_common_log.h"
 
 
@@ -83,7 +78,7 @@ int32_t adi_common_hal_HwReset(adi_common_Device_t *commonDev, uint8_t pinLevel)
 *
 * \param commonDev Pointer to the common structure of type adi_common_Device_t
 * \param time_us The number of micro seconds to sleep
-*
+* 
 * \retval ADI_COMMON_ACT_WARN_RESET_LOG Recovery action for log reset
 * \retval ADI_COMMON_ACT_ERR_CHECK_PARAM Recovery action for bad parameter check
 * \retval ADI_COMMON_ACT_ERR_RESET_INTERFACE Recovery action for SPI reset required
@@ -96,7 +91,7 @@ int32_t adi_common_hal_Wait_us(adi_common_Device_t *commonDev, uint32_t time_us)
 *
 * \param commonDev Pointer to the common structure of type adi_common_Device_t
 * \param time_ms The number of milli seconds to sleep.
-*
+* 
 * \retval ADI_COMMON_ACT_WARN_RESET_LOG Recovery action for log reset
 * \retval ADI_COMMON_ACT_ERR_CHECK_PARAM Recovery action for bad parameter check
 * \retval ADI_COMMON_ACT_ERR_RESET_INTERFACE Recovery action for SPI reset required

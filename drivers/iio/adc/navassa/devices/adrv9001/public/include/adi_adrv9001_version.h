@@ -19,12 +19,8 @@ extern "C" {
 #endif
 
 /* Auto-generated version number - DO NOT MANUALLY EDIT */
-#ifdef INTERNAL_BUILD
-#define ADI_ADRV9001_CURRENT_VERSION "$INTERNAL_BUILD$"
-#else
-#define ADI_ADRV9001_CURRENT_VERSION "14.3.9"
-#endif // INTERNAL_BUILD
-    
+#define ADI_ADRV9001_CURRENT_VERSION "18.8.10"
+
 #ifdef __cplusplus
 }
 #endif

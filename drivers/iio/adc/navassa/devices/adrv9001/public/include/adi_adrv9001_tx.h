@@ -36,7 +36,7 @@ extern "C" {
  *
  * \note Message type: \ref timing_direct "Direct register acccess"
  *
- * \pre This function is called after the device is initialized
+ * \pre Channel state any of STANDBY, CALIBRATED
  *
  * \param[in] adrv9001  Context variable - Pointer to the ADRV9001 device data structure
  * \param[in] channel   The Tx channel for which to configure the attenuation
@@ -53,7 +53,7 @@ int32_t adi_adrv9001_Tx_Attenuation_Configure(adi_adrv9001_Device_t *adrv9001,
  *
  * \note Message type: \ref timing_direct "Direct register acccess"
  *
- * \pre This function is called after the device is initialized
+ * \pre Channel state any of STANDBY, CALIBRATED
  *
  * \param[in]  adrv9001     Context variable - Pointer to the ADRV9001 device data structure
  * \param[in]  channel      The Tx channel for which to inspect the attenuation configuration
@@ -68,8 +68,13 @@ int32_t adi_adrv9001_Tx_Attenuation_Inspect(adi_adrv9001_Device_t *adrv9001,
 /**
  * \brief Set the attenuation control mode
  *
+ * The relationship between Tx attenuation control mode and channel state is shown in the following timing diagram
+ * 
+ * \image html "ADRV9001_TxAtten_State_Transitions.png" "Tx Attenuation control modes and channel state diagram"
+ * 
  * \note Message type: \ref timing_direct "Direct register acccess"
- *
+ * \note Tx attenuation control via GPIO pins is possible only in RF_ENABLED state
+ * 
  * \pre Channel state any of STANDBY, CALIBRATED
  *
  * \param[in] adrv9001  Context variable - Pointer to the ADRV9001 device data structure
@@ -101,7 +106,7 @@ int32_t adi_adrv9001_Tx_AttenuationMode_Get(adi_adrv9001_Device_t *adrv9001,
 /**
  * \brief Set the Tx attenuation for the specified channel
  *
- * \pre If attenuation mode is ADI_ADRV9001_TX_ATTENUATION_CONTROL_MODE_PIN:
+ * \pre If attenuation mode is ADI_ADRV9001_TX_ATTENUATION_CONTROL_MODE_PIN: 
  *      channel state must be any of STANDBY, CALIBRATED, PRIMED.
  * \pre If attenuation mode is ADI_ADRV9001_TX_ATTENUATION_CONTROL_MODE_SPI:
  *      channel state must be any of STANDBY, CALIBRATED, PRIMED, RF_ENABLED
@@ -156,43 +161,40 @@ int32_t adi_adrv9001_Tx_Attenuation_Get(adi_adrv9001_Device_t *adrv9001,
                                         uint16_t *attenuation_mdB);
 
 /**
- * \brief Enable or disable the Tx DAC full scale boost
+ * \brief Enable or disable the Tx output power boost
  *
- * Enable or disable the Tx DAC full scale boost. Enabling the boost increases the DAC output power by 3dB.
- * Boost is disabled by default.
+ * Enable or disable the Tx output power boost. Enabling the boost increases the output power by 3dB. Linearity will be
+ * degraded. Boost is disabled by default.
+ *
+ * \pre Channel state is STANDBY
+ * \note Enabling power boost after calibrations requires running calibrations again or performance will be degraded
  *
  * \note Message type: \ref timing_direct "Direct register acccess"
- *
- * \todo Fix this pre-condition message
- * \pre This function must be called before loading the ADRV9001 ARM processor
  *
  * \param[in] adrv9001          Context variable - Pointer to the ADRV9001 device data structure
- * \param[in] channel           The Tx channel for which to set the DAC full scale boost enabledness
- * \param[in] boostEnable       Whether or not to enable the Tx DAC full scale boost
+ * \param[in] channel           The Tx channel of interest
+ * \param[in] boostEnable       Whether or not to enable the Tx output power boost
  *
  * \returns A code indicating success (ADI_COMMON_ACT_NO_ACTION) or the required action to recover
  */
-int32_t adi_adrv9001_Tx_DacFullScaleBoost_Set(adi_adrv9001_Device_t *adrv9001,
-                                              adi_common_ChannelNumber_e channel,
-                                              bool boostEnable);
+int32_t adi_adrv9001_Tx_OutputPowerBoost_Set(adi_adrv9001_Device_t *adrv9001,
+                                             adi_common_ChannelNumber_e channel,
+                                             bool boostEnable);
 
 /**
- * \brief Get the current Tx DAC full scale boost enable status
+ * \brief Get the current Tx output power boost enable status
  *
  * \note Message type: \ref timing_direct "Direct register acccess"
  *
- * \todo Fix this pre-condition message
- * \pre This function must be called before loading the ADRV9001 ARM processor
- *
  * \param[in]  adrv9001         Context variable - Pointer to the ADRV9001 device data structure
- * \param[in]  channel          The Tx channel for which to get the DAC full scale boost enabledness
- * \param[out] boostEnabled     Whether or not the Tx DAC full scale boost is currently enabled
+ * \param[in]  channel          The Tx channel of interest
+ * \param[out] boostEnabled     Whether or not the Tx output power boost is currently enabled
  *
  * \returns A code indicating success (ADI_COMMON_ACT_NO_ACTION) or the required action to recover
  */
-int32_t adi_adrv9001_Tx_DacFullScaleBoost_Get(adi_adrv9001_Device_t *adrv9001,
-                                              adi_common_ChannelNumber_e channel,
-                                              bool *boostEnabled);
+int32_t adi_adrv9001_Tx_OutputPowerBoost_Get(adi_adrv9001_Device_t *adrv9001,
+                                             adi_common_ChannelNumber_e channel,
+                                             bool *boostEnabled);
 
 /**
  * \brief Write the attenuation table for the specified Tx channels
@@ -391,8 +393,15 @@ int32_t adi_adrv9001_Tx_PaRamp_Inspect(adi_adrv9001_Device_t *adrv9001,
 /**
  * \brief Configure the Tx attenuation through GPIO pins for the specified Tx channel
  *
+ * The relationship between Tx attenuation control mode and channel state is shown in the following timing diagram
+ * 
+ * \image html "ADRV9001_TxAtten_State_Transitions.png" "Tx Attenuation control modes and channel state diagram"
+ * 
  * \note Message type: \ref timing_direct "Direct register acccess"
  * \note Tx attenuation pin control configure is not supported in TX_DIRECT_FM_FSK mode
+ * \note Tx attenuation control via GPIO pins is possible only in RF_ENABLED state
+ *
+ * \pre  Channel state must be CALIBRATED
  *
  * \param[in]  adrv9001    Context variable - Pointer to the ADRV9001 device data structure
  * \param[in]  channel     The Tx channel for which to configure the Tx attenuation
@@ -405,7 +414,7 @@ int32_t adi_adrv9001_Tx_Attenuation_PinControl_Configure(adi_adrv9001_Device_t *
                                                          adi_adrv9001_TxAttenuationPinControlCfg_t *config);
 
 /**
- * \brief Inspectk the Tx attenuation through GPIO pins for the specified Tx channel
+ * \brief Inspect the Tx attenuation through GPIO pins for the specified Tx channel
  *
  * \note Message type: \ref timing_direct "Direct register acccess"
  * \note Tx attenuation pin control inspect is not supported in TX_DIRECT_FM_FSK mode
@@ -419,6 +428,25 @@ int32_t adi_adrv9001_Tx_Attenuation_PinControl_Configure(adi_adrv9001_Device_t *
 int32_t adi_adrv9001_Tx_Attenuation_PinControl_Inspect(adi_adrv9001_Device_t *adrv9001,
                                                        adi_common_ChannelNumber_e channel,
                                                        adi_adrv9001_TxAttenuationPinControlCfg_t *config);
+
+/**
+ * \brief Set the NCO frequency to correct for small deviations in Tx LO frequency
+ *
+ * \note Message type: \ref timing_prioritymailbox "High-priority mailbox command"
+ *
+ * \pre Channel state any of CALIBRATED, PRIMED, RF_ENABLED
+ * \param[in] adrv9001              Context variable - Pointer to the ADRV9001 device data structure
+ * \param[in] channel               The Tx channel for which to set the NCO frequency
+ * \param[in] frequencyOffset_Hz    The desired offset frequency, denoted in Hz
+ * \param[in] immediate             Whether to change the frequency immediately (true), or
+ *                                  update it at the start of the next available frame (false)
+ *
+ * \returns A code indicating success (ADI_COMMON_ACT_NO_ACTION) or the required action to recover
+ */
+int32_t adi_adrv9001_Tx_FrequencyCorrection_Set(adi_adrv9001_Device_t *adrv9001,
+                                                adi_common_ChannelNumber_e channel,
+                                                int32_t frequencyOffset_Hz,
+                                                bool immediate);
 
 #ifdef __cplusplus
 }

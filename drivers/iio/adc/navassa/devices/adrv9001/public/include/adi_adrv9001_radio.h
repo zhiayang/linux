@@ -29,23 +29,19 @@ extern "C" {
  *
  * \note Message type: \ref timing_mailbox "Mailbox command"
  *
- * \pre Channel state is PRIMED
+ * \pre Channel state is STANDBY or CALIBRATED
  *
- * \param[in] adrv9001	            Context variable - Pointer to the ADRV9001 device settings data structure
- * \param[in] port                   The port that the channel refers to
- * \param[in] channel                The channel of the specified port to prime
- * \param[in] pllCalMode             The PLL calibration mode to use
- * \param[in] mbSetState             State to determine whether Mail Box set command is allowed in primed state
- * \param[in] carrierFrequency_Hz    Desired carrier frequency for the given channel in Hz (valid: 30MHz to 6 GHz)
+ * \param[in] adrv9001	Context variable - Pointer to the ADRV9001 device settings data structure
+ * \param[in] port      The port of interest
+ * \param[in] channel   The channel of interest
+ * \param[in] carrier   Desired carrier configuration
  *
  * \returns A code indicating success (ADI_COMMON_ACT_NO_ACTION) or the required action to recover
  */
-int32_t adi_adrv9001_Radio_CarrierFrequency_Set(adi_adrv9001_Device_t *adrv9001,
-                                                adi_common_Port_e port,
-                                                adi_common_ChannelNumber_e channel,
-                                                adrv9001_PllCalMode_e pllCalMode,
-                                                adi_adrv9001_MBSetInPrimedState_e mbSetState,
-                                                uint64_t carrierFrequency_Hz);
+int32_t adi_adrv9001_Radio_Carrier_Configure(adi_adrv9001_Device_t *adrv9001,
+                                             adi_common_Port_e port,
+                                             adi_common_ChannelNumber_e channel,
+                                             adi_adrv9001_Carrier_t *carrier);
 
 /**
  * \brief Gets the Carrier frequency for the specified channel.
@@ -54,46 +50,33 @@ int32_t adi_adrv9001_Radio_CarrierFrequency_Set(adi_adrv9001_Device_t *adrv9001,
  *
  * \pre Channel state any of STANDBY, CALIBRATED, PRIMED, RF_ENABLED
  *
- * \param[in]  adrv9001	            Context variable - Pointer to the ADRV9001 device settings data structure
- * \param[in]  port                 The port that the channel refers to
- * \param[in]  channel              The channel of the specified port to prime
- * \param[out] carrierFrequency_Hz  Desired carrier frequency for the given channel in Hz
+ * \param[in]  adrv9001	 Context variable - Pointer to the ADRV9001 device settings data structure
+ * \param[in]  port      The port of interest
+ * \param[in]  channel   The channel of interest
+ * \param[out] carrier   Current carrier configuration
  *
  * \returns A code indicating success (ADI_COMMON_ACT_NO_ACTION) or the required action to recover
 */
-int32_t adi_adrv9001_Radio_CarrierFrequency_Get(adi_adrv9001_Device_t *adrv9001,
-                                                adi_common_Port_e port,
-                                                adi_common_ChannelNumber_e channel,
-                                                uint64_t *carrierFrequency_Hz);
+int32_t adi_adrv9001_Radio_Carrier_Inspect(adi_adrv9001_Device_t *adrv9001,
+                                           adi_common_Port_e port,
+                                           adi_common_ChannelNumber_e channel,
+                                           adi_adrv9001_Carrier_t *carrier);
 
 /**
- * \brief Checks if the PLLs are locked
- *
- * This function returns the status of the ADRV9001 PLLs via the pllLockStatus pointer. The 4 LSBs of the uint32_t value at
- * pllLockStatus represent the lock status of the CLK PLL, RF PLL and AUX PLL.
+ * \brief Check if the specified PLL is locked
  *
  * \note Message type: \ref timing_direct "Direct register access"
  *
  * \pre This may be called any time after the PLLs have been configured and are operational. This also requires the
  * lockdet_mode<1:0> to have a value of either 1(Run Lock Detect once) or 2(Run Lock Detect Continuously)
  *
- * \param[in]  adrv9001	        Context variable - Pointer to the ADRV9001 device settings data structure
- * \param[out] pllLockStatus    The current lock status of the ADRV9001 PLLs
- * \parblock             pllLockStatus |    Status
- *                      ---------------|----------------
- *                           bit 0     | CLK PLL Lock
- *                           bit 1     | CLK LP PLL Lock
- *                           bit 2     | LO1 PLL Lock
- *                           bit 3     | LO2 PLL Lock
- *                           bit 4     | AUX PLL Lock
- *
- * A bit value of 1 indicates the corresponding PLL is locked
- * A bit value of 0 indicates the corresponding PLL is unlocked.
- * \endparblock
+ * \param[in]  adrv9001	    Context variable - Pointer to the ADRV9001 device settings data structure
+ * \param[in]  pll          The PLL of interest
+ * \param[out] locked       Whether the PLL is locked (true)
  *
  * \returns A code indicating success (ADI_COMMON_ACT_NO_ACTION) or the required action to recover
  */
-int32_t adi_adrv9001_Radio_PllStatus_Get(adi_adrv9001_Device_t *adrv9001, uint32_t *pllLockStatus);
+int32_t adi_adrv9001_Radio_PllStatus_Get(adi_adrv9001_Device_t *adrv9001, adi_adrv9001_Pll_e pll, bool *locked);
 
 /**
  * \brief Configure how the specified channel is enabled
@@ -154,7 +137,7 @@ int32_t adi_adrv9001_Radio_ChannelEnableMode_Get(adi_adrv9001_Device_t *adrv9001
  * \returns A code indicating success (ADI_COMMON_ACT_NO_ACTION) or the required action to recover
  */
 int32_t adi_adrv9001_Radio_State_Get(adi_adrv9001_Device_t *adrv9001, adi_adrv9001_RadioState_t *radioState);
-
+    
 /**
  * \brief Reads the current channel state
  *
@@ -170,7 +153,7 @@ int32_t adi_adrv9001_Radio_State_Get(adi_adrv9001_Device_t *adrv9001, adi_adrv90
  *
  * \returns A code indicating success (ADI_COMMON_ACT_NO_ACTION) or the required action to recover
  */
-int32_t adi_adrv9001_Radio_Channel_State_Get(adi_adrv9001_Device_t *adrv9001,
+int32_t adi_adrv9001_Radio_Channel_State_Get(adi_adrv9001_Device_t *adrv9001, 
                                              adi_common_Port_e port,
                                              adi_common_ChannelNumber_e channel,
                                              adi_adrv9001_ChannelState_e *channelState);
@@ -415,13 +398,13 @@ int32_t adi_adrv9001_Radio_Channel_ToState(adi_adrv9001_Device_t *adrv9001,
  * \pre Channel state is STANDBY
  *
  * \param[in] adrv9001              Context variable - Pointer to the ADRV9001 device data structure containing settings
- * \param[in] pllName               The PLL for which to configure the loop filter
+ * \param[in] pll                   The PLL for which to configure the loop filter
  * \param[in] pllLoopFilterConfig   The desired loop filter configuration
  *
  * \returns A code indicating success (ADI_COMMON_ACT_NO_ACTION) or the required action to recover
  */
 int32_t adi_adrv9001_Radio_PllLoopFilter_Set(adi_adrv9001_Device_t *adrv9001,
-                                             adi_adrv9001_PllName_e pllName,
+                                             adi_adrv9001_Pll_e pll,
                                              adi_adrv9001_PllLoopFilterCfg_t *pllLoopFilterConfig);
 
 /**
@@ -432,16 +415,15 @@ int32_t adi_adrv9001_Radio_PllLoopFilter_Set(adi_adrv9001_Device_t *adrv9001,
  * \pre Channel state any of STANDBY, CALIBRATED, PRIMED, RF_ENABLED
  *
  * \param[in] adrv9001              Context variable - Pointer to the ADRV9001 device data structure containing settings
- * \param[in] pllName               The PLL for which to configure the loop filter
+ * \param[in] pll                   The PLL for which to configure the loop filter
  * \param[in] pllLoopFilterConfig   The current loop filter configuration
  *
  * \returns A code indicating success (ADI_COMMON_ACT_NO_ACTION) or the required action to recover
  */
 int32_t adi_adrv9001_Radio_PllLoopFilter_Get(adi_adrv9001_Device_t *adrv9001,
-                                             adi_adrv9001_PllName_e pllName,
+                                             adi_adrv9001_Pll_e pll,
                                              adi_adrv9001_PllLoopFilterCfg_t *pllLoopFilterConfig);
 
-#ifndef CLIENT_IGNORE
 /**
  * \brief Convert a channel and port combination to the appropriate mailbox channel value
  *
@@ -464,9 +446,7 @@ uint8_t adi_adrv9001_Radio_MailboxChannel_Get(adi_common_Port_e port, adi_common
  */
 uint8_t adi_adrv9001_Radio_MailboxChannelMask_Get(adi_common_Port_e ports[],
                                                   adi_common_ChannelNumber_e channels[],
-                                                  uint8_t length);
-
-#endif
+                                                  uint32_t length);
 
 /**
  * \brief Configure channel enable delays for the specified channel

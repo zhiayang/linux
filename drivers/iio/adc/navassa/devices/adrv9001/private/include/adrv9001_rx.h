@@ -20,22 +20,7 @@ extern "C"{
 #endif
 
 #include "adi_adrv9001_rx_types.h"
-#include "adrv9001_bf_nvs_regmap_rxb.h"
-
-/**
-* \brief Returns the Rx Bitfield function channel base addresses for a given Rx Channel
-*
-* \param device                Pointer to the ADRV9001 device data structure
-* \param rxChannel             Channel for which Rx bitfield base address is requested
-* \param rxChannelBitfieldAddr Pointer to the Rx base address required by the bitfield.
-*
-* \retval ADI_COMMON_ACT_WARN_RESET_LOG  Recovery action for log reset
-* \retval ADI_COMMON_ACT_ERR_CHECK_PARAM Invalid parameter passed
-* \retval ADI_COMMON_ACT_NO_ACTION       Function completed successfully, no action required
-*/
-int32_t adrv9001_RxBitfieldAddressGet(adi_adrv9001_Device_t *device, 
-                                      adi_common_ChannelNumber_e rxChannel, 
-                                      adrv9001_BfNvsRegmapRxbChanAddr_e *rxChannelBitfieldAddr);
+#include "adrv9001_bf.h"
 
 /**
 * \brief Formats gain table structure input into a format expected by ARM DMA

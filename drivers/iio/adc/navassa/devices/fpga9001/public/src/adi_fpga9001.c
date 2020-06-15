@@ -20,11 +20,9 @@
 #include "adi_fpga9001_user.h"
 #include "adi_fpga9001.h"
 #include "adi_fpga9001_error.h"
-#include "fpga9001_bf_dp_capture_control.h"
-
 #include "adi_fpga9001_hal.h"
-
 #include "adi_platform.h"
+#include "fpga9001_utilities.h"
 
 int32_t adi_fpga9001_HwOpen(adi_fpga9001_Device_t *device)
 {
@@ -58,57 +56,57 @@ int32_t adi_fpga9001_HwClose(adi_fpga9001_Device_t *device)
     return (device->common.error.newAction);
 }
 
-// FIXME: This is terrible. Has to be set before use - see init() in ServerMain.cpp
-char fpgaBinDirectory[256] = "/home/analog/adrv9001_server/resources/Adi.Adrv9001.FpgaBinaries";
-int32_t adi_fpga9001_FpgaBinDirectorySet(const char* directory)
-{
-    strncpy(fpgaBinDirectory, directory, 256);
-    
-    return ADI_COMMON_ACT_NO_ACTION;
-}
-
-// TODO: Move to another file
 int32_t adi_fpga9001_SwitchBin(adi_fpga9001_Device_t *device, adi_fpga9001_Binary_e bin)
 {
     // This script takes two positional arguments:
     //      1. Path to the directory containing FPGA binaries
     //      2. The "basename" of the binary to switch to
     // The script will search the directory for the latest semantic version of the file and program the FPGA
-    static const char *SCRIPT = "/home/analog/platform/scripts/switch_bin.sh ";     // Note the space at the end
+    static const char *SCRIPT = "/home/analog/platform/scripts/switch_bin.sh /home/analog/adrv9001_server/resources/Adi.Adrv9001.FpgaBinaries";
     char cmdBuf[256] = { 0 };
     strcat(cmdBuf, SCRIPT);
-    strcat(cmdBuf, fpgaBinDirectory);
-    
-    switch (bin)
-    {
-    case ADI_FPGA9001_CMOS:
-        strcat(cmdBuf, " adrv9001_cmos");     // Note the space at the beginning
-        break;
-    case ADI_FPGA9001_LVDS:
-        strcat(cmdBuf, " adrv9001_lvds");     // Note the space at the beginning
-        break;
-    default:
-        ADI_ERROR_REPORT(&device->common, ADI_COMMON_ERRSRC_API, ADI_COMMON_ERR_INV_PARAM, 
-                         ADI_COMMON_ACT_ERR_CHECK_PARAM, bin, 
-                         "Invalid parameter value. bin must be a valid adi_fpga9001_Binary_e enum value");
-        ADI_API_RETURN(device);
+
+    /* we are still building device variants as separate binaries based on a define compiler directive. */
+
+#ifdef SI_REV_A0
+
+    if (bin == ADI_FPGA9001_CMOS) {
+        strcat(cmdBuf, " adrv9001a_cmos");
+        return(system(cmdBuf));
     }
-    
-    return system(cmdBuf);
+
+    if (bin == ADI_FPGA9001_LVDS) {
+        strcat(cmdBuf, " adrv9001a_lvds");
+        return(system(cmdBuf));
+    }
+
+#else
+
+    if (bin == ADI_FPGA9001_CMOS) {
+        strcat(cmdBuf, " adrv9001_cmos");
+        return(system(cmdBuf));
+    }
+
+    if (bin == ADI_FPGA9001_LVDS) {
+        strcat(cmdBuf, " adrv9001_lvds");
+        return(system(cmdBuf));
+    }
+
+#endif
+
+    ADI_ERROR_REPORT(&device->common, ADI_COMMON_ERRSRC_API, ADI_COMMON_ERR_INV_PARAM, ADI_COMMON_ACT_ERR_CHECK_PARAM, bin,
+        "Invalid fpga bit file parameter,  must be a valid adi_fpga9001_Binary_e enum value");
+    ADI_API_RETURN(device);
 }
 
 int32_t adi_fpga9001_VersionGet(adi_fpga9001_Device_t *device, 
                                 adi_fpga9001_Version_t *version)
 {
     uint32_t regVal = 0;
-    uint32_t fpgaVersionReg = 0x43050000;
-
-    ADI_API_ENTRY_PTR_EXPECT(device, version);
-    ADI_EXPECT(adi_fpga9001_hal_Register_Read, device, fpgaVersionReg, &regVal);
-
-    version->major = (uint8_t)((regVal & 0x00FF0000) >> 16);
-    version->minor = (uint8_t)((regVal & 0x0000FF00) >> 8);
-    version->patch = (uint8_t)(regVal  & 0x000000FF);
-
+    
+    axi_sysid_sys_version_get((void *)device, AXI_SYSID_ID, &regVal);
+    version->major = (uint8_t)((regVal >> 16) & 0xff);
+    version->minor = (uint8_t)((regVal >>  8) & 0xff);
+    version->patch = (uint8_t)((regVal >>  0) & 0xff);
     ADI_API_RETURN(device);
 }

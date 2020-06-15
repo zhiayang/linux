@@ -34,7 +34,7 @@
 #include "adrv9001_crc32.h"
 #include "adrv9001_init.h"
 #include "adrv9001_reg_addr_macros.h"
-#include "adrv9001_bf_nvs_regmap_core.h"
+#include "adrv9001_bf.h"
 
 /* Header files related to libraries */
 
@@ -306,10 +306,10 @@ static int32_t adrv9001_DmaMemReadByte(adi_adrv9001_Device_t *device,
             returnData[i + 2] = dataRead0;
             
             /* 'single_instruction' has to be cleared before reading DMA_DATA3 and set back after */
-            ADI_EXPECT(adrv9001_NvsRegmapCoreSingleInstructionBfSet, device, ADRV9001_BF_CORE, 0x0);
+            ADI_EXPECT(adrv9001_NvsRegmapCore_SingleInstruction_Set, device, 0x0);
             ADRV9001_SPIREADBYTEDMA(device, "ARM_DMA_DATA_3", ADRV9001_ADDR_ARM_DMA_DATA3, &dataRead0);
             returnData[i + 3] = dataRead0;
-            ADI_EXPECT(adrv9001_NvsRegmapCoreSingleInstructionBfSet, device, ADRV9001_BF_CORE, 0x1);
+            ADI_EXPECT(adrv9001_NvsRegmapCore_SingleInstruction_Set, device, 0x1);
         }
     }
 
@@ -625,7 +625,7 @@ static void adrv9001_LoadTxByte(adi_adrv9001_Device_t *device,
     /* 'txPdGainEnable' is referred as 'pdGainEn' in FW */
     cfgData[tempOffset++] = txProfile->txPdGainEnable;
 
-    cfgData[tempOffset++] = txProfile->txBbfPowerMode;
+    cfgData[tempOffset++] = (uint8_t)txProfile->txBbfPower;
 
     /* 'txPrePdRealPole' is referred as 'prePDRealPole' in FW */
     adrv9001_LoadFourBytes(&tempOffset, cfgData, KILO_TO_BASE_UNIT(txProfile->txPrePdRealPole_kHz));
@@ -1157,9 +1157,8 @@ static void adrv9001_LoadRxByte(adi_adrv9001_Device_t *device,
     /* 'rxCorner3dBLp_kHz' is referred as 'corner3dBLp_kHz' in FW */
     adrv9001_LoadFourBytes(&tempOffset, cfgData, KILO_TO_BASE_UNIT(rxProfile->rxCorner3dBLp_kHz));
 
-    cfgData[tempOffset++] = rxProfile->tiaPower;
-
-    cfgData[tempOffset++] = rxProfile->tiaPowerLp;
+    cfgData[tempOffset++] = (uint8_t)rxProfile->tiaPower;
+    cfgData[tempOffset++] = (uint8_t)rxProfile->tiaPowerLp;
 
     cfgData[tempOffset++] = (uint8_t)(rxProfile->adcType & 0xFF);
 
@@ -2126,28 +2125,6 @@ int32_t adrv9001_DmaMemWrite(adi_adrv9001_Device_t *device, uint32_t address, co
     regWrite |= ADRV9001_DMA_CTL_RD_WRB;
     ADRV9001_SPIWRITEBYTEDMA(device, "ARM_DMA_CTL", ADRV9001_ADDR_ARM_DMA_CTL, regWrite);
 
-#if ADRV9001_INIT_DMA_MEM_READ_CHECK
-    uint8_t  returnData[2048] = { 0 };
-    uint32_t addressRead = address;
-
-    /* Perform DMA memory read check only if byteCount is less than 2048
-     * as returnData[] array size is set to 2048 */
-    if (byteCount < 2048)
-    {
-        adrv9001_DmaMemRead(device, addressRead, returnData, byteCount, 0);
-        for (i = 0; i < byteCount; i++)
-        {
-#if ADI_ADRV9001_DEVICE_NOT_CONNECTED == 0
-            if (returnData[i] != data[i])
-            {
-                ADI_ERROR_REPORT(&device->common, ADI_COMMON_ERRSRC_API, ADI_COMMON_ERR_API_FAIL, ADI_COMMON_ACT_ERR_RESET_INTERFACE, NULL, "DMA Write verify failed");
-                ADI_ERROR_RETURN(device->common.error.newAction);
-            }
-#endif
-        }
-    }
-
-#endif
     ADI_API_RETURN(device);
 }
 
@@ -2231,10 +2208,10 @@ int32_t adrv9001_DmaMemRead(adi_adrv9001_Device_t *device, uint32_t address, uin
         returnData[i + 1] = dataRead;
         
         /* 'single_instruction' has to be cleared before reading DMA_DATA3 and set back after */
-        ADI_EXPECT(adrv9001_NvsRegmapCoreSingleInstructionBfSet, device, ADRV9001_BF_CORE, 0x0);
+        ADI_EXPECT(adrv9001_NvsRegmapCore_SingleInstruction_Set, device, 0x0);
         ADRV9001_SPIREADBYTEDMA(device, "ARM_DMA_DATA_0", ADRV9001_ADDR_ARM_DMA_DATA0, &dataRead);
         returnData[i] = dataRead;
-        ADI_EXPECT(adrv9001_NvsRegmapCoreSingleInstructionBfSet, device, ADRV9001_BF_CORE, 0x1);
+        ADI_EXPECT(adrv9001_NvsRegmapCore_SingleInstruction_Set, device, 0x1);
 
         if (autoIncrement == 0)
         {
@@ -2639,6 +2616,8 @@ static uint32_t adrv9001_ArmProfileWrite_Validate(adi_adrv9001_Device_t *device,
     ADI_RANGE_CHECK(device, init->clocks.ext2LoType, ADI_ADRV9001_EXT_LO_DIFFERENTIAL, ADI_ADRV9001_EXT_LO_SINGLE_ENDED);
     ADI_RANGE_CHECK(device, init->clocks.rx1RfInputSel, ADI_ADRV9001_RX_A, ADI_ADRV9001_RX_B);
     ADI_RANGE_CHECK(device, init->clocks.rx2RfInputSel, ADI_ADRV9001_RX_A, ADI_ADRV9001_RX_B);
+    ADI_RANGE_CHECK(device, init->clocks.auxPllPower, ADI_ADRV9001_COMPONENT_POWER_LEVEL_LOW, ADI_ADRV9001_COMPONENT_POWER_LEVEL_HIGH);
+    ADI_RANGE_CHECK(device, init->clocks.clkPllPower, ADI_ADRV9001_COMPONENT_POWER_LEVEL_LOW, ADI_ADRV9001_COMPONENT_POWER_LEVEL_HIGH);
 
     /* PLL LO dividers must be even numbers between 2 and 1022 */
     if ((1022  < init->clocks.extLo1Divider) ||
@@ -2674,6 +2653,7 @@ static uint32_t adrv9001_ArmProfileWrite_Validate(adi_adrv9001_Device_t *device,
         if ( ADRV9001_BF_EQUAL( init->tx.txInitChannelMask, TX_CHANNELS[i] ) )
         {
             ADI_RANGE_CHECK(device, init->tx.txProfile[i].outputSignaling, ADI_ADRV9001_TX_IQ, ADI_ADRV9001_TX_DIRECT_FM_FSK);
+            ADI_RANGE_CHECK(device, init->tx.txProfile[i].txBbfPower, ADI_ADRV9001_COMPONENT_POWER_LEVEL_LOW, ADI_ADRV9001_COMPONENT_POWER_LEVEL_HIGH);
             ADI_RANGE_CHECK(device, init->tx.txProfile[i].txDpProfile.txPreProc.txPreProcMode, ADI_ADRV9001_TX_DP_PREPROC_MODE0, ADI_ADRV9001_TX_DP_PREPROC_MODE3);
             ADI_RANGE_CHECK(device, init->tx.txProfile[i].txDpProfile.txPreProc.txPreProcWbNbPfirIBankSel, ADI_ADRV9001_PFIR_BANK_A, ADI_ADRV9001_PFIR_BANK_D);
             ADI_RANGE_CHECK(device, init->tx.txProfile[i].txDpProfile.txPreProc.txPreProcWbNbPfirQBankSel, ADI_ADRV9001_PFIR_BANK_A, ADI_ADRV9001_PFIR_BANK_D);
@@ -2682,7 +2662,6 @@ static uint32_t adrv9001_ArmProfileWrite_Validate(adi_adrv9001_Device_t *device,
             ADI_RANGE_CHECK(device, init->tx.txProfile[i].txSsiConfig.ssiDataFormatSel, ADI_ADRV9001_SSI_FORMAT_2_BIT_SYMBOL_DATA, ADI_ADRV9001_SSI_FORMAT_16_BIT_I_Q_DATA);
             ADI_RANGE_CHECK(device, init->tx.txProfile[i].txSsiConfig.numLaneSel, ADI_ADRV9001_SSI_1_LANE, ADI_ADRV9001_SSI_4_LANE);
             ADI_RANGE_CHECK(device, init->tx.txProfile[i].txSsiConfig.strobeType, ADI_ADRV9001_SSI_SHORT_STROBE, ADI_ADRV9001_SSI_LONG_STROBE);
-
         }
     }
 
@@ -2694,6 +2673,8 @@ static uint32_t adrv9001_ArmProfileWrite_Validate(adi_adrv9001_Device_t *device,
             ADI_RANGE_CHECK(device, init->rx.rxChannelCfg[i].profile.outputSignaling, ADI_ADRV9001_RX_IQ, ADI_ADRV9001_RX_FM_SYMBOLS);
             ADI_RANGE_CHECK(device, init->rx.rxChannelCfg[i].profile.adcType, ADI_ADRV9001_ADC_LP, ADI_ADRV9001_ADC_HP);
             ADI_RANGE_CHECK(device, init->rx.rxChannelCfg[i].profile.lpAdcCalMode, ADI_ADRV9001_ADC_LOWPOWER_PERIODIC, ADI_ADRV9001_ADC_LOWPOWER_CONTINUOUS);
+            ADI_RANGE_CHECK(device, init->rx.rxChannelCfg[i].profile.tiaPower, ADI_ADRV9001_COMPONENT_POWER_LEVEL_LOW, ADI_ADRV9001_COMPONENT_POWER_LEVEL_HIGH);
+            ADI_RANGE_CHECK(device, init->rx.rxChannelCfg[i].profile.tiaPowerLp, ADI_ADRV9001_COMPONENT_POWER_LEVEL_LOW, ADI_ADRV9001_COMPONENT_POWER_LEVEL_HIGH);
             ADI_RANGE_CHECK(device, init->rx.rxChannelCfg[i].profile.rxDpProfile.rxSincHBTop.sincGainMux, ADI_ADRV9001_RX_SINC_GAIN_MUX_0_DB, ADI_ADRV9001_RX_SINC_GAIN_MUX_NEG_12_DB);
             ADI_RANGE_CHECK(device, init->rx.rxChannelCfg[i].profile.rxDpProfile.rxSincHBTop.sincMux, ADI_ADRV9001_RX_SINC_MUX5_OUTPUT_ZERO, ADI_ADRV9001_RX_SINC_MUX5_OUTPUT_SINC6);
             ADI_RANGE_CHECK(device, init->rx.rxChannelCfg[i].profile.rxDpProfile.rxSincHBTop.hbMux, ADI_ADRV9001_RX_HB_MUX_OUTPUT_ZERO, ADI_ADRV9001_RX_HB_MUX_OUTPUT_HB1);
@@ -2834,9 +2815,9 @@ int32_t adrv9001_ArmProfileWrite(adi_adrv9001_Device_t *device, const adi_adrv90
     cfgData[offset++] = (uint8_t)(init->clocks.armPowerSavingClkDiv - 1);
 
     cfgData[offset++] = (uint8_t)init->clocks.refClockOutEnable;
-
-    /* 2 bytes padding */
-    offset += 2;
+    
+    cfgData[offset++] = (uint8_t)init->clocks.auxPllPower;
+    cfgData[offset++] = (uint8_t)init->clocks.clkPllPower;
 
     /* CLKGEN PLL or LP CLKGEN PLL for HsDigClk */
     /* 0 = CLKGEN PLL; 1 = LP CLKGEN PLL */

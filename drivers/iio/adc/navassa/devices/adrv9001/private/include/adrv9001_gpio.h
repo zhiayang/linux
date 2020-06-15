@@ -25,8 +25,6 @@ extern "C" {
 #include "adi_common_error.h"
 #include "adi_adrv9001_gpio_types.h"
 #include "adi_adrv9001_types.h"
-#include "adrv9001_bf_nvs_regmap_core_1.h"
-#include "adrv9001_bf_nvs_regmap_core_2.h"
 
 /*
 *********************************************************************************************************
@@ -66,9 +64,7 @@ int32_t adrv9001_GpIntHandler(adi_adrv9001_Device_t *device, adi_adrv9001_gpIntS
  * \retval ADI_COMMON_ACT_NO_ACTION           Function completed successfully, no action required.
  *
  */
-int32_t adrv9001_GpInterruptsMaskPinBfGet(adi_adrv9001_Device_t *device, 
-                                          adrv9001_BfNvsRegmapCore1ChanAddr_e baseAddr, 
-                                          uint32_t *bfValue);
+int32_t adrv9001_GpInterruptsMaskPinBfGet(adi_adrv9001_Device_t *device, uint32_t *bfValue);
 
 /**
 * \brief Logic 1 masks the specific interrupt, per bit position, for output on gp_interrupt[0]
@@ -84,9 +80,7 @@ int32_t adrv9001_GpInterruptsMaskPinBfGet(adi_adrv9001_Device_t *device,
 * \retval ADI_COMMON_ACT_NO_ACTION Function  Completed successfully, no action required.
 *
 */
-int32_t adrv9001_GpInterruptsMaskPinBfSet(adi_adrv9001_Device_t *device, 
-                                          adrv9001_BfNvsRegmapCore1ChanAddr_e baseAddr, 
-                                          uint32_t bfValue);
+int32_t adrv9001_GpInterruptsMaskPinBfSet(adi_adrv9001_Device_t *device, uint32_t bfValue);
 
 
 /**
@@ -103,9 +97,7 @@ int32_t adrv9001_GpInterruptsMaskPinBfSet(adi_adrv9001_Device_t *device,
  * \retval ADI_COMMON_ACT_NO_ACTION           Function completed successfully, no action required.
  *
  */
-int32_t adrv9001_GpInterruptsStatusWordBfGet(adi_adrv9001_Device_t *device, 
-                                                           adrv9001_BfNvsRegmapCore1ChanAddr_e baseAddr, 
-                                                           uint32_t *bfValue);
+int32_t adrv9001_GpInterruptsStatusWordBfGet(adi_adrv9001_Device_t *device, uint32_t *bfValue);
 
 #ifdef __cplusplus
 }

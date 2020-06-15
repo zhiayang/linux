@@ -18,13 +18,24 @@
 #include "adrv9001_arm_macros.h"
 #include "adrv9001_init.h"
 #include "adrv9001_reg_addr_macros.h"
-#include "adrv9001_bf_nvs_regmap_core.h"
-#include "adrv9001_bf_nvs_regmap_core_1.h"
-#include "adrv9001_decode_bf_enum.h"
+#include "adrv9001_bf.h"
 
-int32_t adi_adrv9001_Mcs_Prepare(adi_adrv9001_Device_t *device, adi_adrv9001_PllType_e pllType)
+static int32_t adi_adrv9001_Mcs_Prepare_Validate(adi_adrv9001_Device_t *device, adi_adrv9001_Pll_e pll)
 {
-    adrv9001_BfNvsPllMemMapChanAddr_e baseAddr = ADRV9001_BF_CLK_PLL_LP;
+    ADI_RANGE_CHECK(device, pll, ADI_ADRV9001_PLL_LO1, ADI_ADRV9001_PLL_CLK_LP);
+    ADI_API_RETURN(device);
+}
+
+int32_t adi_adrv9001_Mcs_Prepare(adi_adrv9001_Device_t *device, adi_adrv9001_Pll_e pll)
+{
+    static const adrv9001_BfNvsPllMemMap_e instances[] = {
+        ADRV9001_BF_RF1_PLL,
+        ADRV9001_BF_RF2_PLL,
+        ADRV9001_BF_AUX_PLL,
+        ADRV9001_BF_CLK_PLL,
+        ADRV9001_BF_CLK_PLL_LP
+    };
+    adrv9001_BfNvsPllMemMap_e instance = ADRV9001_BF_CLK_PLL;
 
     static const uint8_t SYSREF_BUFFER_ENABLE         = 0x40;
     static const uint8_t SYSREF_SAMPLE_ENABLE         = 0x10;
@@ -37,7 +48,9 @@ int32_t adi_adrv9001_Mcs_Prepare(adi_adrv9001_Device_t *device, adi_adrv9001_Pll
     static const uint8_t DEVICE_CLK_CONTROL_1         = 0x12;
     static const uint8_t ANALOG_SPARE_6               = 0x0F;
 
-    ADI_API_ENTRY_EXPECT(device);
+    ADI_PERFORM_VALIDATION(adi_adrv9001_Mcs_Prepare_Validate, device, pll);
+    
+    instance = instances[pll];
 
     /*
      *SPI:
@@ -70,24 +83,22 @@ int32_t adi_adrv9001_Mcs_Prepare(adi_adrv9001_Device_t *device, adi_adrv9001_Pll
     */
     ADRV9001_SPIWRITEBYTE(device, "MCS_CMOS_MODE_ENABLE", ADRV9001_ADDR_MCS_REG0, MCS_CMOS_MODE_ENABLE);
 
-    baseAddr = adrv9001_PllMemMapAddr_Get(device->devStateInfo.clkPllMode, pllType);
-
-    ADRV9001_SPIWRITEBYTE(device, "MCS_CONTROL", baseAddr + ADRV9001_ADDR_MCS_CONTROL_OFFSET, MCS_CONTROL_SET);
+    ADRV9001_SPIWRITEBYTE(device, "MCS_CONTROL", instance + ADRV9001_ADDR_MCS_CONTROL_OFFSET, MCS_CONTROL_SET);
 
     /*
         clk_pll_bf.mcs_serdes_align = 2'b00
         clk_pll_bf.clkgen_mcs2dig_count = x00C
     */
-    ADRV9001_SPIWRITEBYTE(device, "MCS_CONTROL_4", baseAddr + ADRV9001_ADDR_MCS_CONTROL_4_OFFSET, MCS_CONTROL_4_SET);
+    ADRV9001_SPIWRITEBYTE(device, "MCS_CONTROL_4", instance + ADRV9001_ADDR_MCS_CONTROL_4_OFFSET, MCS_CONTROL_4_SET);
 
-    ADRV9001_SPIWRITEBYTE(device, "MCS_CONTROL_5", baseAddr + ADRV9001_ADDR_MCS_CONTROL_5_OFFSET, MCS_CONTROL_5_SET);
+    ADRV9001_SPIWRITEBYTE(device, "MCS_CONTROL_5", instance + ADRV9001_ADDR_MCS_CONTROL_5_OFFSET, MCS_CONTROL_5_SET);
 
     /*
         clk_pll_bf.clkgen_use_backup_reset = 0
         core_bf.devclk_divider_mcs_resetb = 1
         core_1_bf.analog_spare_6= 0x0F
     */
-    ADRV9001_SPIWRITEBYTE(device, "CLKGEN_RESET", baseAddr + ADRV9001_ADDR_CLKGEN_RESET_OFFSET, CLKGEN_RESET);
+    ADRV9001_SPIWRITEBYTE(device, "CLKGEN_RESET", instance + ADRV9001_ADDR_CLKGEN_RESET_OFFSET, CLKGEN_RESET);
 
     ADRV9001_SPIWRITEBYTE(device, "DEVICE_CLK_CONTROL_1", ADRV9001_ADDR_DEVICE_CLK_CONTROL_1, DEVICE_CLK_CONTROL_1);
 
@@ -110,16 +121,30 @@ int32_t adi_adrv9001_Mcs_PrepareArm(adi_adrv9001_Device_t *device)
     ADI_API_RETURN(device);
 }
 
-int32_t adi_adrv9001_Mcs_AnalogStatus_Get(adi_adrv9001_Device_t *device, adi_adrv9001_PllType_e pllType, uint32_t *mcsStatus)
+static int32_t adi_adrv9001_Mcs_AnalogStatus_Get_Validate(adi_adrv9001_Device_t *device, adi_adrv9001_Pll_e pll, uint32_t *mcsStatus)
+{
+    ADI_RANGE_CHECK(device, pll, ADI_ADRV9001_PLL_LO1, ADI_ADRV9001_PLL_CLK_LP);
+    ADI_NULL_PTR_RETURN(&device->common, mcsStatus);
+    ADI_API_RETURN(device);
+}
+
+int32_t adi_adrv9001_Mcs_AnalogStatus_Get(adi_adrv9001_Device_t *device, adi_adrv9001_Pll_e pll, uint32_t *mcsStatus)
 {
     uint8_t mcsStatusRead = 0;
-    adrv9001_BfNvsPllMemMapChanAddr_e baseAddr = ADRV9001_BF_CLK_PLL_LP;
+    static const adrv9001_BfNvsPllMemMap_e instances[] = {
+        ADRV9001_BF_RF1_PLL,
+        ADRV9001_BF_RF2_PLL,
+        ADRV9001_BF_AUX_PLL,
+        ADRV9001_BF_CLK_PLL,
+        ADRV9001_BF_CLK_PLL_LP
+    };
+    adrv9001_BfNvsPllMemMap_e instance = ADRV9001_BF_CLK_PLL;
 
-    ADI_API_ENTRY_PTR_EXPECT(device, mcsStatus);
+    ADI_PERFORM_VALIDATION(adi_adrv9001_Mcs_AnalogStatus_Get_Validate, device, pll, mcsStatus);
 
-    baseAddr = adrv9001_PllMemMapAddr_Get(device->devStateInfo.clkPllMode, pllType);
-
-    ADRV9001_SPIREADBYTE(device, "MCS_CONTROL_3", baseAddr + ADRV9001_ADDR_MCS_CONTROL_3_OFFSET, &mcsStatusRead);
+    instance = instances[pll];
+    
+    ADRV9001_SPIREADBYTE(device, "MCS_CONTROL_3", instance + ADRV9001_ADDR_MCS_CONTROL_3_OFFSET, &mcsStatusRead);
 
     *mcsStatus = (uint32_t)mcsStatusRead;
 
@@ -190,8 +215,8 @@ int32_t adi_adrv9001_Mcs_Capture_Enable(adi_adrv9001_Device_t *device)
     static const uint8_t MCS_CAPTURE_ENABLE           = 0x01;
     static const uint8_t MCS_INTERNAL_GEN             = 0x02;
 
-    /* TODO (JS): Evaluate if this can just be done via BfSet functions
-    ADI_EXPECT(adrv9001_NvsRegmapCoreMcsCaptureEnableBfSet, device, ADRV9001_BF_CORE, 1);
+    /* TODO (JS): Evaluate if this can just be done via _Set functions
+    ADI_EXPECT(adrv9001_NvsRegmapCoreMcsCaptureEnable_Set, device, 1);
     */
     ADRV9001_SPIREADBYTE(device, "MCS_CONTROL_1", ADRV9001_ADDR_MCS_CONTROL_1, &mcsCtrlReg1);
     mcsCtrlReg1 = (mcsCtrlReg1 & (~MCS_INTERNAL_GEN)) | MCS_CAPTURE_ENABLE;
@@ -206,9 +231,9 @@ int32_t adi_adrv9001_Mcs_Internal_Sync(adi_adrv9001_Device_t *device)
 
     static const uint8_t MCS_INTERNAL_GEN             = 0x02;
 
-    /* TODO (JS): Evaluate if this can just be done via BfSet functions
-    ADI_EXPECT(adrv9001_NvsRegmapCoreMcsInternalGenBfSet, device, ADRV9001_BF_CORE, 1);
-    ADI_EXPECT(adrv9001_NvsRegmapCoreMcsInternalGenBfSet, device, ADRV9001_BF_CORE, 0);
+    /* TODO (JS): Evaluate if this can just be done via _Set functions
+    ADI_EXPECT(adrv9001_NvsRegmapCoreMcsInternalGen_Set, device, 1);
+    ADI_EXPECT(adrv9001_NvsRegmapCoreMcsInternalGen_Set, device, 0);
     */
     /* Set MCS_INTERNAL_GEN field */
     ADRV9001_SPIREADBYTE(device, "MCS_CONTROL_1", ADRV9001_ADDR_MCS_CONTROL_1, &mcsCtrlReg1);
@@ -255,7 +280,7 @@ int32_t adi_adrv9001_Mcs_DigitalStatus_Get(adi_adrv9001_Device_t *device, uint32
     ADI_API_RETURN(device);
 }
 
-static int32_t __maybe_unused Mcs_Execute_Validate(adi_adrv9001_Device_t *device, adi_adrv9001_McsAction_e mcsAction)
+static int32_t Mcs_Execute_Validate(adi_adrv9001_Device_t *device, adi_adrv9001_McsAction_e mcsAction)
 {
     ADI_RANGE_CHECK(device, mcsAction, ADI_ADRV9001_MCS_INT_DIGITAL_ALL, ADI_ADRV9001_MCS_EXT_ANALOG_3);
 
@@ -266,15 +291,18 @@ int32_t adi_adrv9001_Mcs_Execute(adi_adrv9001_Device_t *device, adi_adrv9001_Mcs
 {
     uint8_t regVal = 0;
     int32_t halError = ADI_COMMON_ACT_NO_ACTION;
-    adrv9001_BfNvsPllMemMapChanAddr_e baseAddr = ADRV9001_BF_CLK_PLL_LP;
-
+    adrv9001_BfNvsPllMemMap_e baseAddr = ADRV9001_BF_CLK_PLL_LP;
+    
     static const uint8_t ANALOG_DEVCLK_REFCLK_DIV_SYNCED = 0x10;
     static const uint8_t ANALOG_SDM_SYNCED = 0x08;
     static const uint8_t ANALOG_CLKGEN_SYNCED = 0x04;
 
     ADI_PERFORM_VALIDATION(Mcs_Execute_Validate, device, mcsAction);
 
-    baseAddr = adrv9001_PllMemMapAddr_Get(device->devStateInfo.clkPllMode, ADI_ADRV9001_PLL_TYPE_CLK);
+    if (ADI_ADRV9001_CLK_PLL_HP_MODE == device->devStateInfo.clkPllMode)
+    {
+        baseAddr = ADRV9001_BF_CLK_PLL;
+    }
 
     if (true == bbicInitiated)
     {
@@ -321,22 +349,22 @@ int32_t adi_adrv9001_Mcs_Execute(adi_adrv9001_Device_t *device, adi_adrv9001_Mcs
         halError = adi_hal_Mcs_Pulse(device->common.devHalInfo, 1);
         break;
     case ADI_ADRV9001_MCS_EXT_ANALOG_ALL:
-        ADI_EXPECT(adi_adrv9001_Mcs_Prepare, device, ADI_ADRV9001_PLL_TYPE_CLK);
+        ADI_EXPECT(adi_adrv9001_Mcs_Prepare, device, ADI_ADRV9001_PLL_CLK);
         halError = adi_hal_Mcs_Pulse(device->common.devHalInfo, 4);
-        ADI_ERROR_REPORT(&device->common,
-                         ADI_COMMON_ERR_API_FAIL,
-                         halError,
-                         ADI_COMMON_ACT_ERR_RESET_FULL,
+        ADI_ERROR_REPORT(&device->common, 
+                         ADI_COMMON_ERR_API_FAIL, 
+                         halError, 
+                         ADI_COMMON_ACT_ERR_RESET_FULL, 
                          NULL,
                          "Error occurred in adi_hal_Mcs_Pulse");
         ADI_ERROR_RETURN(device->common.error.newAction);
-        ADI_EXPECT(adrv9001_NvsPllMemMapMcsSpiStatusBfGet, device, baseAddr, &regVal);
-        ADI_EXPECT(adrv9001_NvsPllMemMapClkgenUseSerdesMcsBfSet, device, baseAddr, 1);
+        ADI_EXPECT(adrv9001_NvsPllMemMap_McsSpiStatus_Get, device, baseAddr, &regVal);
+        ADI_EXPECT(adrv9001_NvsPllMemMap_ClkgenUseSerdesMcs_Set, device, baseAddr, 1);
         break;
     case ADI_ADRV9001_MCS_EXT_ANALOG_1:
-        ADI_EXPECT(adi_adrv9001_Mcs_Prepare, device, ADI_ADRV9001_PLL_TYPE_CLK);
+        ADI_EXPECT(adi_adrv9001_Mcs_Prepare, device, ADI_ADRV9001_PLL_CLK);
         halError = adi_hal_Mcs_Pulse(device->common.devHalInfo, 2);
-        ADI_EXPECT(adrv9001_NvsPllMemMapMcsSpiStatusBfGet, device, baseAddr, &regVal);
+        ADI_EXPECT(adrv9001_NvsPllMemMap_McsSpiStatus_Get, device, baseAddr, &regVal);
         if ((regVal & ANALOG_DEVCLK_REFCLK_DIV_SYNCED) != ANALOG_DEVCLK_REFCLK_DIV_SYNCED)
         {
             ADI_ERROR_REPORT(&device->common,
@@ -350,7 +378,7 @@ int32_t adi_adrv9001_Mcs_Execute(adi_adrv9001_Device_t *device, adi_adrv9001_Mcs
         break;
     case ADI_ADRV9001_MCS_EXT_ANALOG_2:
         halError = adi_hal_Mcs_Pulse(device->common.devHalInfo, 1);
-        ADI_EXPECT(adrv9001_NvsPllMemMapMcsSpiStatusBfGet, device, baseAddr, &regVal);
+        ADI_EXPECT(adrv9001_NvsPllMemMap_McsSpiStatus_Get, device, baseAddr, &regVal);
         if ((regVal & ANALOG_SDM_SYNCED) != ANALOG_SDM_SYNCED)
         {
             ADI_ERROR_REPORT(&device->common,
@@ -364,7 +392,7 @@ int32_t adi_adrv9001_Mcs_Execute(adi_adrv9001_Device_t *device, adi_adrv9001_Mcs
         break;
     case ADI_ADRV9001_MCS_EXT_ANALOG_3:
         halError = adi_hal_Mcs_Pulse(device->common.devHalInfo, 1);
-        ADI_EXPECT(adrv9001_NvsPllMemMapMcsSpiStatusBfGet, device, baseAddr, &regVal);
+        ADI_EXPECT(adrv9001_NvsPllMemMap_McsSpiStatus_Get, device, baseAddr, &regVal);
         if ((regVal & ANALOG_CLKGEN_SYNCED) != ANALOG_CLKGEN_SYNCED)
         {
             ADI_ERROR_REPORT(&device->common,
@@ -375,7 +403,7 @@ int32_t adi_adrv9001_Mcs_Execute(adi_adrv9001_Device_t *device, adi_adrv9001_Mcs
                              "Analog MCS 3 failed");
             ADI_ERROR_RETURN(device->common.error.newAction);
         }
-        ADI_EXPECT(adrv9001_NvsPllMemMapClkgenUseSerdesMcsBfSet, device, baseAddr, 1);
+        ADI_EXPECT(adrv9001_NvsPllMemMap_ClkgenUseSerdesMcs_Set, device, baseAddr, 1);
         break;
     default:
         ADI_ERROR_REPORT(&device->common,
@@ -386,15 +414,15 @@ int32_t adi_adrv9001_Mcs_Execute(adi_adrv9001_Device_t *device, adi_adrv9001_Mcs
                          "ADRV9001 did not request a known MCS action");
         ADI_ERROR_RETURN(device->common.error.newAction);
     }
-
-    ADI_ERROR_REPORT(&device->common,
-                     ADI_COMMON_ERR_API_FAIL,
-                     halError,
-                     ADI_COMMON_ACT_ERR_RESET_FULL,
+    
+    ADI_ERROR_REPORT(&device->common, 
+                     ADI_COMMON_ERR_API_FAIL, 
+                     halError, 
+                     ADI_COMMON_ACT_ERR_RESET_FULL, 
                      NULL,
                      "Error occurred in adi_hal_Mcs_Pulse");
     ADI_ERROR_RETURN(device->common.error.newAction);
-
+    
     halError = adi_hal_ssi_Reset(device->common.devHalInfo);
     ADI_ERROR_REPORT(&device->common,
                      ADI_COMMON_ERRSRC_DEVICEHAL,

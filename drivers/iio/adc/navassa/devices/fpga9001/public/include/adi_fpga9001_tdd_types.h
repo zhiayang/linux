@@ -98,6 +98,9 @@ typedef struct adi_fpga9001_TddConfig
     adi_fpga9001_TddChannel_t txGpioControls[ADI_ADRV9001_NUM_CHANNELS];
     adi_fpga9001_TddChannel_t interFrameControlSignal1[ADI_ADRV9001_NUM_CHANNELS];
     adi_fpga9001_TddChannel_t interFrameControlSignal2[ADI_ADRV9001_NUM_CHANNELS];
+    
+    adi_fpga9001_TddChannel_t smaOutput1;
+    adi_fpga9001_TddChannel_t smaOutput2;
 } adi_fpga9001_TddConfig_t;
 
 #ifdef __cplusplus

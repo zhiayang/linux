@@ -52,7 +52,7 @@ typedef enum adi_adrv9001_GpioPin
     ADI_ADRV9001_GPIO_ANALOG_10,        /*!< Analog GPIO Pin 10 */
     ADI_ADRV9001_GPIO_ANALOG_11,        /*!< Analog GPIO Pin 11 */
 } adi_adrv9001_GpioPin_e;
-
+    
 typedef enum adi_adrv9001_GpioPinCrumbSel
 {
     ADI_ADRV9001_GPIO_PIN_CRUMB_UNASSIGNED,
@@ -86,7 +86,7 @@ typedef enum adi_adrv9001_GpioTx1SsiPinSel
     ADI_ADRV9001_GPIO_TX1_SSI_04,      /*!< Select GPIO_Tx1_SSI_04*/
     ADI_ADRV9001_GPIO_TX1_SSI_05,      /*!< Select GPIO_Tx1_SSI_05*/
     ADI_ADRV9001_GPIO_TX1_SSI_06,      /*!< Select GPIO_Tx1_SSI_06*/
-    ADI_ADRV9001_GPIO_TX1_SSI_07,      /*!< Select GPIO_Tx1_SSI_07*/
+    ADI_ADRV9001_GPIO_TX1_SSI_07,      /*!< Select GPIO_Tx1_SSI_07*/    
     ADI_ADRV9001_GPIO_TX1_SSI_INVALID  /*!< Invalid Tx1 SSI GPIO*/
 } adi_adrv9001_GpioTx1SsiPinSel_e;
 
@@ -102,7 +102,7 @@ typedef enum adi_adrv9001_GpioTx2SsiPinSel
     ADI_ADRV9001_GPIO_TX2_SSI_04,      /*!< Select GPIO_Tx2_SSI_04*/
     ADI_ADRV9001_GPIO_TX2_SSI_05,      /*!< Select GPIO_Tx2_SSI_05*/
     ADI_ADRV9001_GPIO_TX2_SSI_06,      /*!< Select GPIO_Tx2_SSI_06*/
-    ADI_ADRV9001_GPIO_TX2_SSI_07,      /*!< Select GPIO_Tx2_SSI_07*/
+    ADI_ADRV9001_GPIO_TX2_SSI_07,      /*!< Select GPIO_Tx2_SSI_07*/    
     ADI_ADRV9001_GPIO_TX2_SSI_INVALID  /*!< Invalid TxX2 SSI GPIO*/
 } adi_adrv9001_GpioTx2SsiPinSel_e;
 
@@ -118,7 +118,7 @@ typedef enum adi_adrv9001_GpioRx1SsiPinSel
     ADI_ADRV9001_GPIO_RX1_SSI_04,      /*!< Select GPIO_Rx1_SSI_04*/
     ADI_ADRV9001_GPIO_RX1_SSI_05,      /*!< Select GPIO_Rx1_SSI_05*/
     ADI_ADRV9001_GPIO_RX1_SSI_06,      /*!< Select GPIO_Rx1_SSI_06*/
-    ADI_ADRV9001_GPIO_RX1_SSI_07,      /*!< Select GPIO_Rx1_SSI_07*/
+    ADI_ADRV9001_GPIO_RX1_SSI_07,      /*!< Select GPIO_Rx1_SSI_07*/    
     ADI_ADRV9001_GPIO_RX1_SSI_INVALID  /*!< Invalid Rx1 SSI GPIO*/
 } adi_adrv9001_GpioRx1SsiPinSel_e;
 
@@ -134,7 +134,7 @@ typedef enum adi_adrv9001_GpioRx2SsiPinSel
     ADI_ADRV9001_GPIO_RX2_SSI_04,      /*!< Select GPIO_Rx2_SSI_04*/
     ADI_ADRV9001_GPIO_RX2_SSI_05,      /*!< Select GPIO_Rx2_SSI_05*/
     ADI_ADRV9001_GPIO_RX2_SSI_06,      /*!< Select GPIO_Rx2_SSI_06*/
-    ADI_ADRV9001_GPIO_RX2_SSI_07,      /*!< Select GPIO_Rx2_SSI_07*/
+    ADI_ADRV9001_GPIO_RX2_SSI_07,      /*!< Select GPIO_Rx2_SSI_07*/    
     ADI_ADRV9001_GPIO_RX2_SSI_INVALID  /*!< Invalid Rx2 SSI GPIO*/
 } adi_adrv9001_GpioRx2SsiPinSel_e;
 
@@ -245,7 +245,7 @@ typedef enum adi_adrv9001_gpMaskSelect
 {
     ADI_ADRV9001_GPINT,
     ADI_ADRV9001_GPINT_NUMBER_OF_CHANNELS /* Keep this ENUM last as a reference to the total number of gp channel enum values */
-}adi_adrv9001_gpMaskSelect_e;
+}adi_adrv9001_gpMaskSelect_e;	
 
 /**
 * \brief GP_INT status general structure
@@ -267,7 +267,7 @@ typedef struct adi_adrv9001_gpMaskArray
 }adi_adrv9001_gpMaskArray_t;
 
 /**
- * \brief Enumeration of GPIO signal polarity
+ * \brief Enumeration of GPIO signal polarity 
  **/
 typedef enum adi_adrv9001_GpioPolarity
 {
@@ -302,7 +302,7 @@ typedef struct adi_adrv9001_GpioCtrlInitCfg
     adi_adrv9001_GpioCfg_t ext_pll_chip_enable[ADI_ADRV9001_NUM_PORTS];     /*!< (AGPIO) External PLL Chip Enables */
     adi_adrv9001_GpioCfg_t vco_chip_enable[ADI_ADRV9001_NUM_PORTS];         /*!< (AGPIO) Rx VCO Chip Enables */
     adi_adrv9001_GpioCfg_t ext_pll_lock[ADI_ADRV9001_NUM_PORTS];            /*!< (AGPIO) External PLL locks */
-
+    
     adi_adrv9001_GpioCfg_t channelPowerSaving[ADI_ADRV9001_NUM_CHANNELS];   /*!< (DGPIO) Channel Power Saving Enables */
     adi_adrv9001_GpioCfg_t systemPowerSavingAndMonitorEnable;               /*!< (DGPIO) System Power Saving and Monitor Enable */
     adi_adrv9001_GpioCfg_t systemPowerSavingAndMonitorWakeUp;               /*!< (DGPIO) Monitor WakeUp */

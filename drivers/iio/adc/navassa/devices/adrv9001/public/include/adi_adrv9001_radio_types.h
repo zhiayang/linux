@@ -21,23 +21,58 @@
 /**
  *  \brief Enum of PLL selections
  */
-typedef enum adi_adrv9001_PllName
+typedef enum adi_adrv9001_Pll
 {
-    ADI_ADRV9001_LO1_PLL = 0, /*!< Selects PLL LO1 for Rx and Tx */
-    ADI_ADRV9001_LO2_PLL,     /*!< Selects PLL LO2 for Rx and Tx */
-    ADI_ADRV9001_AUX_PLL      /*!< Selects AUX PLL for Rx and tx*/
-} adi_adrv9001_PllName_e;
+    ADI_ADRV9001_PLL_LO1 = 0, /*!< Selects PLL LO1 for Rx and Tx */
+    ADI_ADRV9001_PLL_LO2,     /*!< Selects PLL LO2 for Rx and Tx */
+    ADI_ADRV9001_PLL_AUX,     /*!< Selects AUX PLL for Rx and tx*/
+    ADI_ADRV9001_PLL_CLK,
+    ADI_ADRV9001_PLL_CLK_LP
+} adi_adrv9001_Pll_e;
 
 /**
  *  \brief Enum of PLL calibration mode
  */
-typedef enum adrv9001_PllCalMode 
+typedef enum adi_adrv9001_PllCalibration 
 {
-    ADI_ADRV9001_PLL_CAL_MODE_NORM = 0x00, /*!< PLL calibration setting in Normal mode */
-    ADI_ADRV9001_PLL_CAL_MODE_FAST = 0x01, /*!< PLL calibration setting in Fast mode  */
-    ADI_ADRV9001_PLL_RESERVED      = 0x02  /*!< RESERVED */
-} adrv9001_PllCalMode_e;
-    
+    ADI_ADRV9001_PLL_CALIBRATION_NORMAL,    /*!< PLL calibration setting in Normal mode */
+    ADI_ADRV9001_PLL_CALIBRATION_FAST,      /*!< PLL calibration setting in Fast mode  */
+    ADI_ADRV9001_PLL_CALIBRATION_RESERVED   /*!< RESERVED */
+} adi_adrv9001_PllCalibration_e;
+
+/**
+ * \brief Modes for LO Gen optimization
+ */
+typedef enum adi_adrv9001_LoGenOptimization
+{
+    ADI_ADRV9001_LO_GEN_OPTIMIZATION_PHASE_NOISE,       // Reduce phase noise at the cost of increased power consumption
+    ADI_ADRV9001_LO_GEN_OPTIMIZATION_POWER_CONSUMPTION  // Reduce power consumption at the cost of increased phase noise
+} adi_adrv9001_LoGenOptimization_e;
+
+/**
+ * \brief PLL power levels
+ */
+typedef enum adi_adrv9001_PllPower
+{
+    ADI_ADRV9001_PLL_POWER_LOW,
+    ADI_ADRV9001_PLL_POWER_MEDIUM,
+    ADI_ADRV9001_PLL_POWER_HIGH
+} adi_adrv9001_PllPower_e;
+
+/**
+ * \brief Carrier frequency configuration
+ */
+typedef struct adi_adrv9001_Carrier
+{
+    adi_adrv9001_PllCalibration_e pllCalibration;
+    /** LO Gen optimization mode
+     * \note When carrierFrequency_Hz > 1 GHz this is automatically selected by the ADRV9001 regardless of what you set
+     */
+    adi_adrv9001_LoGenOptimization_e loGenOptimization;
+    adi_adrv9001_PllPower_e pllPower;   /*!< PLL power; ignored in CALIBRATED state */
+    uint64_t carrierFrequency_Hz;       /*!< Carrier frequency, denoted in Hz. Valid range: 30MHz to 6 GHz*/
+} adi_adrv9001_Carrier_t;
+
 /**
  * \brief Modes controlling how a channel is enabled
  */    
@@ -80,15 +115,6 @@ typedef struct adi_adrv9001_PllLoopFilterCfg
     uint8_t  phaseMargin_degrees; /*< Synthesizer PLL Loop filter phase margin in degrees. Range 40-85 */
     uint8_t  powerScale; /*!< Synthesizer PLL Loop filter power scale. Range 0 - 10. Default is 10 */
 } adi_adrv9001_PllLoopFilterCfg_t;
-
-/**
- * \brief Enum used to determine if a Mail Box command is allowed inPrimed state 
- */
-typedef enum adi_adrv9001_MBSetInPrimedState
-{
-    ADI_ADRV9001_MB_NOT_ALLOWED, /*!< Mail Box command not allowed in primed state  */
-    ADI_ADRV9001_MB_RESERVED     /*!< Reserved */
-} adi_adrv9001_MBSetInPrimedState_e;
 
 /**
  * \brief Delay parameters from Tx_enable/Rx_enable rising/falling edge.

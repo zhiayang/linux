@@ -20,116 +20,15 @@
 #include "adi_fpga9001_error.h"
 #include "adi_fpga9001_hal.h"
 #include "adi_fpga9001_ssi.h"
-#include "fpga9001_ssi.h"
-
-#include "fpga9001_bf_dp_tollgate.h"
-#include "fpga9001_bf_dp_rx_dma.h"
-#include "fpga9001_bf_dp_tx_dma.h"
-#include "fpga9001_bf_dp_capture_control.h"
-#include "fpga9001_bf_tdd_dp_ctrl.h"
-#include "fpga9001_bf_axi_tdd_enable.h"
-#include "fpga9001_bf_axi_adrv9001_rx.h"
-
-
-/************************** Static helper functions **************************/
-/* This function should only be called with a single chain selected */
-static fpga9001_BfDpTollgateChanAddr_e fpga9001_TollgateChanAddrGet(adi_fpga9001_Device_t *device,
-                                                                    adi_common_Port_e port,
-                                                                    adi_common_ChannelNumber_e channel)
-{
-    if (ADI_RX == port && ADI_CHANNEL_1 == channel)
-    {
-        return FPGA9001_BF_RX_DP_TOLLGATE_00;
-    }
-    else if (ADI_RX == port && ADI_CHANNEL_2 == channel)
-    {
-        return FPGA9001_BF_RX_DP_TOLLGATE_01;
-    }
-    else if (ADI_TX == port && ADI_CHANNEL_1 == channel)
-    {
-        return FPGA9001_BF_TX_DP_TOLLGATE_00;
-    }
-    else if (ADI_TX == port && ADI_CHANNEL_2 == channel)
-    {
-        return FPGA9001_BF_TX_DP_TOLLGATE_01;
-    }
-    else if ((ADI_ORX == port && ADI_CHANNEL_1 == channel) ||
-             (ADI_ILB == port && ADI_CHANNEL_1 == channel) ||
-             (ADI_ELB == port && ADI_CHANNEL_1 == channel))
-    {
-        return FPGA9001_BF_RX_DP_TOLLGATE_02;
-    }
-    else if ((ADI_ORX == port && ADI_CHANNEL_2 == channel) ||
-             (ADI_ILB == port && ADI_CHANNEL_2 == channel) ||
-             (ADI_ELB == port && ADI_CHANNEL_2 == channel))
-    {
-        return FPGA9001_BF_RX_DP_TOLLGATE_03;
-    }
-    else
-    {
-        return 0;
-    }
-}
-
-static uint32_t fpga9001_DmaChanAddrGet(adi_fpga9001_Device_t *device,
-                                        adi_common_Port_e port,
-                                        adi_common_ChannelNumber_e channel)
-{
-    if (ADI_RX == port && ADI_CHANNEL_1 == channel)
-    {
-        return FPGA9001_BF_RX_DP_DMA_00;
-    }
-    else if (ADI_RX == port && ADI_CHANNEL_2 == channel)
-    {
-        return FPGA9001_BF_RX_DP_DMA_01;
-    }
-    else if (ADI_TX == port && ADI_CHANNEL_1 == channel)
-    {
-        return FPGA9001_BF_TX_DP_DMA_00;
-    }
-    else if (ADI_TX == port && ADI_CHANNEL_2 == channel)
-    {
-        return FPGA9001_BF_TX_DP_DMA_01;
-    }
-    else if ((ADI_ORX == port && ADI_CHANNEL_1 == channel) ||
-             (ADI_ILB == port && ADI_CHANNEL_1 == channel) ||
-             (ADI_ELB == port && ADI_CHANNEL_1 == channel))
-    {
-        return FPGA9001_BF_RX_DP_DMA_02;
-    }
-    else if ((ADI_ORX == port && ADI_CHANNEL_2 == channel) ||
-             (ADI_ILB == port && ADI_CHANNEL_2 == channel) ||
-             (ADI_ELB == port && ADI_CHANNEL_2 == channel))
-    {
-        return FPGA9001_BF_RX_DP_DMA_03;
-    }
-    else
-    {
-        return 0;
-    }
-}
+#include "fpga9001_utilities.h"
 
 int32_t adi_fpga9001_DataChain_Tollgate_Configure(adi_fpga9001_Device_t *device,
                                                   adi_common_Port_e port,
                                                   adi_common_ChannelNumber_e channel,
                                                   adi_fpga9001_TollgateCfg_t *tollGateCfg)
 {
-    fpga9001_BfDpTollgateChanAddr_e instanceAddress = FPGA9001_BF_RX_DP_TOLLGATE_00;
-
-    /* TODO: Refactor Range checks */
-    ADI_NULL_DEVICE_PTR_RETURN(device);
-
-    ADI_NULL_PTR_RETURN(&device->common, tollGateCfg);
-
-    ADI_RANGE_CHECK(device, port, ADI_RX, ADI_ELB);
-    ADI_RANGE_CHECK(device, channel, ADI_CHANNEL_1, ADI_CHANNEL_2);
-
-    instanceAddress = fpga9001_TollgateChanAddrGet(device, port, channel);
-
-//    ADI_EXPECT(fpga9001_DpTollgateEdgeLevelBfSet, device, instanceAddress, tollGateCfg->tollGateEdgeOrLvl);
-//    ADI_EXPECT(fpga9001_DpTollgateHighRisingLowFallingBfSet, device, instanceAddress, tollGateCfg->tollGateHiRiseOrLoFall);
-    ADI_EXPECT(fpga9001_DpTollgateTriggerSelectBfSet, device, instanceAddress, tollGateCfg->tollGateTrigSource);
-
+    ADI_ERROR_REPORT(&device->common, ADI_COMMON_ERRSRC_API, ADI_COMMON_ERR_OK, ADI_COMMON_ACT_NO_ACTION, 0,
+        "The function `adi_fpga9001_DataChain_Tollgate_Configure' is deprecated.");
     ADI_API_RETURN(device);
 }
 
@@ -138,31 +37,8 @@ int32_t adi_fpga9001_DataChain_Tollgate_Inspect(adi_fpga9001_Device_t *device,
                                                 adi_common_ChannelNumber_e channel,
                                                 adi_fpga9001_TollgateCfg_t *tollGateCfg)
 {
-    fpga9001_BfDpTollgateChanAddr_e instanceAddress = FPGA9001_BF_RX_DP_TOLLGATE_00;
-
-#ifdef ADI_FPGA9001_VERBOSE
-    ADI_FUNCTION_ENTRY_LOG(&device->common, ADI_COMMON_LOG_API);
-#endif
-
-    /* TODO: Refactor Range checks */
-    ADI_NULL_DEVICE_PTR_RETURN(device);
-
-    ADI_NULL_PTR_RETURN(&device->common, tollGateCfg);
-
-    ADI_RANGE_CHECK(device, port, ADI_RX, ADI_ELB);
-    ADI_RANGE_CHECK(device, channel, ADI_CHANNEL_1, ADI_CHANNEL_2);
-
-    instanceAddress = fpga9001_TollgateChanAddrGet(device, port, channel);
-
-    ADI_EXPECT(fpga9001_DpTollgateEdgeLevelBfGet, device, instanceAddress, &tollGateCfg->tollGateEdgeOrLvl);
-
-    ADI_EXPECT(fpga9001_DpTollgateHighRisingLowFallingBfGet,
-               device,
-               instanceAddress,
-               &tollGateCfg->tollGateHiRiseOrLoFall);
-
-    ADI_EXPECT(fpga9001_DpTollgateTriggerSelectBfGet, device, instanceAddress, &tollGateCfg->tollGateTrigSource);
-
+    ADI_ERROR_REPORT(&device->common, ADI_COMMON_ERRSRC_API, ADI_COMMON_ERR_OK, ADI_COMMON_ACT_NO_ACTION, 0,
+        "The function `adi_fpga9001_DataChain_Tollgate_Inspect' is deprecated.");
     ADI_API_RETURN(device);
 }
 
@@ -171,18 +47,8 @@ int32_t adi_fpga9001_DataChain_TollgateReset_Set(adi_fpga9001_Device_t *device,
                                                  adi_common_ChannelNumber_e channel,
                                                  uint8_t resetVal)
 {
-    fpga9001_BfDpTollgateChanAddr_e instanceAddress = FPGA9001_BF_RX_DP_TOLLGATE_00;
-
-    /* TODO: Refactor Range checks */
-    ADI_NULL_DEVICE_PTR_RETURN(device);
-
-    ADI_RANGE_CHECK(device, port, ADI_RX, ADI_ELB);
-    ADI_RANGE_CHECK(device, channel, ADI_CHANNEL_1, ADI_CHANNEL_2);
-
-    instanceAddress = fpga9001_TollgateChanAddrGet(device, port, channel);
-
-    ADI_EXPECT(fpga9001_DpTollgateResetTollgateBfSet, device, instanceAddress, resetVal);
-
+    ADI_ERROR_REPORT(&device->common, ADI_COMMON_ERRSRC_API, ADI_COMMON_ERR_OK, ADI_COMMON_ACT_NO_ACTION, 0,
+        "The function `adi_fpga9001_DataChain_TollgateReset_Set' is deprecated.");
     ADI_API_RETURN(device);
 }
 
@@ -191,48 +57,55 @@ int32_t adi_fpga9001_DataChain_TollgateReset_Get(adi_fpga9001_Device_t *device,
                                                  adi_common_ChannelNumber_e channel,
                                                  uint16_t *resetVal)
 {
-    fpga9001_BfDpTollgateChanAddr_e instanceAddress = FPGA9001_BF_RX_DP_TOLLGATE_00;
-    uint8_t resetBitRead = 0;
-
-    /* TODO: Refactor Range checks */
-    ADI_NULL_DEVICE_PTR_RETURN(device);
-
-    ADI_NULL_PTR_RETURN(&device->common, resetVal);
-
-    ADI_RANGE_CHECK(device, port, ADI_RX, ADI_TX);
-    ADI_RANGE_CHECK(device, channel, ADI_CHANNEL_1, ADI_CHANNEL_2);
-
-    instanceAddress = fpga9001_TollgateChanAddrGet(device, port, channel);
-
-    ADI_EXPECT(fpga9001_DpTollgateResetTollgateBfGet, device, instanceAddress, &resetBitRead);
-
-    *resetVal = (resetBitRead & 1);
-
+    ADI_ERROR_REPORT(&device->common, ADI_COMMON_ERRSRC_API, ADI_COMMON_ERR_OK, ADI_COMMON_ACT_NO_ACTION, 0,
+        "The function `adi_fpga9001_DataChain_TollgateReset_Get' is deprecated.");
     ADI_API_RETURN(device);
 }
+
+/* trigger select here is re-interpreted as follows; this needs to be fixed at the header. */
+/* hardware supports four trigger sources. */
+/* 1. CARRIER.SMA.0 (In ZC706, this is J67). */
+/* 2. CARRIER.SMA.1 (In ZC706, this is J68). */
+/* 3. FMC.SMA (In ADRV9001, this is MCS (this can also be sourced by device)). */
+/* 4. DEVICE.GPIO (In ADRV9001, this is any one of the digital GPIO.) */
+/* Each source can be either disabled (if all are disabled, it is immediate) */
+/* Individually rising edge OR falling edge (combination is allowed). */
+/* ADI_FPGA9001_TRIGGER_IMMEDIATE  : all trigger sources are disabled. */
+/* ADI_FPGA9001_TRIGGER_EXTERNAL   : CARRIER.SMA.0 is selected, rising edge. */
+/* ADI_FPGA9001_TRIGGER_TDD_DP     : Ignored. */
+/* ADI_FPGA9001_TRIGGER_TDD_GPIO   : DEVICE.GPIO is selected, rising edge. */
+/* Also, setting a trigger source while DMA is in progress will result in UNKNOWN  behavior. */
+/* It is certain that data integrity is lost, as data is disabled until trigger occurs. */
 
 int32_t adi_fpga9001_DataChain_TollgateTrigger_Set(adi_fpga9001_Device_t *device,
                                                    adi_common_Port_e port,
                                                    adi_common_ChannelNumber_e channel,
                                                    uint32_t triggerSelect)
 {
-    fpga9001_BfDpTollgateChanAddr_e instanceAddress = FPGA9001_BF_RX_DP_TOLLGATE_00;
+    uint32_t dma_id;
+    uint32_t trigger_mode[4];
 
-    /* TODO: Refactor Range checks */
     ADI_NULL_DEVICE_PTR_RETURN(device);
-
-    ADI_RANGE_CHECK(device, port, ADI_RX, ADI_TX);
+    ADI_RANGE_CHECK(device, port, ADI_RX, ADI_ORX);
     ADI_RANGE_CHECK(device, channel, ADI_CHANNEL_1, ADI_CHANNEL_2);
 
-    instanceAddress = fpga9001_TollgateChanAddrGet(device, port, channel);
-    adi_fpga9001_DataChain_TollgateReset_Set(device, port, channel, 1);
-    ADI_ERROR_RETURN(device->common.error.newAction);
+    if ((triggerSelect & ADI_FPGA9001_TRIGGER_TDD_DP) != 0)
+    {
+        ADI_ERROR_REPORT(&device->common, ADI_COMMON_ERRSRC_API, ADI_COMMON_ERR_OK, ADI_COMMON_ACT_NO_ACTION, 0,
+            "Trigger mode `ADI_FPGA9001_TRIGGER_TDD_DP' is deprecated.");
+    }
+    
+    trigger_mode[0] = (((triggerSelect & ADI_FPGA9001_TRIGGER_EXTERNAL) == 0) ||
+        ((triggerSelect & ADI_FPGA9001_TRIGGER_IMMEDIATE) != 0)) ?
+        AXI_DMA_TRIGGER_DISABLE : AXI_DMA_TRIGGER_RISING_EDGE;
+    trigger_mode[1] = AXI_DMA_TRIGGER_DISABLE;
+    trigger_mode[2] = AXI_DMA_TRIGGER_DISABLE;
+    trigger_mode[3] = (((triggerSelect & ADI_FPGA9001_TRIGGER_TDD_GPIO) == 0) ||
+        ((triggerSelect & ADI_FPGA9001_TRIGGER_IMMEDIATE) != 0)) ?
+        AXI_DMA_TRIGGER_DISABLE : AXI_DMA_TRIGGER_RISING_EDGE;
 
-    ADI_EXPECT(fpga9001_DpTollgateTriggerSelectBfSet, device, instanceAddress, triggerSelect);
-
-    adi_fpga9001_DataChain_TollgateReset_Set(device, port, channel, 0);
-    ADI_ERROR_RETURN(device->common.error.newAction);
-
+    dma_id = fpga9001_DMAIdGet(device, port, channel);
+    axi_dma_trigger_mode_set((void *)device, dma_id, &trigger_mode[0]);
     ADI_API_RETURN(device);
 }
 
@@ -241,174 +114,26 @@ int32_t adi_fpga9001_DataChain_TollgateTrigger_Get(adi_fpga9001_Device_t *device
                                                    adi_common_ChannelNumber_e channel,
                                                    uint32_t *triggerSelect)
 {
-    fpga9001_BfDpTollgateChanAddr_e instanceAddress = FPGA9001_BF_RX_DP_TOLLGATE_00;
+    uint32_t dma_id;
+    uint32_t trigger_data;
+    uint32_t trigger_mode[4];
 
-    /* TODO: Refactor Range checks */
     ADI_NULL_DEVICE_PTR_RETURN(device);
-
-    ADI_RANGE_CHECK(device, port, ADI_RX, ADI_TX);
+    ADI_RANGE_CHECK(device, port, ADI_RX, ADI_ORX);
     ADI_RANGE_CHECK(device, channel, ADI_CHANNEL_1, ADI_CHANNEL_2);
-
     ADI_NULL_PTR_RETURN(&device->common, triggerSelect);
 
-    instanceAddress = fpga9001_TollgateChanAddrGet(device, port, channel);
+    dma_id = fpga9001_DMAIdGet(device, port, channel);
+    axi_dma_trigger_mode_get((void *)device, dma_id, &trigger_mode[0]);
 
-    ADI_EXPECT(fpga9001_DpTollgateTriggerSelectBfGet, device, instanceAddress, (uint32_t *)triggerSelect);
+    trigger_data = ADI_FPGA9001_TRIGGER_IMMEDIATE;
+    if (trigger_mode[0] == AXI_DMA_TRIGGER_RISING_EDGE)
+        trigger_data = (trigger_data & ~ADI_FPGA9001_TRIGGER_IMMEDIATE) | ADI_FPGA9001_TRIGGER_EXTERNAL;
+    if (trigger_mode[3] == AXI_DMA_TRIGGER_RISING_EDGE)
+        trigger_data = (trigger_data & ~ADI_FPGA9001_TRIGGER_IMMEDIATE) | ADI_FPGA9001_TRIGGER_TDD_GPIO;
 
+    *triggerSelect = trigger_data;
     ADI_API_RETURN(device);
-}
-
-int32_t fpga9001_DpDmaEnableEnhancedModeBfSet(adi_fpga9001_Device_t * device, uint32_t baseAddr, uint8_t value)
-{
-    switch (baseAddr)
-    {
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_00:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_01:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_02:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_03:
-        return fpga9001_DpRxDmaEnableEnhancedModeBfSet(device, (fpga9001_BfDpRxDmaChanAddr_e)baseAddr, value);
-    case (uint32_t)FPGA9001_BF_TX_DP_DMA_00:
-    case (uint32_t)FPGA9001_BF_TX_DP_DMA_01:
-        return fpga9001_DpTxDmaEnableEnhancedModeBfSet(device, (fpga9001_BfDpTxDmaChanAddr_e)baseAddr, value);
-    default:
-        return ADI_COMMON_ACT_ERR_CHECK_PARAM;
-    }
-}
-
-int32_t fpga9001_DpDmaEnableSgBfSet(adi_fpga9001_Device_t *device, uint32_t baseAddr, uint8_t value)
-{
-    switch (baseAddr)
-    {
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_00:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_01:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_02:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_03:
-        return fpga9001_DpRxDmaEnableSgBfSet(device, (fpga9001_BfDpRxDmaChanAddr_e)baseAddr, value);
-    case (uint32_t)FPGA9001_BF_TX_DP_DMA_00:
-    case (uint32_t)FPGA9001_BF_TX_DP_DMA_01:
-        return fpga9001_DpTxDmaEnableSgBfSet(device, (fpga9001_BfDpTxDmaChanAddr_e)baseAddr, value);
-    default:
-        return ADI_COMMON_ACT_ERR_CHECK_PARAM;
-    }
-}
-
-int32_t fpga9001_DpDmaLengthBfSet(adi_fpga9001_Device_t *device, uint32_t baseAddr, uint32_t value)
-{
-    switch (baseAddr)
-    {
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_00:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_01:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_02:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_03:
-        return fpga9001_DpRxDmaLengthBfSet(device, (fpga9001_BfDpRxDmaChanAddr_e)baseAddr, value);
-    case (uint32_t)FPGA9001_BF_TX_DP_DMA_00:
-    case (uint32_t)FPGA9001_BF_TX_DP_DMA_01:
-        return fpga9001_DpTxDmaLengthBfSet(device, (fpga9001_BfDpTxDmaChanAddr_e)baseAddr, value);
-    default:
-        return ADI_COMMON_ACT_ERR_CHECK_PARAM;
-    }
-}
-
-int32_t fpga9001_DpDmaSgFirstDescriptorBfSet(adi_fpga9001_Device_t *device, uint32_t baseAddr, uint32_t value)
-{
-    switch (baseAddr)
-    {
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_00:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_01:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_02:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_03:
-        return fpga9001_DpRxDmaSgFirstDescriptorBfSet(device, (fpga9001_BfDpRxDmaChanAddr_e)baseAddr, value);
-    case (uint32_t)FPGA9001_BF_TX_DP_DMA_00:
-    case (uint32_t)FPGA9001_BF_TX_DP_DMA_01:
-        return fpga9001_DpTxDmaSqFirstDescriptorBfSet(device, (fpga9001_BfDpTxDmaChanAddr_e)baseAddr, value);
-    default:
-        return ADI_COMMON_ACT_ERR_CHECK_PARAM;
-    }
-}
-
-int32_t fpga9001_DpDmaSgLastDescriptorBfSet(adi_fpga9001_Device_t *device, uint32_t baseAddr, uint32_t value)
-{
-    switch (baseAddr)
-    {
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_00:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_01:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_02:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_03:
-        return fpga9001_DpRxDmaSgLastDescriptorBfSet(device, (fpga9001_BfDpRxDmaChanAddr_e)baseAddr, value);
-    case (uint32_t)FPGA9001_BF_TX_DP_DMA_00:
-    case (uint32_t)FPGA9001_BF_TX_DP_DMA_01:
-        return fpga9001_DpTxDmaSgLastDescriptorBfSet(device, (fpga9001_BfDpTxDmaChanAddr_e)baseAddr, value);
-    default:
-        return ADI_COMMON_ACT_ERR_CHECK_PARAM;
-    }
-}
-
-int32_t fpga9001_DpDmaSimpleStartAddrBfSet(adi_fpga9001_Device_t *device, uint32_t baseAddr, uint32_t value)
-{
-    switch (baseAddr)
-    {
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_00:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_01:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_02:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_03:
-        return fpga9001_DpRxDmaSimpleStartAddrBfSet(device, (fpga9001_BfDpRxDmaChanAddr_e)baseAddr, value);
-    case (uint32_t)FPGA9001_BF_TX_DP_DMA_00:
-    case (uint32_t)FPGA9001_BF_TX_DP_DMA_01:
-        return fpga9001_DpTxDmaSimpleStartAddrBfSet(device, (fpga9001_BfDpTxDmaChanAddr_e)baseAddr, value);
-    default:
-        return ADI_COMMON_ACT_ERR_CHECK_PARAM;
-    }
-}
-
-int32_t fpga9001_DpDmaValidDataWidthStreamBfSet(adi_fpga9001_Device_t *device, uint32_t baseAddr, uint8_t value)
-{
-    switch (baseAddr)
-    {
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_00:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_01:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_02:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_03:
-        return fpga9001_DpRxDmaValidDataWidthStreamBfSet(device, (fpga9001_BfDpRxDmaChanAddr_e)baseAddr, value);
-    case (uint32_t)FPGA9001_BF_TX_DP_DMA_00:
-    case (uint32_t)FPGA9001_BF_TX_DP_DMA_01:
-        return fpga9001_DpTxDmaValidDataWidthStreamBfSet(device, (fpga9001_BfDpTxDmaChanAddr_e)baseAddr, value);
-    default:
-        return ADI_COMMON_ACT_ERR_CHECK_PARAM;
-    }
-}
-
-int32_t fpga9001_DpDmaResetBfSet(adi_fpga9001_Device_t *device, uint32_t baseAddr, uint8_t value)
-{
-    switch (baseAddr)
-    {
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_00:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_01:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_02:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_03:
-        return fpga9001_DpRxDmaResetBfSet(device, (fpga9001_BfDpRxDmaChanAddr_e)baseAddr, value);
-    case (uint32_t)FPGA9001_BF_TX_DP_DMA_00:
-    case (uint32_t)FPGA9001_BF_TX_DP_DMA_01:
-        return fpga9001_DpTxDmaResetBfSet(device, (fpga9001_BfDpTxDmaChanAddr_e)baseAddr, value);
-    default:
-        return ADI_COMMON_ACT_ERR_CHECK_PARAM;
-    }
-}
-
-int32_t fpga9001_DpDmaRunStopBfSet(adi_fpga9001_Device_t *device, uint32_t baseAddr, uint8_t value)
-{
-    switch (baseAddr)
-    {
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_00:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_01:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_02:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_03:
-        return fpga9001_DpRxDmaRunStopBfSet(device, (fpga9001_BfDpRxDmaChanAddr_e)baseAddr, value);
-    case (uint32_t)FPGA9001_BF_TX_DP_DMA_00:
-    case (uint32_t)FPGA9001_BF_TX_DP_DMA_01:
-        return fpga9001_DpTxDmaRunStopBfSet(device, (fpga9001_BfDpTxDmaChanAddr_e)baseAddr, value);
-    default:
-        return ADI_COMMON_ACT_ERR_CHECK_PARAM;
-    }
 }
 
 int32_t adi_fpga9001_DataChain_Dma_Configure(adi_fpga9001_Device_t *device,
@@ -416,340 +141,53 @@ int32_t adi_fpga9001_DataChain_Dma_Configure(adi_fpga9001_Device_t *device,
                                              adi_common_ChannelNumber_e channel,
                                              adi_fpga9001_DmaCfg_t *dmaCfg)
 {
-    uint32_t instanceAddress = FPGA9001_BF_RX_DP_DMA_00;
-    uint32_t MAX_DMA_SIZE = 0;
-    uint32_t regVal = 0;
-    static const uint8_t CONTROL_REG_OFFSET = 0x8;
-    static const uint8_t VALID_DATA_WIDTH_OFFSET = 8;
-    static const uint8_t VALID_DATA_WIDTH_MASK = 0xF;
-    static const uint8_t ENABLE_ENHANCED_OFFSET = 3;
-    static const uint8_t ENABLE_ENHANCED_MASK = 0x1;
-    static const uint8_t ENABLE_SG_OFFSET = 2;
-    static const uint8_t ENABLE_SG_MASK = 0x1;
-    static const uint8_t CONTINUOUS_OFFSET = 1;
-    static const uint8_t CONTINUOUS_MASK = 0x1;
-    static const uint8_t RUN_STOP_OFFSET = 0;
-    static const uint8_t RUN_STOP_MASK = 0x1;
+    uint32_t dma_id;
+    uint32_t dma_max_size;
+    struct axi_dma_params dma_params;
 
-    /* TODO: Refactor Range checks */
     ADI_NULL_DEVICE_PTR_RETURN(device);
-
     ADI_RANGE_CHECK(device, port, ADI_RX, ADI_ELB);
     ADI_RANGE_CHECK(device, channel, ADI_CHANNEL_1, ADI_CHANNEL_2);
-
     ADI_NULL_PTR_RETURN(&device->common, dmaCfg);
 
-    /* DMA start address and length must be multiples of 64 */
     if (dmaCfg->simpleStartAddr % 64 != 0)
     {
-        ADI_ERROR_REPORT(&device->common,
-                         ADI_COMMON_ERRSRC_API,
-                         ADI_COMMON_ERR_INV_PARAM,
-                         ADI_COMMON_ACT_ERR_CHECK_PARAM,
-                         dmaCfg->simpleStartAddr,
-                         "Invalid parameter value. dmaCfg->simpleStartAddr must be a multiple of 64");
+        ADI_ERROR_REPORT(&device->common, ADI_COMMON_ERRSRC_API, ADI_COMMON_ERR_INV_PARAM,
+            ADI_COMMON_ACT_ERR_CHECK_PARAM, dmaCfg->simpleStartAddr,
+            "Invalid parameter value, dmaCfg->simpleStartAddr must be a multiple of 64.");
         ADI_ERROR_RETURN(device->common.error.newAction);
     }
+
     if (dmaCfg->length % 64 != 0)
     {
-        ADI_ERROR_REPORT(&device->common,
-                         ADI_COMMON_ERRSRC_API,
-                         ADI_COMMON_ERR_INV_PARAM,
-                         ADI_COMMON_ACT_ERR_CHECK_PARAM,
-                         dmaCfg->length,
-                         "Invalid parameter value. dmaCfg->length must be a multiple of 64");
+        ADI_ERROR_REPORT(&device->common, ADI_COMMON_ERRSRC_API, ADI_COMMON_ERR_INV_PARAM,
+            ADI_COMMON_ACT_ERR_CHECK_PARAM, dmaCfg->length,
+            "Invalid parameter value, dmaCfg->length must be a multiple of 64.");
         ADI_ERROR_RETURN(device->common.error.newAction);
     }
 
-    /* Validate dmaCfg->validDataWidthStream */
-    switch (dmaCfg->validDataWidthStream)
+    dma_max_size = (port == ADI_TX) ? TX_DMA_SIZE : RX_DMA_SIZE;
+    if (dmaCfg->length > dma_max_size)
     {
-    case ADI_FPGA9001_STREAM_32_BITS:   /* Falls through */
-    case ADI_FPGA9001_STREAM_64_BITS:   /* Falls through */
-    case ADI_FPGA9001_STREAM_128_BITS:   /* Falls through */
-    case ADI_FPGA9001_STREAM_256_BITS:   /* Falls through */
-    case ADI_FPGA9001_STREAM_512_BITS:   /* Falls through */
-        break;
-    default:
-        ADI_ERROR_REPORT(&device->common,
-                         ADI_COMMON_ERRSRC_API,
-                         ADI_COMMON_ERR_INV_PARAM,
-                         ADI_COMMON_ACT_ERR_CHECK_PARAM,
-                         dmaCfg->validDataWidthStream,
-                         "Invalid parameter value. dmaCfg->validDataWidthStream must be of adi_fpga9001_ValidDataWidth_e type.");
+        ADI_ERROR_REPORT(&device->common, ADI_COMMON_ERRSRC_API, ADI_COMMON_ERR_INV_PARAM,
+            ADI_COMMON_ACT_ERR_CHECK_PARAM, dmaCfg->length,
+            "Invalid parameter value, dmaCfg->length can not exceed certain size.");
+        ADI_ERROR_RETURN(device->common.error.newAction);
     }
 
-    /* The max DMA size depends on the data chains selected */
-    if ((ADI_RX == port)  || 
-        (ADI_ORX == port) ||
-        (ADI_ILB == port) ||
-        (ADI_ELB == port))
-    {
-        MAX_DMA_SIZE = RX_DMA_SIZE;
-    }
-    else if (ADI_TX == port)
-    {
-        MAX_DMA_SIZE = TX_DMA_SIZE;
-    }
+    dma_id = fpga9001_DMAIdGet(device, port, channel);
+    dma_params.start_address = dmaCfg->simpleStartAddr;
+    dma_params.length = dmaCfg->length;
+    dma_params.qthreshold = 0x2;
+    dma_params.cyclic = dmaCfg->continuous;
+    axi_dma_config((void *)device, dma_id, &dma_params);
+
+    if (dmaCfg->runStop == 1)
+        axi_dma_start((void *)device, dma_id);
     else
-    {
-        /* Nothing to do here; validation should ensure this is never reached */
-    }
-
-    /* TODO: start address could be changed at runtime by this function, and this length check is not enough to ensure RAM buffers do not overlap */
-    if (dmaCfg->length > MAX_DMA_SIZE)
-    {
-        ADI_ERROR_REPORT(&device->common,
-                         ADI_COMMON_ERRSRC_API,
-                         ADI_COMMON_ERR_INV_PARAM,
-                         ADI_COMMON_ACT_ERR_CHECK_PARAM,
-                         dmaCfg->length,
-                         "FPGA DMA capture length is too large for RAM buffer area");
-        ADI_ERROR_RETURN(device->common.error.newAction);
-    }
-
-    instanceAddress = fpga9001_DmaChanAddrGet(device, port, channel);
-
-    ADI_EXPECT(fpga9001_DpDmaSimpleStartAddrBfSet, device, instanceAddress, dmaCfg->simpleStartAddr);
-
-    ADI_EXPECT(fpga9001_DpDmaLengthBfSet, device, instanceAddress, dmaCfg->length);
-
-    /* Write the DMA control register */
-    regVal = ((dmaCfg->validDataWidthStream & VALID_DATA_WIDTH_MASK)    << VALID_DATA_WIDTH_OFFSET) |
-             ((dmaCfg->enableEnhancedMode   & ENABLE_ENHANCED_MASK)     << ENABLE_ENHANCED_OFFSET)  |
-             ((dmaCfg->enableSg             & ENABLE_SG_MASK)           << ENABLE_SG_OFFSET)        |
-             ((dmaCfg->continuous           & CONTINUOUS_MASK)          << CONTINUOUS_OFFSET)       |
-             ((dmaCfg->runStop              & RUN_STOP_MASK)            << RUN_STOP_OFFSET);
-
-    ADI_EXPECT(adi_fpga9001_hal_Register_Write, device, instanceAddress + CONTROL_REG_OFFSET, regVal);
-
-//    ADI_EXPECT(fpga9001_DpDmaSgFirstDescriptorBfSet, device, instanceAddress, dmaCfg->sgFirstDescriptor);
-
-    /* TODO: In TOKELAU, writing to this seems to be clearing the status register. debug later */
-//    ADI_EXPECT(fpga9001_DpDmaSgLastDescriptorBfSet, device, instanceAddress, dmaCfg->sgLastDescriptor);
+        axi_dma_stop((void *)device, dma_id);
 
     ADI_API_RETURN(device);
-}
-
-int32_t fpga9001_DpDmaActiveBfGet(adi_fpga9001_Device_t *device, uint32_t baseAddr, uint8_t *value)
-{
-    switch (baseAddr)
-    {
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_00:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_01:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_02:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_03:
-        return fpga9001_DpRxDmaActiveBfGet(device, (fpga9001_BfDpRxDmaChanAddr_e)baseAddr, value);
-    case (uint32_t)FPGA9001_BF_TX_DP_DMA_00:
-    case (uint32_t)FPGA9001_BF_TX_DP_DMA_01:
-        return fpga9001_DpTxDmaActiveBfGet(device, (fpga9001_BfDpTxDmaChanAddr_e)baseAddr, value);
-    default:
-        return ADI_COMMON_ACT_ERR_CHECK_PARAM;
-    }
-}
-
-int32_t fpga9001_DpDmaCompleteBfGet(adi_fpga9001_Device_t *device, uint32_t baseAddr, uint8_t *value)
-{
-    switch (baseAddr)
-    {
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_00:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_01:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_02:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_03:
-        return fpga9001_DpRxDmaCompleteBfGet(device, (fpga9001_BfDpRxDmaChanAddr_e)baseAddr, value);
-    case (uint32_t)FPGA9001_BF_TX_DP_DMA_00:
-    case (uint32_t)FPGA9001_BF_TX_DP_DMA_01:
-        return fpga9001_DpTxDmaCompleteBfGet(device, (fpga9001_BfDpTxDmaChanAddr_e)baseAddr, value);
-    default:
-        return ADI_COMMON_ACT_ERR_CHECK_PARAM;
-    }
-}
-
-int32_t fpga9001_DpDmaEnableEnhancedModeBfGet(adi_fpga9001_Device_t *device, uint32_t baseAddr, uint8_t *value)
-{
-    switch (baseAddr)
-    {
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_00:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_01:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_02:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_03:
-        return fpga9001_DpRxDmaEnableEnhancedModeBfGet(device, (fpga9001_BfDpRxDmaChanAddr_e)baseAddr, value);
-    case (uint32_t)FPGA9001_BF_TX_DP_DMA_00:
-    case (uint32_t)FPGA9001_BF_TX_DP_DMA_01:
-        return fpga9001_DpTxDmaEnableEnhancedModeBfGet(device, (fpga9001_BfDpTxDmaChanAddr_e)baseAddr, value);
-    default:
-        return ADI_COMMON_ACT_ERR_CHECK_PARAM;
-    }
-}
-
-int32_t fpga9001_DpDmaEnableSgBfGet(adi_fpga9001_Device_t *device, uint32_t baseAddr, uint8_t *value)
-{
-    switch (baseAddr)
-    {
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_00:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_01:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_02:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_03:
-        return fpga9001_DpRxDmaEnableSgBfGet(device, (fpga9001_BfDpRxDmaChanAddr_e)baseAddr, value);
-    case (uint32_t)FPGA9001_BF_TX_DP_DMA_00:
-    case (uint32_t)FPGA9001_BF_TX_DP_DMA_01:
-        return fpga9001_DpTxDmaEnableSgBfGet(device, (fpga9001_BfDpTxDmaChanAddr_e)baseAddr, value);
-    default:
-        return ADI_COMMON_ACT_ERR_CHECK_PARAM;
-    }
-}
-
-int32_t fpga9001_DpDmaHaltCompleteBfGet(adi_fpga9001_Device_t *device, uint32_t baseAddr, uint8_t *value)
-{
-    switch (baseAddr)
-    {
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_00:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_01:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_02:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_03:
-        return fpga9001_DpRxDmaHaltCompleteBfGet(device, (fpga9001_BfDpRxDmaChanAddr_e)baseAddr, value);
-    case (uint32_t)FPGA9001_BF_TX_DP_DMA_00:
-    case (uint32_t)FPGA9001_BF_TX_DP_DMA_01:
-        return fpga9001_DpTxDmaHaltCompleteBfGet(device, (fpga9001_BfDpTxDmaChanAddr_e)baseAddr, value);
-    default:
-        return ADI_COMMON_ACT_ERR_CHECK_PARAM;
-    }
-}
-
-int32_t fpga9001_DpDmaLengthBfGet(adi_fpga9001_Device_t *device, uint32_t baseAddr, uint32_t *value)
-{
-    switch (baseAddr)
-    {
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_00:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_01:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_02:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_03:
-        return fpga9001_DpRxDmaLengthBfGet(device, (fpga9001_BfDpRxDmaChanAddr_e)baseAddr, value);
-    case (uint32_t)FPGA9001_BF_TX_DP_DMA_00:
-    case (uint32_t)FPGA9001_BF_TX_DP_DMA_01:
-        return fpga9001_DpTxDmaLengthBfGet(device, (fpga9001_BfDpTxDmaChanAddr_e)baseAddr, value);
-    default:
-        return ADI_COMMON_ACT_ERR_CHECK_PARAM;
-    }
-}
-
-int32_t fpga9001_DpDmaOverUnderflowBfGet(adi_fpga9001_Device_t *device, uint32_t baseAddr, uint8_t *value)
-{
-    switch (baseAddr)
-    {
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_00:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_01:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_02:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_03:
-        return fpga9001_DpRxDmaOverflowBfGet(device, (fpga9001_BfDpRxDmaChanAddr_e)baseAddr, value);
-    case (uint32_t)FPGA9001_BF_TX_DP_DMA_00:
-    case (uint32_t)FPGA9001_BF_TX_DP_DMA_01:
-        return fpga9001_DpTxDmaUnderflowBfGet(device, (fpga9001_BfDpTxDmaChanAddr_e)baseAddr, value);
-    default:
-        return ADI_COMMON_ACT_ERR_CHECK_PARAM;
-    }
-}
-
-int32_t fpga9001_DpDmaRunStopBfGet(adi_fpga9001_Device_t *device, uint32_t baseAddr, uint8_t *value)
-{
-    switch (baseAddr)
-    {
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_00:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_01:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_02:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_03:
-        return fpga9001_DpRxDmaRunStopBfGet(device, (fpga9001_BfDpRxDmaChanAddr_e)baseAddr, value);
-    case (uint32_t)FPGA9001_BF_TX_DP_DMA_00:
-    case (uint32_t)FPGA9001_BF_TX_DP_DMA_01:
-        return fpga9001_DpTxDmaRunStopBfGet(device, (fpga9001_BfDpTxDmaChanAddr_e)baseAddr, value);
-    default:
-        return ADI_COMMON_ACT_ERR_CHECK_PARAM;
-    }
-}
-
-int32_t fpga9001_DpDmaContinuousBfGet(adi_fpga9001_Device_t *device, uint32_t baseAddr, uint8_t *value)
-{
-    switch (baseAddr)
-    {
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_00:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_01:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_02:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_03:
-        return 0;
-    case (uint32_t)FPGA9001_BF_TX_DP_DMA_00:
-    case (uint32_t)FPGA9001_BF_TX_DP_DMA_01:
-        return fpga9001_DpTxDmaContinuousBfGet(device, (fpga9001_BfDpTxDmaChanAddr_e)baseAddr, value);
-    default:
-        return ADI_COMMON_ACT_ERR_CHECK_PARAM;
-    }
-}
-
-int32_t fpga9001_DpDmaSgFirstDescriptorBfGet(adi_fpga9001_Device_t *device, uint32_t baseAddr, uint32_t *value)
-{
-    switch (baseAddr)
-    {
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_00:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_01:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_02:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_03:
-        return fpga9001_DpRxDmaSgFirstDescriptorBfGet(device, (fpga9001_BfDpRxDmaChanAddr_e)baseAddr, value);
-    case (uint32_t)FPGA9001_BF_TX_DP_DMA_00:
-    case (uint32_t)FPGA9001_BF_TX_DP_DMA_01:
-        return fpga9001_DpTxDmaSqFirstDescriptorBfGet(device, (fpga9001_BfDpTxDmaChanAddr_e)baseAddr, value);
-    default:
-        return ADI_COMMON_ACT_ERR_CHECK_PARAM;
-    }
-}
-
-int32_t fpga9001_DpDmaSgLastDescriptorBfGet(adi_fpga9001_Device_t *device, uint32_t baseAddr, uint32_t *value)
-{
-    switch (baseAddr)
-    {
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_00:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_01:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_02:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_03:
-        return fpga9001_DpRxDmaSgLastDescriptorBfGet(device, (fpga9001_BfDpRxDmaChanAddr_e)baseAddr, value);
-    case (uint32_t)FPGA9001_BF_TX_DP_DMA_00:
-    case (uint32_t)FPGA9001_BF_TX_DP_DMA_01:
-        return fpga9001_DpTxDmaSgLastDescriptorBfGet(device, (fpga9001_BfDpTxDmaChanAddr_e)baseAddr, value);
-    default:
-        return ADI_COMMON_ACT_ERR_CHECK_PARAM;
-    }
-}
-
-int32_t fpga9001_DpDmaSimpleStartAddrBfGet(adi_fpga9001_Device_t *device, uint32_t baseAddr, uint32_t *value)
-{
-    switch (baseAddr)
-    {
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_00:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_01:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_02:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_03:
-        return fpga9001_DpRxDmaSimpleStartAddrBfGet(device, (fpga9001_BfDpRxDmaChanAddr_e)baseAddr, value);
-    case (uint32_t)FPGA9001_BF_TX_DP_DMA_00:
-    case (uint32_t)FPGA9001_BF_TX_DP_DMA_01:
-        return fpga9001_DpTxDmaSimpleStartAddrBfGet(device, (fpga9001_BfDpTxDmaChanAddr_e)baseAddr, value);
-    default:
-        return ADI_COMMON_ACT_ERR_CHECK_PARAM;
-    }
-}
-
-int32_t fpga9001_DpDmaValidDataWidthStreamBfGet(adi_fpga9001_Device_t *device, uint32_t baseAddr, uint8_t *value)
-{
-    switch (baseAddr)
-    {
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_00:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_01:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_02:
-    case (uint32_t)FPGA9001_BF_RX_DP_DMA_03:
-        return fpga9001_DpRxDmaValidDataWidthStreamBfGet(device, (fpga9001_BfDpRxDmaChanAddr_e)baseAddr, value);
-    case (uint32_t)FPGA9001_BF_TX_DP_DMA_00:
-    case (uint32_t)FPGA9001_BF_TX_DP_DMA_01:
-        return fpga9001_DpTxDmaValidDataWidthStreamBfGet(device, (fpga9001_BfDpTxDmaChanAddr_e)baseAddr, value);
-    default:
-        return ADI_COMMON_ACT_ERR_CHECK_PARAM;
-    }
 }
 
 int32_t adi_fpga9001_DataChain_Dma_Inspect(adi_fpga9001_Device_t *device,
@@ -757,34 +195,27 @@ int32_t adi_fpga9001_DataChain_Dma_Inspect(adi_fpga9001_Device_t *device,
                                            adi_common_ChannelNumber_e channel,
                                            adi_fpga9001_DmaCfg_t *dmaCfg)
 {
-    uint32_t instanceAddress = FPGA9001_BF_RX_DP_DMA_00;
-    uint8_t validDataWidthStream = 0;
+    uint32_t dma_id;
 
-    /* TODO: Refactor Range checks */
     ADI_NULL_DEVICE_PTR_RETURN(device);
-
     ADI_RANGE_CHECK(device, port, ADI_RX, ADI_ELB);
     ADI_RANGE_CHECK(device, channel, ADI_CHANNEL_1, ADI_CHANNEL_2);
-
     ADI_NULL_PTR_RETURN(&device->common, dmaCfg);
 
-    instanceAddress = fpga9001_DmaChanAddrGet(device, port, channel);
-
-    ADI_EXPECT(fpga9001_DpDmaActiveBfGet,                  device, instanceAddress, &dmaCfg->active);
-    ADI_EXPECT(fpga9001_DpDmaCompleteBfGet,                device, instanceAddress, &dmaCfg->complete);
-    ADI_EXPECT(fpga9001_DpDmaEnableEnhancedModeBfGet,      device, instanceAddress, &dmaCfg->enableEnhancedMode);
-    ADI_EXPECT(fpga9001_DpDmaEnableSgBfGet,                device, instanceAddress, &dmaCfg->enableSg);
-    ADI_EXPECT(fpga9001_DpDmaHaltCompleteBfGet,            device, instanceAddress, &dmaCfg->haltComplete);
-    ADI_EXPECT(fpga9001_DpDmaLengthBfGet,                  device, instanceAddress, &dmaCfg->length);
-    ADI_EXPECT(fpga9001_DpDmaOverUnderflowBfGet,           device, instanceAddress, &dmaCfg->overUnderflow);
-    ADI_EXPECT(fpga9001_DpDmaRunStopBfGet,                 device, instanceAddress, &dmaCfg->runStop);
-    ADI_EXPECT(fpga9001_DpDmaContinuousBfGet,              device, instanceAddress, &dmaCfg->continuous);
-    ADI_EXPECT(fpga9001_DpDmaSgFirstDescriptorBfGet,       device, instanceAddress, &dmaCfg->sgFirstDescriptor);
-    ADI_EXPECT(fpga9001_DpDmaSgLastDescriptorBfGet,        device, instanceAddress, &dmaCfg->sgLastDescriptor);
-    ADI_EXPECT(fpga9001_DpDmaSimpleStartAddrBfGet,         device, instanceAddress, &dmaCfg->simpleStartAddr);
-    ADI_EXPECT(fpga9001_DpDmaValidDataWidthStreamBfGet,    device, instanceAddress, &validDataWidthStream);
-    dmaCfg->validDataWidthStream = (adi_fpga9001_ValidDataWidth_e)validDataWidthStream;
-
+    dma_id = fpga9001_DMAIdGet(device, port, channel);
+    dmaCfg->simpleStartAddr = axi_reg_read((void *)device, dma_id, AXI_DMA_START_ADDR_LOW_ADDR);
+    dmaCfg->length = axi_reg_read((void *)device, dma_id, AXI_DMA_LENGTH_ADDR);
+    dmaCfg->continuous = AXI_DMA_CYCLIC(axi_reg_read((void *)device, dma_id, AXI_DMA_CONTROL_ADDR));
+    dmaCfg->overUnderflow = AXI_DMA_OVERFLOW(axi_reg_read((void *)device, dma_id, AXI_DMA_STATUS_ADDR));
+    dmaCfg->active = axi_dma_busy((void *)device, dma_id);
+    dmaCfg->complete = ~dmaCfg->active;
+    dmaCfg->haltComplete = ~dmaCfg->active;
+    dmaCfg->runStop = dmaCfg->active;
+    dmaCfg->enableEnhancedMode = 0;
+    dmaCfg->enableSg = 0;
+    dmaCfg->sgFirstDescriptor = 0;
+    dmaCfg->sgLastDescriptor = 0;
+    dmaCfg->validDataWidthStream = ADI_FPGA9001_STREAM_512_BITS;
     ADI_API_RETURN(device);
 }
 
@@ -793,18 +224,14 @@ int32_t adi_fpga9001_DataChain_DmaReset_Set(adi_fpga9001_Device_t *device,
                                             adi_common_ChannelNumber_e channel,
                                             uint8_t reset)
 {
-    uint32_t instanceAddress = FPGA9001_BF_RX_DP_DMA_00;
+    uint32_t dma_id;
 
-    /* TODO: Refactor Range checks */
     ADI_NULL_DEVICE_PTR_RETURN(device);
-
     ADI_RANGE_CHECK(device, port, ADI_RX, ADI_ELB);
     ADI_RANGE_CHECK(device, channel, ADI_CHANNEL_1, ADI_CHANNEL_2);
 
-    instanceAddress = fpga9001_DmaChanAddrGet(device, port, channel);
-
-    ADI_EXPECT(fpga9001_DpDmaResetBfSet, device, instanceAddress, reset);
-
+    dma_id = fpga9001_DMAIdGet(device, port, channel);
+    axi_dma_reset((void *)device, dma_id);
     ADI_API_RETURN(device);
 }
 
@@ -813,30 +240,17 @@ int32_t adi_fpga9001_DataChain_DmaRun_Set(adi_fpga9001_Device_t *device,
                                               adi_common_ChannelNumber_e channel,
                                               bool run)
 {
-    uint32_t instanceAddress = FPGA9001_BF_RX_DP_DMA_00;
-    uint8_t dmaActive = 0;
-    uint8_t haltComplete = 0;
+    uint32_t dma_id;
 
-    /* TODO: Refactor Range checks */
     ADI_NULL_DEVICE_PTR_RETURN(device);
-
     ADI_RANGE_CHECK(device, port, ADI_RX, ADI_ELB);
     ADI_RANGE_CHECK(device, channel, ADI_CHANNEL_1, ADI_CHANNEL_2);
 
-    instanceAddress = fpga9001_DmaChanAddrGet(device, port, channel);
-
-    ADI_EXPECT(fpga9001_DpDmaActiveBfGet, device, instanceAddress, &dmaActive);
-
-    ADI_EXPECT(fpga9001_DpDmaRunStopBfSet, device, instanceAddress, run);
-
-    if (1 == dmaActive && false == run)
-    {
-        while (0 == haltComplete)
-        {
-            ADI_EXPECT(fpga9001_DpDmaHaltCompleteBfGet, device, instanceAddress, &haltComplete);
-        }
-    }
-
+    dma_id = fpga9001_DMAIdGet(device, port, channel);
+    if (run)
+        axi_dma_start((void *)device, dma_id);
+    else
+        axi_dma_stop((void *)device, dma_id);
     ADI_API_RETURN(device);
 }
 
@@ -845,29 +259,32 @@ int32_t adi_fpga9001_DataChain_DmaLength_Set(adi_fpga9001_Device_t *device,
                                              adi_common_ChannelNumber_e channel,
                                              uint32_t numBytes)
 {
-    uint32_t instanceAddress = FPGA9001_BF_RX_DP_DMA_00;
+    uint32_t dma_id;
+    uint32_t dma_max_size;
 
-    /* TODO: Refactor Range checks */
     ADI_NULL_DEVICE_PTR_RETURN(device);
-
-    ADI_RANGE_CHECK(device, port, ADI_RX, ADI_TX);
+    ADI_RANGE_CHECK(device, port, ADI_RX, ADI_ORX);
     ADI_RANGE_CHECK(device, channel, ADI_CHANNEL_1, ADI_CHANNEL_2);
 
-    if (numBytes > RX_DMA_SIZE)
+    if (numBytes % 64 != 0)
     {
-        ADI_ERROR_REPORT(&device->common,
-                         ADI_COMMON_ERRSRC_API,
-                         ADI_COMMON_ERR_INV_PARAM,
-                         ADI_COMMON_ACT_ERR_CHECK_PARAM,
-                         numBytes,
-                         "FPGA Rx DMA capture length is too large for RAM buffer area");
+        ADI_ERROR_REPORT(&device->common, ADI_COMMON_ERRSRC_API, ADI_COMMON_ERR_INV_PARAM,
+            ADI_COMMON_ACT_ERR_CHECK_PARAM, numBytes,
+            "Invalid parameter value, numBytes must be a multiple of 64.");
         ADI_ERROR_RETURN(device->common.error.newAction);
     }
 
-    instanceAddress = fpga9001_DmaChanAddrGet(device, port, channel);
+    dma_max_size = (port == ADI_TX) ? TX_DMA_SIZE : RX_DMA_SIZE;
+    if (numBytes > dma_max_size)
+    {
+        ADI_ERROR_REPORT(&device->common, ADI_COMMON_ERRSRC_API, ADI_COMMON_ERR_INV_PARAM,
+            ADI_COMMON_ACT_ERR_CHECK_PARAM, numBytes,
+            "Invalid parameter value, numBytes can not exceed certain size.");
+        ADI_ERROR_RETURN(device->common.error.newAction);
+    }
 
-    ADI_EXPECT(fpga9001_DpDmaLengthBfSet, device, instanceAddress, numBytes);
-
+    dma_id = fpga9001_DMAIdGet(device, port, channel);
+    axi_reg_write((void *)device, dma_id, AXI_DMA_LENGTH_ADDR, numBytes);
     ADI_API_RETURN(device);
 }
 
@@ -877,257 +294,24 @@ int32_t adi_fpga9001_DataChain_Configure(adi_fpga9001_Device_t *device,
                                          adi_fpga9001_TollgateCfg_t *tollgateCfg,
                                          adi_fpga9001_DmaCfg_t *dmaCfg)
 {
-    /* TODO: Refactor Range checks */
-    ADI_NULL_DEVICE_PTR_RETURN(device);
-
-    ADI_RANGE_CHECK(device, port, ADI_RX, ADI_ELB);
-    ADI_RANGE_CHECK(device, channel, ADI_CHANNEL_1, ADI_CHANNEL_2);
-
-    ADI_EXPECT(adi_fpga9001_DataChain_DmaRun_Set, device, port, channel, false);
-
-    /* Capture control datapath active */
-    if ((ADI_RX == port)  || 
-        (ADI_ORX == port) ||
-        (ADI_ILB == port) ||
-        (ADI_ELB == port))
-
-    {
-        fpga9001_DpCaptureControlDatapathActiveBfSet(device, FPGA9001_BF_RX_DP_CAPTURE_CONTROL, 1);
-    }
-    if (ADI_TX == port)
-    {
-        fpga9001_DpCaptureControlDatapathActiveBfSet(device, FPGA9001_BF_TX_DP_CAPTURE_CONTROL, 1);
-    }
-
-    /* Reset tollgate */
-    ADI_EXPECT(adi_fpga9001_DataChain_TollgateReset_Set, device, port, channel, 1);
-
-    ///* Reset DMAs */
-    ADI_EXPECT(adi_fpga9001_DataChain_DmaReset_Set, device, port, channel, 1);
-
-    /* Set up tollgate */
-    ADI_EXPECT(adi_fpga9001_DataChain_Tollgate_Configure, device, port, channel, tollgateCfg);
-
-    /* Configure DMAs */
-    ADI_EXPECT(adi_fpga9001_DataChain_Dma_Configure, device, port, channel, dmaCfg);
-
-    /* Reset capture control */
-    if ((ADI_RX == port)  || 
-        (ADI_ORX == port) ||
-        (ADI_ILB == port) ||
-        (ADI_ELB == port))
-    {
-        ADI_EXPECT(fpga9001_DpCaptureControlResetBfSet, device, FPGA9001_BF_RX_DP_CAPTURE_CONTROL, 1);
-    }
-    if (ADI_TX == port)
-    {
-        ADI_EXPECT(fpga9001_DpCaptureControlResetBfSet, device, FPGA9001_BF_TX_DP_CAPTURE_CONTROL, 1);
-    }
-
-
-
-    /* Un-reset capture control */
-    if ((ADI_RX == port)  || 
-        (ADI_ORX == port) ||
-        (ADI_ILB == port) ||
-        (ADI_ELB == port))
-    {
-        ADI_EXPECT(fpga9001_DpCaptureControlResetBfSet, device, FPGA9001_BF_RX_DP_CAPTURE_CONTROL, 0);
-    }
-    if (ADI_TX == port)
-    {
-        ADI_EXPECT(fpga9001_DpCaptureControlResetBfSet, device, FPGA9001_BF_TX_DP_CAPTURE_CONTROL, 0);
-    }
-
-    /* Un-reset DMAs */
-    ADI_EXPECT(adi_fpga9001_DataChain_DmaReset_Set, device, port, channel, 0);
-
-    /* Un-reset tollgate */
-    ADI_EXPECT(adi_fpga9001_DataChain_TollgateReset_Set, device, port, channel, 0);
-
-
-    ADI_API_RETURN(device);
+    return(adi_fpga9001_DataChain_Dma_Configure(device, port, channel, dmaCfg));
 }
 
 int32_t adi_fpga9001_DataChain_Reset(adi_fpga9001_Device_t *device)
 {
-    uint8_t active = 0;
-    uint8_t haltComplete = 0;
-    uint8_t i = 0;
-    static const uint8_t DATA_CHAIN_RESET_MAX_COUNT = 5;
-
-    /* TODO: Refactor Range checks */
     ADI_NULL_DEVICE_PTR_RETURN(device);
-
-    /* reset  */
-    ADI_EXPECT(fpga9001_DpCaptureControlDatapathActiveBfSet, device, FPGA9001_BF_RX_DP_CAPTURE_CONTROL, 0);
-    ADI_EXPECT(fpga9001_DpCaptureControlResetBfSet, device, FPGA9001_BF_RX_DP_CAPTURE_CONTROL, 1);
-
-    ADI_EXPECT(fpga9001_DpCaptureControlDatapathActiveBfSet, device, FPGA9001_BF_TX_DP_CAPTURE_CONTROL, 0);
-    ADI_EXPECT(fpga9001_DpCaptureControlResetBfSet, device, FPGA9001_BF_TX_DP_CAPTURE_CONTROL, 1);
-
-    /* Clear Rx DMA 0 */
-    ADI_EXPECT(fpga9001_DpDmaActiveBfGet, device, FPGA9001_BF_RX_DP_DMA_00, &active);
-
-    ADI_EXPECT(fpga9001_DpDmaRunStopBfSet, device, FPGA9001_BF_RX_DP_DMA_00, 0);
-
-    ADI_ERROR_RETURN(device->common.error.newAction);
-
-    if (active == 1)
-    {
-        haltComplete = 0;
-        for (i = 0; i < DATA_CHAIN_RESET_MAX_COUNT; i++)
-        {
-            ADI_EXPECT(fpga9001_DpDmaHaltCompleteBfGet, device, FPGA9001_BF_RX_DP_DMA_00, &haltComplete);
-            if (haltComplete != 0)
-            {
-                break;
-            }
-        }
-
-        if (i == DATA_CHAIN_RESET_MAX_COUNT)
-        {
-            ADI_ERROR_REPORT(&device->common,
-                             ADI_COMMON_ERRSRC_API,
-                             ADI_COMMON_ERR_API_FAIL,
-                             ADI_COMMON_ACT_ERR_RESET_FULL,
-                             NULL,
-                             "RX0 DMA Halt failed.");
-            ADI_ERROR_RETURN(device->common.error.newAction);
-        }
-    }
-
     adi_fpga9001_DataChain_DmaReset_Set(device, ADI_RX, ADI_CHANNEL_1, 1);
-    ADI_ERROR_RETURN(device->common.error.newAction);
-    /* End Rx DMA 0*/
-
-    /* Clear Rx DMA 1 */
-    active = 0;
-    haltComplete = 0;
-    ADI_EXPECT(fpga9001_DpDmaActiveBfGet, device, FPGA9001_BF_RX_DP_DMA_01, &active);
-
-    ADI_EXPECT(fpga9001_DpDmaRunStopBfSet, device, FPGA9001_BF_RX_DP_DMA_01, 0);
-    ADI_ERROR_RETURN(device->common.error.newAction);
-
-    if (active == 1)
-    {
-        for (i = 0; i < DATA_CHAIN_RESET_MAX_COUNT; i++)
-        {
-            ADI_EXPECT(fpga9001_DpDmaHaltCompleteBfGet, device, FPGA9001_BF_RX_DP_DMA_01, &haltComplete);
-            if (haltComplete != 0)
-            {
-                break;
-            }
-        }
-
-        if (i == DATA_CHAIN_RESET_MAX_COUNT)
-        {
-            ADI_ERROR_REPORT(&device->common,
-                             ADI_COMMON_ERRSRC_API,
-                             ADI_COMMON_ERR_API_FAIL,
-                             ADI_COMMON_ACT_ERR_RESET_FULL,
-                             NULL,
-                             "RX1 DMA Halt failed.");
-            ADI_ERROR_RETURN(device->common.error.newAction);
-        }
-    }
-
     adi_fpga9001_DataChain_DmaReset_Set(device, ADI_RX, ADI_CHANNEL_2, 1);
-    ADI_ERROR_RETURN(device->common.error.newAction);
-    /* End Rx DMA 1*/
-
-    /* Clear Tx DMA 0 */
-    haltComplete = 0;
-    ADI_EXPECT(fpga9001_DpDmaActiveBfGet, device, FPGA9001_BF_TX_DP_DMA_00, &active);
-
-    ADI_EXPECT(fpga9001_DpDmaRunStopBfSet, device, FPGA9001_BF_TX_DP_DMA_00, 0);
-    ADI_ERROR_RETURN(device->common.error.newAction);
-
-    if (active == 1)
-    {
-        haltComplete = 0;
-        for (i = 0; i < DATA_CHAIN_RESET_MAX_COUNT; i++)
-        {
-            ADI_EXPECT(fpga9001_DpDmaHaltCompleteBfGet, device, FPGA9001_BF_TX_DP_DMA_00, &haltComplete);
-            if (haltComplete != 0)
-            {
-                break;
-            }
-        }
-
-        if (i == DATA_CHAIN_RESET_MAX_COUNT)
-        {
-            ADI_ERROR_REPORT(&device->common,
-                             ADI_COMMON_ERRSRC_API,
-                             ADI_COMMON_ERR_API_FAIL,
-                             ADI_COMMON_ACT_ERR_RESET_FULL,
-                             NULL,
-                             "TX0 DMA Halt failed.");
-            ADI_ERROR_RETURN(device->common.error.newAction);
-        }
-    }
-
     adi_fpga9001_DataChain_DmaReset_Set(device, ADI_TX, ADI_CHANNEL_1, 1);
-    ADI_ERROR_RETURN(device->common.error.newAction);
-    /* End Tx DMA 0*/
-
-    /* Clear DMA 1 */
-    haltComplete = 0;
-    active = 0;
-    ADI_EXPECT(fpga9001_DpDmaActiveBfGet, device, FPGA9001_BF_TX_DP_DMA_01, &active);
-
-    ADI_EXPECT(fpga9001_DpDmaRunStopBfSet, device, FPGA9001_BF_TX_DP_DMA_01, 0);
-    ADI_ERROR_RETURN(device->common.error.newAction);
-
-    if (active == 1)
-    {
-        for (i = 0; i < DATA_CHAIN_RESET_MAX_COUNT; i++)
-        {
-            ADI_EXPECT(fpga9001_DpDmaHaltCompleteBfGet, device, FPGA9001_BF_TX_DP_DMA_01, &haltComplete);
-            if (haltComplete != 0)
-            {
-                break;
-            }
-        }
-
-        if (i == DATA_CHAIN_RESET_MAX_COUNT)
-        {
-            ADI_ERROR_REPORT(&device->common,
-                             ADI_COMMON_ERRSRC_API,
-                             ADI_COMMON_ERR_API_FAIL,
-                             ADI_COMMON_ACT_ERR_RESET_FULL,
-                             NULL,
-                             "TX1 DMA Halt failed.");
-            ADI_ERROR_RETURN(device->common.error.newAction);
-        }
-    }
-
     adi_fpga9001_DataChain_DmaReset_Set(device, ADI_TX, ADI_CHANNEL_2, 1);
-    ADI_ERROR_RETURN(device->common.error.newAction);
-    /* End Tx DMA 1*/
-
-    adi_fpga9001_DataChain_TollgateReset_Set(device, ADI_RX, ADI_CHANNEL_1, 1);
-    adi_fpga9001_DataChain_TollgateReset_Set(device, ADI_RX, ADI_CHANNEL_2, 1);
-    adi_fpga9001_DataChain_TollgateReset_Set(device, ADI_TX, ADI_CHANNEL_1, 1);
-    adi_fpga9001_DataChain_TollgateReset_Set(device, ADI_TX, ADI_CHANNEL_2, 1);
-    ADI_ERROR_RETURN(device->common.error.newAction);
-
     ADI_API_RETURN(device);
 }
 
 int32_t adi_fpga9001_DataChain_TxData_Stop(adi_fpga9001_Device_t *device)
 {
-#ifdef ADI_FPGA9001_VERBOSE
-    ADI_FUNCTION_ENTRY_LOG(&device->common, ADI_COMMON_LOG_API);
-#endif
-    /* Range checks */
     ADI_NULL_DEVICE_PTR_RETURN(device);
-
-    ADI_EXPECT(fpga9001_DpTxDmaRunStopBfSet, device, FPGA9001_BF_TX_DP_DMA_00, 0);
-    ADI_EXPECT(fpga9001_DpTxDmaRunStopBfSet, device, FPGA9001_BF_TX_DP_DMA_01, 0);
-
-    ADI_EXPECT(fpga9001_DpCaptureControlResetBfSet, device, FPGA9001_BF_TX_DP_CAPTURE_CONTROL, 1);
-
+    axi_dma_stop((void *)device, AXI_DMA_TX0_ID);
+    axi_dma_stop((void *)device, AXI_DMA_TX1_ID);
     ADI_API_RETURN(device);
 }
 
@@ -1136,78 +320,22 @@ int32_t adi_fpga9001_DataChain_Capture_Wait(adi_fpga9001_Device_t *device,
                                             adi_common_ChannelNumber_e channel,
                                             uint32_t timeout_ms)
 {
-    uint8_t bfVal = 0;
-    uint32_t i = 0;
-    uint32_t baseAddr = 0;
+    uint32_t dma_id;
 
-    /* TODO: Refactor Range checks */
     ADI_NULL_DEVICE_PTR_RETURN(device);
-
     ADI_RANGE_CHECK(device, port, ADI_RX, ADI_ELB);
     ADI_RANGE_CHECK(device, channel, ADI_CHANNEL_1, ADI_CHANNEL_2);
 
-    baseAddr = fpga9001_DmaChanAddrGet(device, port, channel);
+    dma_id = fpga9001_DMAIdGet(device, port, channel);
+    axi_dma_timer_set((void *)device, dma_id, (timeout_ms * 100000));
+    while (axi_dma_timer_get((void *)device, dma_id) != 0) {
+        if (axi_dma_busy((void *)device, dma_id) == 0)
+            ADI_API_RETURN(device);
+    }
     
-    for (i = 0; i < timeout_ms; i++)
-    {
-        ADI_EXPECT(fpga9001_DpDmaCompleteBfGet, device, baseAddr, &bfVal);
-        if (bfVal == 1)
-        {
-            return ADI_COMMON_ACT_NO_ACTION;
-        }
-
-        adi_common_hal_Wait_us(&device->common, 1000);
-    }
-
-    ADI_ERROR_REPORT(&device->common,
-                     ADI_COMMON_ERRSRC_API,
-                     ADI_FPGA9001_ERR_RX_DATA_MOVER_WAIT_TIMEOUT,
-                     ADI_COMMON_ACT_ERR_RESET_FEATURE,
-                     NULL,
-                     "RxCaptureWait timeout");
-
+    ADI_ERROR_REPORT(&device->common, ADI_COMMON_ERRSRC_API, ADI_FPGA9001_ERR_RX_DATA_MOVER_WAIT_TIMEOUT,
+        ADI_COMMON_ACT_ERR_RESET_FEATURE, 0, "The function `adi_fpga9001_DataChain_Capture_Wait' has timed out!");
     ADI_API_RETURN(device);
-}
-
-static int32_t RamAddrOffsetGet(adi_fpga9001_Device_t *device,
-                                adi_common_Port_e port,
-                                adi_common_ChannelNumber_e channel,
-                                uint32_t *ramAddress)
-{
-    if (ADI_RX == port && ADI_CHANNEL_1 == channel)
-    {
-        *ramAddress = ADI_FPGA9001_RX1_ADDR_OFFSET;
-    }
-    else if (ADI_RX == port && ADI_CHANNEL_2 == channel)
-    {
-        *ramAddress = ADI_FPGA9001_RX2_ADDR_OFFSET;
-    }
-    else if (ADI_TX == port && ADI_CHANNEL_1 == channel)
-    {
-        *ramAddress = ADI_FPGA9001_TX1_ADDR_OFFSET;
-    }
-    else if (ADI_TX == port && ADI_CHANNEL_2 == channel)
-    {
-        *ramAddress = ADI_FPGA9001_TX2_ADDR_OFFSET;
-    }
-    else if ((ADI_ORX == port && ADI_CHANNEL_1 == channel) ||
-             (ADI_ILB == port && ADI_CHANNEL_1 == channel) ||
-             (ADI_ELB == port && ADI_CHANNEL_1 == channel))
-    {
-        *ramAddress = ADI_FPGA9001_ORX1_ADDR_OFFSET;
-    }
-    else if ((ADI_ORX == port && ADI_CHANNEL_2 == channel) ||
-             (ADI_ILB == port && ADI_CHANNEL_2 == channel) ||
-             (ADI_ELB == port && ADI_CHANNEL_2 == channel))
-    {
-        *ramAddress = ADI_FPGA9001_ORX2_ADDR_OFFSET;
-    }
-    else
-    {
-        return ADI_COMMON_ACT_ERR_CHECK_PARAM;
-    }
-
-    return ADI_COMMON_ACT_NO_ACTION;
 }
 
 int32_t adi_fpga9001_DataChain_PerformCapture(adi_fpga9001_Device_t *device,
@@ -1217,50 +345,19 @@ int32_t adi_fpga9001_DataChain_PerformCapture(adi_fpga9001_Device_t *device,
                                               uint32_t numBytes,
                                               adi_fpga9001_TollgateTriggerSources_e trigger)
 {
-    uint32_t ramAddress = 0;
-
-    adi_fpga9001_TollgateCfg_t tollgateCfg = {
-        .tollGateTrigSource = trigger
-    };
-
-    adi_fpga9001_DmaCfg_t dmaCfg = {
-        .enableEnhancedMode = 0,
-        .length = numBytes,
-        .validDataWidthStream = ADI_FPGA9001_STREAM_32_BITS,
-        .runStop = 1
-    };
+    uint32_t trigger_select;
+    adi_fpga9001_DmaCfg_t dmaCfg;
 
     ADI_API_ENTRY_EXPECT(device);
+    dmaCfg.simpleStartAddr = ADI_FPGA9001_RAM_START_ADDR + fpga9001_BufBaseAddrGet(port, channel);
+    dmaCfg.continuous = (port == ADI_TX) ? 1 : 0;
+    dmaCfg.length = numBytes;
+    dmaCfg.runStop = 1;
+    trigger_select = (uint32_t) trigger;
 
-    ADI_EXPECT(RamAddrOffsetGet, device, port, channel, &ramAddress);
-    dmaCfg.simpleStartAddr = ADI_FPGA9001_RAM_START_ADDR + ramAddress;
-
-    // Check to see if tollgate and dma configurations actually need to be changed
-    adi_fpga9001_TollgateCfg_t currentTollgateCfg = {};
-    adi_fpga9001_DmaCfg_t currentDmaCfg = {};
-    ADI_EXPECT(adi_fpga9001_DataChain_Tollgate_Inspect, device, port, channel, &currentTollgateCfg);
-    ADI_EXPECT(adi_fpga9001_DataChain_Dma_Inspect, device, port, channel, &currentDmaCfg);
-
-    if (currentDmaCfg.enableEnhancedMode == dmaCfg.enableEnhancedMode &&
-        currentDmaCfg.simpleStartAddr == dmaCfg.simpleStartAddr &&
-        currentDmaCfg.length == dmaCfg.length &&
-        currentDmaCfg.sgFirstDescriptor == dmaCfg.sgFirstDescriptor &&
-        currentDmaCfg.sgLastDescriptor == dmaCfg.sgLastDescriptor &&
-        currentDmaCfg.continuous == dmaCfg.continuous &&
-        currentTollgateCfg.tollGateTrigSource == tollgateCfg.tollGateTrigSource)
-    // Just minimal operations required for restarting capture to RAM
-    {
-        ADI_EXPECT(adi_fpga9001_DataChain_DmaReset_Set, device, port, channel, 1);
-        ADI_EXPECT(adi_fpga9001_DataChain_DmaReset_Set, device, port, channel, 0);
-    }
-    else
-    // Otherwise, need full configuration and reset
-    {
-        ADI_EXPECT(adi_fpga9001_DataChain_Configure, device, port, channel, &tollgateCfg, &dmaCfg);
-    }
-    
-    ADI_EXPECT(adi_fpga9001_DataChain_Capture_Wait, device, port, channel, timeout_ms);
-
+    adi_fpga9001_DataChain_TollgateTrigger_Set(device, port, channel, trigger_select);
+    adi_fpga9001_DataChain_Configure(device, port, channel, 0, &dmaCfg);
+    adi_fpga9001_DataChain_Capture_Wait(device, port, channel, timeout_ms);
     ADI_API_RETURN(device);
 }
 
@@ -1268,24 +365,20 @@ int32_t adi_fpga9001_DataChain_PerformTx(adi_fpga9001_Device_t *device,
                                          adi_common_ChannelNumber_e channel,
                                          adi_fpga9001_TollgateTriggerSources_e trigger)
 {
-    uint32_t ramAddress = 0;
-    adi_fpga9001_TollgateCfg_t tollgateCfg = {
-        .tollGateTrigSource = trigger
-    };
-
-    adi_fpga9001_DmaCfg_t dmaCfg = { 0 };
+    uint32_t dma_id;
+    uint32_t trigger_select;
+    adi_fpga9001_DmaCfg_t dmaCfg;
 
     ADI_API_ENTRY_EXPECT(device);
-
-    ADI_EXPECT(RamAddrOffsetGet, device, ADI_TX, channel, &ramAddress);
-    ADI_EXPECT(adi_fpga9001_DataChain_Dma_Inspect, device, ADI_TX, channel, &dmaCfg);
+    dma_id = fpga9001_DMAIdGet(device, ADI_TX, channel);
+    dmaCfg.simpleStartAddr = ADI_FPGA9001_RAM_START_ADDR + fpga9001_BufBaseAddrGet(ADI_TX, channel);
+    dmaCfg.length = axi_reg_read((void *)device, dma_id, AXI_DMA_LENGTH_ADDR);
     dmaCfg.continuous = 1;
-    dmaCfg.enableEnhancedMode = 0;
-    dmaCfg.validDataWidthStream = ADI_FPGA9001_STREAM_32_BITS;
     dmaCfg.runStop = 1;
-    dmaCfg.simpleStartAddr = ADI_FPGA9001_RAM_START_ADDR + ramAddress;
-    ADI_EXPECT(adi_fpga9001_DataChain_Configure, device, ADI_TX, channel, &tollgateCfg, &dmaCfg);
+    trigger_select = (uint32_t) trigger;
 
+    adi_fpga9001_DataChain_TollgateTrigger_Set(device, ADI_TX, channel, trigger_select);
+    adi_fpga9001_DataChain_Configure(device, ADI_TX, channel, 0, &dmaCfg);
     ADI_API_RETURN(device);
 }
 
@@ -1407,8 +500,8 @@ int32_t adi_fpga9001_DataChain_Data_Get_16I16Q_Deduplicate(adi_fpga9001_Device_t
         ADI_API_RETURN(device);
     }
 
-    recoveryAction = RamAddrOffsetGet(device, port, channel, &ramAddress);
-    if (recoveryAction != ADI_COMMON_ACT_NO_ACTION)
+    ramAddress = fpga9001_BufBaseAddrGet(port, channel);
+    if (ramAddress == (uint32_t) -1)
     {
         free(rdBuff);
         ADI_API_RETURN(device);
@@ -1454,7 +547,7 @@ static int32_t adi_fpga9001_DataChain_Data_Get_16IQInterleavedValidate(adi_fpga9
                                                                        uint32_t length,
                                                                        uint32_t deduplicateBy)
 {
-    ADI_RANGE_CHECK(device, port, ADI_RX, ADI_TX);
+    ADI_RANGE_CHECK(device, port, ADI_RX, ADI_ORX);
     ADI_RANGE_CHECK(device, channel, ADI_CHANNEL_1, ADI_CHANNEL_2);
     ADI_RANGE_CHECK(device, deduplicateBy, 1u, 32u);
 
@@ -1488,7 +581,8 @@ int32_t adi_fpga9001_DataChain_Data_Get_16IQInterleaved_Deduplicate(adi_fpga9001
         ADI_API_RETURN(device);
     }
 
-    if (RamAddrOffsetGet(device, port, channel, &ramAddress) != ADI_COMMON_ACT_NO_ACTION)
+    ramAddress = fpga9001_BufBaseAddrGet(port, channel);
+    if (ramAddress == (uint32_t) -1)
     {
         free(rdBuff);
         ADI_API_RETURN(device);
@@ -1531,7 +625,7 @@ static int32_t adi_fpga9001_DataChain_Data_Get_16IValidate(adi_fpga9001_Device_t
                                                            uint16_t *iData,
                                                            uint32_t length)
 {
-    ADI_RANGE_CHECK(device, port, ADI_RX, ADI_TX);
+    ADI_RANGE_CHECK(device, port, ADI_RX, ADI_ORX);
     ADI_RANGE_CHECK(device, channel, ADI_CHANNEL_1, ADI_CHANNEL_2);
 
     ADI_NULL_PTR_RETURN(&device->common, iData);
@@ -1562,7 +656,9 @@ int32_t adi_fpga9001_DataChain_Data_Get_16I(adi_fpga9001_Device_t *device,
                          "Unable to allocate memory");
         ADI_API_RETURN(device);
     }
-    if (RamAddrOffsetGet(device, port, channel, &ramAddress) != ADI_COMMON_ACT_NO_ACTION)
+
+    ramAddress = fpga9001_BufBaseAddrGet(port, channel);
+    if (ramAddress == (uint32_t) -1)
     {
         free(rdBuff);
         ADI_API_RETURN(device);
@@ -1591,7 +687,7 @@ static int32_t adi_fpga9001_DataGet_SValidate(adi_fpga9001_Device_t *device,
                                               uint8_t *symbols,
                                               uint32_t length)
 {
-    ADI_RANGE_CHECK(device, port, ADI_RX, ADI_TX);
+    ADI_RANGE_CHECK(device, port, ADI_RX, ADI_ORX);
     ADI_RANGE_CHECK(device, channel, ADI_CHANNEL_1, ADI_CHANNEL_2);
 
     ADI_NULL_PTR_RETURN(&device->common, symbols);
@@ -1623,7 +719,8 @@ int32_t adi_fpga9001_DataChain_Data_Get_8S(adi_fpga9001_Device_t *device,
         ADI_API_RETURN(device);
     }
 
-    if (RamAddrOffsetGet(device, port, channel, &ramAddress) != ADI_COMMON_ACT_NO_ACTION)
+    ramAddress = fpga9001_BufBaseAddrGet(port, channel);
+    if (ramAddress == (uint32_t) -1)
     {
         free(rdBuff);
         ADI_API_RETURN(device);
@@ -1672,7 +769,8 @@ int32_t adi_fpga9001_DataChain_Data_Get_2S(adi_fpga9001_Device_t *device,
         ADI_API_RETURN(device);
     }
 
-    if (RamAddrOffsetGet(device, port, channel, &ramAddress) != ADI_COMMON_ACT_NO_ACTION)
+    ramAddress = fpga9001_BufBaseAddrGet(port, channel);
+    if (ramAddress == (uint32_t) -1)
     {
         free(rdBuff);
         ADI_API_RETURN(device);
@@ -1724,7 +822,8 @@ int32_t adi_fpga9001_DataChain_Data_Set_16I16Q(adi_fpga9001_Device_t *device,
         ADI_API_RETURN(device);
     }
 
-    if (RamAddrOffsetGet(device, port, channel, &ramAddress) != ADI_COMMON_ACT_NO_ACTION)
+    ramAddress = fpga9001_BufBaseAddrGet(port, channel);
+    if (ramAddress == (uint32_t) -1)
     {
         free(wrBuff);
         ADI_API_RETURN(device);
@@ -1768,7 +867,8 @@ int32_t adi_fpga9001_DataChain_Data_Set_16IQInterleaved(adi_fpga9001_Device_t *d
         ADI_API_RETURN(device);
     }
 
-    if (RamAddrOffsetGet(device, port, channel, &ramAddress) != ADI_COMMON_ACT_NO_ACTION)
+    ramAddress = fpga9001_BufBaseAddrGet(port, channel);
+    if (ramAddress == (uint32_t) -1)
     {
         free(wrBuff);
         ADI_API_RETURN(device);
@@ -1814,7 +914,8 @@ int32_t adi_fpga9001_DataChain_Data_Set_16I(adi_fpga9001_Device_t *device,
         ADI_API_RETURN(device);
     }
 
-    if (RamAddrOffsetGet(device, port, channel, &ramAddress) != ADI_COMMON_ACT_NO_ACTION)
+    ramAddress = fpga9001_BufBaseAddrGet(port, channel);
+    if (ramAddress == (uint32_t) -1)
     {
         free(wrBuff);
         ADI_API_RETURN(device);
@@ -1858,7 +959,8 @@ int32_t adi_fpga9001_DataChain_Data_Set_8S(adi_fpga9001_Device_t *device,
         ADI_API_RETURN(device);
     }
 
-    if (RamAddrOffsetGet(device, port, channel, &ramAddress) != ADI_COMMON_ACT_NO_ACTION)
+    ramAddress = fpga9001_BufBaseAddrGet(port, channel);
+    if (ramAddress == (uint32_t) -1)
     {
         free(wrBuff);
         ADI_API_RETURN(device);
@@ -1905,7 +1007,8 @@ int32_t adi_fpga9001_DataChain_Data_Set_2S(adi_fpga9001_Device_t *device,
         ADI_API_RETURN(device);
     }
 
-    if (RamAddrOffsetGet(device, port, channel, &ramAddress) != ADI_COMMON_ACT_NO_ACTION)
+    ramAddress = fpga9001_BufBaseAddrGet(port, channel);
+    if (ramAddress == (uint32_t) -1)
     {
         free(wrBuff);
         ADI_API_RETURN(device);
@@ -1930,7 +1033,6 @@ static int32_t adi_fpga9001_DataChain_RxClkRate_Set_Validate(adi_fpga9001_Device
                                                              adi_common_ChannelNumber_e channel)
 {
     ADI_RANGE_CHECK(device, channel, ADI_CHANNEL_1, ADI_CHANNEL_2);
-    
     ADI_API_RETURN(device);
 }
 
@@ -1938,14 +1040,16 @@ int32_t adi_fpga9001_DataChain_RxClkRate_Set(adi_fpga9001_Device_t *device,
                                              adi_common_ChannelNumber_e channel, 
                                              uint8_t rxClkRate_Hz)
 {
-    fpga9001_BfAxiAdrv9001RxChanAddr_e instanceAddr = FPGA9001_BF_AXI_ADRV9001_RX_0;
-    
+    uint32_t ssi_id;
+    uint32_t data;
+
     ADI_PERFORM_VALIDATION(adi_fpga9001_DataChain_RxClkRate_Set_Validate, device, channel);
     
-    instanceAddr = fpga9001_BfSsiChanAddrGet(device, ADI_RX, channel);
-    
-    ADI_EXPECT(fpga9001_AxiAdrv9001RxRxClkRateBfSet, device, instanceAddr, rxClkRate_Hz);
-    
+    ssi_id = fpga9001_SsiIdGet(device, ADI_RX, channel);
+    data = axi_reg_read((void *)device, AXI_ADRV9001_ID, (ssi_id + AXI_ADRV9001_SSI_CONTROL_ADDR));
+    data = data & ~AXI_ADRV9001_SSI_CLK_RATE_SET((uint32_t) -1);
+    data = data | AXI_ADRV9001_SSI_CLK_RATE_SET(rxClkRate_Hz);
+    axi_reg_write((void *)device, AXI_ADRV9001_ID, (ssi_id + AXI_ADRV9001_SSI_CONTROL_ADDR), data);
     ADI_API_RETURN(device);
 }
 
@@ -1954,9 +1058,7 @@ static int32_t adi_fpga9001_DataChain_RxClkRate_Get_Validate(adi_fpga9001_Device
                                                              uint8_t *rxClkRate_Hz)
 {
     ADI_RANGE_CHECK(device, channel, ADI_CHANNEL_1, ADI_CHANNEL_2);
-    
     ADI_NULL_PTR_RETURN(&device->common, rxClkRate_Hz);
-    
     ADI_API_RETURN(device);
 }
 
@@ -1964,13 +1066,13 @@ int32_t adi_fpga9001_DataChain_RxClkRate_Get(adi_fpga9001_Device_t *device,
                                              adi_common_ChannelNumber_e channel, 
                                              uint8_t *rxClkRate_Hz)
 {
-    fpga9001_BfAxiAdrv9001RxChanAddr_e instanceAddr = FPGA9001_BF_AXI_ADRV9001_RX_0;
-    
+    uint32_t ssi_id;
+    uint32_t data;
+
     ADI_PERFORM_VALIDATION(adi_fpga9001_DataChain_RxClkRate_Get_Validate, device, channel, rxClkRate_Hz);
     
-    instanceAddr = fpga9001_BfSsiChanAddrGet(device, ADI_RX, channel);
-    
-    ADI_EXPECT(fpga9001_AxiAdrv9001RxRxClkRateBfGet, device, instanceAddr, rxClkRate_Hz);
-    
+    ssi_id = fpga9001_SsiIdGet(device, ADI_RX, channel);
+    data = axi_reg_read((void *)device, AXI_ADRV9001_ID, (ssi_id + AXI_ADRV9001_SSI_CONTROL_ADDR));
+    *rxClkRate_Hz = AXI_ADRV9001_SSI_CLK_RATE_GET(data);
     ADI_API_RETURN(device);
 }
