@@ -43,7 +43,7 @@ int32_t adi_adrv9001_cals_InitCals_Run(adi_adrv9001_Device_t *adrv9001,
 
     ADI_API_ENTRY_PTR_EXPECT(adrv9001, initCals);
     ADI_NULL_PTR_RETURN(&adrv9001->common, errorFlag);
-    
+
     /* Bit mask info for non-channel related Init calibrations */
     payloadMailbox[0] = (uint8_t)(initCals->sysInitCalMask);
     payloadMailbox[1] = (uint8_t)(initCals->sysInitCalMask >> 8);
@@ -103,7 +103,7 @@ int32_t adi_adrv9001_cals_InitCals_Run(adi_adrv9001_Device_t *adrv9001,
                    adrv9001,
                    ADRV9001_ARMCMD_ERRCODE(ADRV9001_ARM_RUNINIT_OPCODE, 0, cmdStatusByte));
     }
-    
+
     adrv9001->devStateInfo.devState = (adi_adrv9001_ApiStates_e)(adrv9001->devStateInfo.devState | ADI_ADRV9001_STATE_INITCALS_RUN);
 
     /* TODO: Uncomment when FW requires this */
@@ -118,7 +118,7 @@ int32_t adi_adrv9001_cals_InitCals_Run(adi_adrv9001_Device_t *adrv9001,
                      device,
                      "Timer not working");
     ADI_ERROR_RETURN(adrv9001->common.error.newAction);
-    
+
     ADI_EXPECT(adi_adrv9001_Mcs_Execute, adrv9001, ADI_ADRV9001_MCS_EXT_ANALOG_ALL, true);
 #endif
     ADI_API_RETURN(adrv9001);
@@ -126,10 +126,11 @@ int32_t adi_adrv9001_cals_InitCals_Run(adi_adrv9001_Device_t *adrv9001,
 
 int32_t adi_adrv9001_cals_InitCalsBuildDefault(adi_adrv9001_InitCals_t *initCals)
 {
+    int ii = 0;
+
     initCals->calMode = ADI_ADRV9001_INIT_CAL_MODE_ALL;
     initCals->sysInitCalMask = ADI_ADRV9001_INIT_CAL_SYSTEM_ALL;
 
-    int ii = 0;
     for (ii = 0; ii < ADI_ADRV9001_MAX_RX_ONLY; ii++)
     {
         initCals->chanInitCalMask[ii] = ADI_ADRV9001_INIT_CAL_RX_TX_ALL;
@@ -152,7 +153,7 @@ static int32_t adi_adrv9001_TrackingCals_Channel_State_Validate(adi_adrv9001_Dev
         /* Check whether RX1/2 and TX1/2 are in CALIBRATED state to run tracking calibrations */
         if (trackingCals->chanTrackingCalMask[i] != 0)
         {
-            if (!(currentState.channelStates[0][i] == ADI_ADRV9001_CHANNEL_STANDBY) && 
+            if (!(currentState.channelStates[0][i] == ADI_ADRV9001_CHANNEL_STANDBY) &&
                 !(currentState.channelStates[0][i] == ADI_ADRV9001_CHANNEL_CALIBRATED))
             {
                 ADI_ERROR_REPORT(&adrv9001->common,
@@ -163,7 +164,7 @@ static int32_t adi_adrv9001_TrackingCals_Channel_State_Validate(adi_adrv9001_Dev
                     "Error while attempting to send tracking calmask mailbox command to ARM firmware. RX Channel must be in CALIBRATED state.");
                 ADI_API_RETURN(adrv9001)
             }
-            else if (!(currentState.channelStates[1][i] == ADI_ADRV9001_CHANNEL_STANDBY) && 
+            else if (!(currentState.channelStates[1][i] == ADI_ADRV9001_CHANNEL_STANDBY) &&
                      !(currentState.channelStates[1][i] == ADI_ADRV9001_CHANNEL_CALIBRATED))
             {
                 ADI_ERROR_REPORT(&adrv9001->common,
@@ -481,7 +482,7 @@ static int32_t adi_adrv9001_cals_ExternalPathDelay_Set_Validate(adi_adrv9001_Dev
     adi_common_channel_to_index(channel, &chan_index);
 
     ADI_EXPECT(adi_adrv9001_Radio_State_Get, adrv9001, &currentState);
-    if (!(currentState.channelStates[ADI_TX][chan_index] == ADI_ADRV9001_CHANNEL_STANDBY) && 
+    if (!(currentState.channelStates[ADI_TX][chan_index] == ADI_ADRV9001_CHANNEL_STANDBY) &&
         !(currentState.channelStates[ADI_TX][chan_index] == ADI_ADRV9001_CHANNEL_CALIBRATED))
     {
         ADI_ERROR_REPORT(&adrv9001->common,
@@ -579,7 +580,7 @@ int32_t adi_adrv9001_cals_InternalPathDelay_Get_Validate(adi_adrv9001_Device_t *
 {
     static uint8_t MAX_NUM_PROFILE = 6;
     adi_adrv9001_ChannelState_e state = ADI_ADRV9001_CHANNEL_STANDBY;
-    
+
     ADI_RANGE_CHECK(adrv9001, port, ADI_RX, ADI_TX);
     ADI_RANGE_CHECK(adrv9001, channel, ADI_CHANNEL_1, ADI_CHANNEL_2);
     ADI_NULL_PTR_RETURN(&adrv9001->common, internalPathDelays_ns);
@@ -587,7 +588,7 @@ int32_t adi_adrv9001_cals_InternalPathDelay_Get_Validate(adi_adrv9001_Device_t *
     ADI_EXPECT(adi_adrv9001_Radio_Channel_State_Get, adrv9001, port, channel, &state);
     if (ADI_ADRV9001_CHANNEL_STANDBY == state)
     {
-        ADI_ERROR_REPORT(&adrv9001->common, 
+        ADI_ERROR_REPORT(&adrv9001->common,
             ADI_COMMON_ERRSRC_API,
             ADI_COMMON_ERR_INV_PARAM,
             ADI_COMMON_ACT_ERR_CHECK_PARAM,

@@ -434,14 +434,13 @@ int32_t adi_adrv9001_spi_Inspect(adi_adrv9001_Device_t *device, adi_adrv9001_Spi
 int32_t adi_adrv9001_spi_Verify(adi_adrv9001_Device_t *device)
 {
     uint8_t spiReg = 0;
-
-    ADI_API_ENTRY_EXPECT(device);
-
     static const uint8_t SCRATCH_PAD_1 = 0xB6; /* DATA 10110110 */
     static const uint8_t SCRATCH_PAD_2 = 0x49; /* DATA 01001001 */
     static const uint8_t SCRATCH_PAD_3 = 0xA5; /* DATA 10100101 */
     static const uint8_t VENDOR_ID_0   = 0x56;
     static const uint8_t VENDOR_ID_1   = 0x04;
+
+    ADI_API_ENTRY_EXPECT(device);
 
     /* Check SPI read - VENDOR_ID_0 */
     ADRV9001_SPIREADBYTE(device, "VENDOR_ID_0", ADRV9001_ADDR_VENDOR_ID_0, &spiReg);
@@ -607,13 +606,18 @@ static uint32_t adi_adrv9001_Number_Extract(const char *src, uint8_t *location)
 int32_t adi_adrv9001_ApiVersion_Get(adi_adrv9001_Device_t *device, adi_common_ApiVersion_t *apiVersion)
 {
     char *version = ADI_ADRV9001_CURRENT_VERSION;
+#ifdef __KERNEL__
+    uint8_t location = 0;
+#endif
 
     ADI_API_ENTRY_PTR_EXPECT(device, apiVersion);
 
 #ifdef ADI_FILESYSTEM_AVAILABLE
     sscanf(version, "%u.%u.%u", &apiVersion->major, &apiVersion->minor, &apiVersion->patch);
 #else
+#ifndef __KERNEL__
     uint8_t location = 0;
+#endif
     apiVersion->major = adi_adrv9001_Number_Extract(version, &location);
     apiVersion->minor = adi_adrv9001_Number_Extract(version, &location);
     apiVersion->patch = adi_adrv9001_Number_Extract(version, &location);

@@ -15,8 +15,12 @@
 #ifndef ADRV9001_SPI_TYPES_H_
 #define ADRV9001_SPI_TYPES_H_
 
+#ifdef __KERNEL__
+#include <linux/types.h>
+#else
 #include <stdint.h>
 #include <stddef.h>
+#endif
 
 #include "adi_adrv9001.h"
 #include "adi_common_hal.h"

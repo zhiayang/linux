@@ -109,7 +109,7 @@ int32_t adi_adrv9001_Rx_GainControl_Mode_Get(adi_adrv9001_Device_t *device,
 {
     static const adrv9001_BfNvsRegmapRxb_e instances[] = { ADRV9001_BF_RXB1_CORE, ADRV9001_BF_RXB2_CORE };
     adrv9001_BfNvsRegmapRxb_e instance = ADRV9001_BF_RXB1_CORE;
-    uint8_t instanceIdx = 0;    
+    uint8_t instanceIdx = 0;
     uint8_t agcSetup = 0;
     uint8_t pinControl = 0;
 
@@ -280,6 +280,14 @@ int32_t adi_adrv9001_Rx_GainControl_Configure(adi_adrv9001_Device_t *device,
     static const uint8_t ADI_ADRV9001_GPIO_SOURCE_RX2_3_2 = 0x15;
     static const uint8_t ADI_ADRV9001_GPIO_SOURCE_RX2_5_4 = 0x16; /* peak */
     static const uint8_t ADI_ADRV9001_GPIO_SOURCE_RX2_7_6 = 0x17;
+#ifdef __KERNEL__
+    /* APD Low Frequency MITIGATION Mode Setup */
+    static const uint8_t APD_LOW_FREQ_ADCOVRG_2ND_HIGH_COUNTER = 3;
+    static const uint8_t APD_LOW_FREQ_ERROR_MITIGATION_MODE = 1;
+    static const uint32_t APD_LOW_FREQ_THRESH_SUBTRACTION_FACTOR = 33352;
+    static const uint32_t APD_LOW_FREQ_THRESH_DIVISION_FACTOR = 133352;
+    static const uint32_t APD_LOW_FREQ_THRESH_MULTIPLICATION_FACTOR = 100000;
+#endif
 
     ADI_PERFORM_VALIDATION(adi_adrv9001_Rx_GainControl_Configure_Validate, device, channel, agcCfg);
 
@@ -348,6 +356,7 @@ int32_t adi_adrv9001_Rx_GainControl_Configure(adi_adrv9001_Device_t *device,
     ADI_EXPECT(adrv9001_NvsRegmapRxb_AgcAdcovrgLowInt1Counter_Set,                 device, rxbAddr, agcCfg->peak.hbUnderRangeMidThreshExceededCount);
     ADI_EXPECT(adrv9001_NvsRegmapRxb_AgcAdcovrgLowInt0Counter_Set,                 device, rxbAddr, agcCfg->peak.hbUnderRangeLowThreshExceededCount);
 
+#ifndef __KERNEL__
     /* APD Low Frequency MITIGATION Mode Setup */
     static const uint8_t APD_LOW_FREQ_ADCOVRG_2ND_HIGH_COUNTER = 3;
     static const uint8_t APD_LOW_FREQ_ERROR_MITIGATION_MODE = 1;
@@ -355,7 +364,7 @@ int32_t adi_adrv9001_Rx_GainControl_Configure(adi_adrv9001_Device_t *device,
     static const uint32_t APD_LOW_FREQ_THRESH_SUBTRACTION_FACTOR = 33352;
     static const uint32_t APD_LOW_FREQ_THRESH_DIVISION_FACTOR = 133352;
     static const uint32_t APD_LOW_FREQ_THRESH_MULTIPLICATION_FACTOR = 100000;
-
+#endif
     /* The new formula should be:
        "decimated_data_overload_secondary_upper_threshold = Round((hbHighThresh - 0.33352)/1.33352)"
        The equation above is derived based on the fact that the 2nd high counter should be set 1.5dB below the hbHighThresh value.
@@ -474,7 +483,7 @@ int32_t adi_adrv9001_Rx_GainControl_Inspect(adi_adrv9001_Device_t *device,
     uint8_t instanceIdx = 0;
     uint8_t bfValue = 0;
     uint8_t i = 0;
-    
+
     static const uint16_t GPIO_SOURCE_SEL_ADDR = 0x56;
     enum
     {
@@ -487,7 +496,7 @@ int32_t adi_adrv9001_Rx_GainControl_Inspect(adi_adrv9001_Device_t *device,
         ADI_ADRV9001_GPIO_SOURCE_RX2_5_4 = 0x16, /* peak */
         ADI_ADRV9001_GPIO_SOURCE_RX2_7_6 = 0x17
     };
-    
+
     ADI_PERFORM_VALIDATION(adi_adrv9001_Rx_GainControl_Inspect_Validate, device, channel, agcCfg);
 
     adi_common_channel_to_index(channel, &instanceIdx);
@@ -577,7 +586,7 @@ int32_t adi_adrv9001_Rx_GainControl_Inspect(adi_adrv9001_Device_t *device,
 
     /* External LNA */
     ADI_EXPECT(adrv9001_NvsRegmapRxb_ExtLnaSettlingDelay_Get, device, rxbAddr, &agcCfg->extLna.settlingDelay);
-    
+
     /* GPIO */
     agcCfg->peak.feedback_high_threshold_counter_exceeded = ADI_ADRV9001_GPIO_PIN_CRUMB_UNASSIGNED;
     agcCfg->peak.feedback_low_threshold_counter_exceeded = ADI_ADRV9001_GPIO_PIN_CRUMB_UNASSIGNED;
@@ -586,7 +595,7 @@ int32_t adi_adrv9001_Rx_GainControl_Inspect(adi_adrv9001_Device_t *device,
     for (i = 0; i < ADI_ADRV9001_GPIO_PIN_CRUMB_15_14; i++)
     {
         ADRV9001_SPIREADBYTE(device, "GPIO_SOURCE_SEL", (GPIO_SOURCE_SEL_ADDR + i), &bfValue);
-        
+
         switch (bfValue)
         {
         case ADI_ADRV9001_GPIO_SOURCE_RX1_1_0:  /* Falls through */
@@ -679,7 +688,7 @@ int32_t adi_adrv9001_Rx_GainControl_MinMaxGainIndex_Get(adi_adrv9001_Device_t *d
     adrv9001_BfNvsRegmapRxb_e instances[] = { ADRV9001_BF_RXB1_CORE, ADRV9001_BF_RXB2_CORE };
     adrv9001_BfNvsRegmapRxb_e instance = ADRV9001_BF_RXB1_CORE;
     uint8_t instanceIdx = 0;
-    
+
     ADI_PERFORM_VALIDATION(adi_adrv9001_Rx_GainControl_MinMaxGainIndex_Get_Validate, device, channel, minGainIndex, maxGainIndex);
 
     adi_common_channel_to_index(channel, &instanceIdx);

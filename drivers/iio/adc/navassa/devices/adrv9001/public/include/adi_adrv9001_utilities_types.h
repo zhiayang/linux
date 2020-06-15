@@ -14,7 +14,11 @@
 #ifndef _ADI_ADRV9001_UTILITIES_TYPES_H_
 #define _ADI_ADRV9001_UTILITIES_TYPES_H_
 
+#ifdef __KERNEL__
+#include <linux/types.h>
+#else
 #include <stdint.h>
+#endif
 #include "adi_adrv9001_arm_types.h"
 #include "adi_adrv9001_cals_types.h"
 #include "adi_adrv9001_dpd_types.h"
@@ -48,20 +52,20 @@ typedef struct adi_adrv9001_RadioCtrlInit
 
     adi_adrv9001_Carrier_t rxCarriers[ADI_ADRV9001_MAX_RX_ONLY];    /*!< Configuration to hold Rx1/Rx2 channel carrier configuration on init */
     adi_adrv9001_Carrier_t txCarriers[ADI_ADRV9001_MAX_TXCHANNELS]; /*!< Configuration to hold Tx1/Tx2 channel carrier configuration on init */
-    
+
     bool txOutputPowerBoostEnable[ADI_ADRV9001_MAX_TXCHANNELS]; /*!< Enables Tx output power boost, increasing Tx output power by 3dB. Linearity will be degraded */
     adi_adrv9001_DpdInitCfg_t txDpdInit[ADI_ADRV9001_MAX_TXCHANNELS];
-    
+
     /* Stream binary image to download.  Used if adi_adrv9001_PlatformFiles.streamImageFile[0] == 0 */
-    uint8_t (*streamImageBinary)[ADI_ADRV9001_STREAM_BINARY_IMAGE_FILE_SIZE_BYTES]; 
-    
+    uint8_t (*streamImageBinary)[ADI_ADRV9001_STREAM_BINARY_IMAGE_FILE_SIZE_BYTES];
+
     adi_adrv9001_ChannelEnablementDelays_t rxEnableDelays[ADI_ADRV9001_NUM_CHANNELS];
     adi_adrv9001_ChannelEnablementDelays_t txEnableDelays[ADI_ADRV9001_NUM_CHANNELS];
 
     adi_adrv9001_SsiCalibrationCfg_t ssiConfig;                 /*!< CMOS/LVDS SSI calibration */
     uint32_t externalPathDelay_ps[ADI_ADRV9001_MAX_TXCHANNELS]; /*!< External path delay (LSB is 100ps; valid 0-6553500 ps) */
     bool adcDynamicSwitchEnable[ADI_ADRV9001_MAX_RX_ONLY];      /*!< Enable ADC Dynamic Switching */
-    
+
     /* TODO: Make these pointers in future */
     adi_adrv9001_PowerManagementSettings_t powerManagementSettings;                    /*!< LDO settings for adjusting power consumption */
     adi_adrv9001_arm_MonitorModeInitCfg_t monitorModeInitCfg;  /*!< Monitor Mode configuration at initialization time */
@@ -78,7 +82,7 @@ typedef struct adi_adrv9001_PlatformFiles
     uint8_t orxGainTableFile[128];
     uint8_t txAttenTableFile[128];
 } adi_adrv9001_PlatformFiles_t;
-    
+
 /**
 * \brief Data Structure to hold Resource Config settings
 */

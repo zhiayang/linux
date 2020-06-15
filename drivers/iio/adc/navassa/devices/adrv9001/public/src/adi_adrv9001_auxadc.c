@@ -139,7 +139,7 @@ int32_t adi_adrv9001_AuxAdc_Voltage_Get(adi_adrv9001_Device_t *device,
     uint16_t auxAdcCode = 0;
     static const uint16_t MEASURED_OFFSET = 0;
     static const uint16_t MEASURED_GAIN = 4096;
-    
+
     ADI_PERFORM_VALIDATION(adi_adrv9001_AuxAdc_Voltage_Get_Validate, device, auxAdc, auxAdc_mV);
 
     /* Get 12 bit ADC word from selected AuxADC */
@@ -162,7 +162,7 @@ int32_t adi_adrv9001_AuxAdc_Voltage_Get(adi_adrv9001_Device_t *device,
 
     /*TODO: offset and gain may be read from ADRV9001 device for this calculation */
     /* AUXADC_mV = (auxAdcCode - meausured_offset) / measured_gain */
-    *auxAdc_mV = KILO_TO_BASE_UNIT((float)(auxAdcCode - MEASURED_OFFSET) / MEASURED_GAIN);
+    *auxAdc_mV = KILO_TO_BASE_UNIT(auxAdcCode - MEASURED_OFFSET) / MEASURED_GAIN;
 
     ADI_API_RETURN(device);
 }

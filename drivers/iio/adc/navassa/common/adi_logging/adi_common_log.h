@@ -14,7 +14,11 @@
 #ifndef _ADI_COMMON_LOG_H_
 #define _ADI_COMMON_LOG_H_
 
+#ifdef __KERNEL__
+#include <linux/types.h>
+#else
 #include <stdint.h>
+#endif
 #include "adi_common_log_types.h"
 #include "adi_common_macros.h"
 #include "adi_common_error.h"
@@ -32,10 +36,10 @@ extern "C" {
 #ifdef ADI_COMMON_VERBOSE
 /**
 * \brief Macro to log API function entry
-* 
+*
 * This macro will call adi_common_LogWrite function with the __FUNCTION__ preprocessor
 * It will report any error discovered.
-* 
+*
 * \param commonDev pointer to adi_common_Device_t
 * \param logLevel of type adi_common_LogLevel_e
 */
@@ -45,9 +49,9 @@ extern "C" {
 
 /**
 * \brief Macro to log API function entry
-* 
+*
 * This macro will call adi_common_LogWrite function with the __FUNCTION__ preprocessor
-* 
+*
 * \param commonDev pointer to adi_common_Device_t
 * \param logLevel of type adi_common_LogLevel_e
 * \param message const char pointer that represents the message to be logged
@@ -58,9 +62,9 @@ extern "C" {
 
 /**
 * \brief Macro to log API function entry
-* 
+*
 * This macro will call adi_common_LogWrite function with the __FUNCTION__ preprocessor
-* 
+*
 * \param commonDev pointer to adi_common_Device_t
 * \param message const char pointer that represents the message to be logged
 */
@@ -111,9 +115,9 @@ extern "C" {
 
 /**
 * \brief Function to set the log level
-* 
-* Used to set the log level mask of what types of messages to log 
-* 
+*
+* Used to set the log level mask of what types of messages to log
+*
 * \param commonDev pointer to adi_common_Device_t
 * \param halLogLevel of type int32_t that follows adi_common_LogLevel_e
 *                    sets the application log level to which all log statement levels will be commpared to.
@@ -122,18 +126,18 @@ void adi_common_LogLevelSet(adi_common_Device_t *commonDev, int32_t halLogLevel)
 
 /**
 * \brief Function to get the log level
-* 
+*
 * Used to read the log level mask of what types of messages are able to be logged.
 *
 * \param commonDev pointer to adi_common_Device_t
 * \param halLogLevel Pointer of type int32_t that follows adi_common_LogLevel_e
-* 
+*
 */
 void adi_common_LogLevelGet(adi_common_Device_t *commonDev, int32_t *halLogLevel);
 
 /**
 * \brief Function to write to log with a selected comment
-* 
+*
 * \param commonDev pointer to adi_common_Device_t
 * \param logLevel of type adi_common_LogLevel_e
 * \param comment const char pointer that represents the message to be logged
@@ -143,12 +147,12 @@ void adi_common_LogWrite(adi_common_Device_t *commonDev, adi_common_LogLevel_e l
 
 /**
 * \brief Function to open the log file associated to the log
-* 
+*
 * Used to open the log file that is stored in the platform
-* 
+*
 * \param commonDev pointer to adi_common_Device_t
 * \param fileName file name to be open, if null default name in the devHalInfo structure will be used
-* 
+*
 * \retval ADI_COMMON_ACT_WARN_RESET_LOG Recovery action for log reset
 * \retval ADI_COMMON_ACT_NO_ACTION Function completed successfully, no action required
 */
@@ -156,11 +160,11 @@ int32_t adi_common_LogFileOpen(adi_common_Device_t *commonDev, char* fileName);
 
 /**
 * \brief Function to close the log file associated to the log
-* 
+*
 * Used to close the log file that is stored in the platform
-* 
+*
 * \param commonDev pointer to adi_common_Device_t
-* 
+*
 * \retval ADI_COMMON_ACT_WARN_RESET_LOG Recovery action for log reset
 * \retval ADI_COMMON_ACT_NO_ACTION Function completed successfully, no action required
 */

@@ -20,9 +20,13 @@
 extern "C" {
 #endif
 
+#ifdef __KERNEL__
+#include <linux/types.h>
+#else
 #include <stdint.h>
 #include <stdbool.h>
-    
+#endif
+
 /**
 *  \brief Rx gain table SRAM base addresses
 */

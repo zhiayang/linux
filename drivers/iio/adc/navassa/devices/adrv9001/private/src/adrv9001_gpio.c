@@ -216,10 +216,6 @@ int32_t adrv9001_GpIntHandler(adi_adrv9001_Device_t *device, adi_adrv9001_gpIntS
         recoveryAction = ADI_ADRV9001_ACT_ERR_BBIC_LOG_ERROR;
         errMsg = "Unknown GP Interrupt source";
     }
-    if (errMsg == '\0')
-    {
-        errMsg = "No Interrupt Detected";
-    }
 
     if (recoveryAction == 10000)
     {
@@ -265,7 +261,7 @@ int32_t adrv9001_GpInterruptsMaskPinBfGet(adi_adrv9001_Device_t *device, uint32_
 
     ADI_FUNCTION_ENTRY_LOG(&device->common, ADI_COMMON_LOG_BF);
 
-#if ADRV9001_BITFIELD_NULL_CHECK > 0
+#ifdef ADRV9001_BITFIELD_NULL_CHECK
     /* NULL check */
     ADI_NULL_PTR_RETURN(&device->common, bfValue);
 #endif /* ADRV9001_BITFIELD_NULL_CHECK */
@@ -300,7 +296,7 @@ int32_t adrv9001_GpInterruptsStatusWordBfGet(adi_adrv9001_Device_t *device, uint
 
     ADI_NULL_DEVICE_PTR_RETURN(device);
 
-#if ADRV9001_BITFIELD_NULL_CHECK > 0
+#ifdef ADRV9001_BITFIELD_NULL_CHECK
     /* NULL check */
     ADI_NULL_PTR_RETURN(&device->common, bfValue);
 #endif /* ADRV9001_BITFIELD_NULL_CHECK */
