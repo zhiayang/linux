@@ -403,16 +403,20 @@ static ssize_t adrv9002_phy_lo_write(struct iio_dev *indio_dev,
 	struct adrv9002_rf_phy *phy = iio_priv(indio_dev);
 	const adi_common_Port_e port = ADRV_ADDRESS_PORT(chan->address);
 	const int chan_nr = ADRV_ADDRESS_CHAN(chan->address);
-	u64 readin;
 	int ret = 0;
 	struct adrv9002_chan *chann = adrv9002_get_channel(phy, port, chan_nr);
+	struct adi_adrv9001_Carrier lo_freq = {
+		.pllCalibration = ADI_ADRV9001_PLL_CALIBRATION_NORMAL,
+		.loGenOptimization = ADI_ADRV9001_LO_GEN_OPTIMIZATION_PHASE_NOISE,
+		.pllPower = ADI_ADRV9001_PLL_POWER_MEDIUM
+	};
 
 	if (!chann->enabled)
 		return -ENODEV;
 
 	switch (private) {
 	case LOEXT_FREQ:
-		ret = kstrtoull(buf, 10, &readin);
+		ret = kstrtoull(buf, 10, &lo_freq.carrierFrequency_Hz);
 		if (ret)
 			return ret;
 
@@ -424,11 +428,8 @@ static ssize_t adrv9002_phy_lo_write(struct iio_dev *indio_dev,
 		if (ret)
 			goto unlock;
 
-		ret = adi_adrv9001_Radio_CarrierFrequency_Set(phy->adrv9001,
-							      port, chann->number,
-							      ADI_ADRV9001_PLL_CAL_MODE_NORM,
-							      ADI_ADRV9001_MB_NOT_ALLOWED,
-							      readin);
+		ret = adi_adrv9001_Radio_Carrier_Configure(phy->adrv9001, port,
+							   chann->number, &lo_freq);
 		if (ret) {
 			ret = adrv9002_dev_err(phy);
 			goto unlock;
@@ -453,9 +454,9 @@ static ssize_t adrv9002_phy_lo_read(struct iio_dev *indio_dev,
 	struct adrv9002_rf_phy *phy = iio_priv(indio_dev);
 	adi_common_Port_e port = ADRV_ADDRESS_PORT(chan->address);
 	const int channel = ADRV_ADDRESS_CHAN(chan->address);
-	u64 val;
 	int ret;
 	struct adrv9002_chan *chann = adrv9002_get_channel(phy, port, channel);
+	struct adi_adrv9001_Carrier lo_freq;
 
 	if (!chann->enabled)
 		return -ENODEV;
@@ -463,15 +464,13 @@ static ssize_t adrv9002_phy_lo_read(struct iio_dev *indio_dev,
 	switch (private) {
 	case LOEXT_FREQ:
 		mutex_lock(&phy->lock);
-		ret = adi_adrv9001_Radio_CarrierFrequency_Get(phy->adrv9001,
-							      port,
-							      chann->number,
-							      &val);
+		ret = adi_adrv9001_Radio_Carrier_Inspect(phy->adrv9001, port,
+							 chann->number, &lo_freq);
 		mutex_unlock(&phy->lock);
 		if (ret)
 			return adrv9002_dev_err(phy);
 
-		return sprintf(buf, "%llu\n", val);
+		return sprintf(buf, "%llu\n", lo_freq.carrierFrequency_Hz);
 	default:
 		return -EINVAL;
 	}
@@ -1719,9 +1718,9 @@ static int adrv9002_tx_set_dac_full_scale(struct adrv9002_rf_phy *phy)
 		if (!tx->channel.enabled || !tx->dac_boost_en)
 			continue;
 
-		ret = adi_adrv9001_Tx_DacFullScaleBoost_Set(phy->adrv9001,
-							    tx->channel.number,
-							    true);
+		ret = adi_adrv9001_Tx_OutputPowerBoost_Set(phy->adrv9001,
+							   tx->channel.number,
+							   true);
 		if (ret)
 			return adrv9002_dev_err(phy);
 	}
@@ -1736,8 +1735,7 @@ static int adrv9002_tx_path_config(struct adrv9002_rf_phy *phy)
 
 	for (i = 0; i < ARRAY_SIZE(phy->tx_channels); i++) {
 		struct adrv9002_tx_chan *tx = &phy->tx_channels[i];
-		u32 *tx_rate = &phy->adrv9001->devStateInfo.txInputRate_kHz[i];
-
+		struct adi_adrv9001_Info *info = &phy->adrv9001->devStateInfo;
 		/* For each tx channel enabled */
 		if (!tx->channel.enabled)
 			continue;
@@ -1746,7 +1744,8 @@ static int adrv9002_tx_path_config(struct adrv9002_rf_phy *phy)
 		 * the NCO tone generation. We need to clarify if this will be
 		 * done by the API in future releases.
 		 */
-		*tx_rate = profi[i].txInputRate_Hz / 1000;
+		info->txInputRate_kHz[i] = profi[i].txInputRate_Hz / 1000;
+		info->outputSignaling[i] = profi[i].outputSignaling;
 
 		if (!tx->pin_cfg)
 			goto rf_enable;
@@ -1882,10 +1881,6 @@ static int adrv9002_setup(struct adrv9002_rf_phy *phy,
 
 	ret = adi_adrv9001_InitAnalog(adrv9001_device, adrv9002_init,
 			adrv9002_radio_init->adrv9001DeviceClockOutputDivisor);
-	if (ret)
-		return adrv9002_dev_err(phy);
-
-	ret = adi_adrv9001_InitDigital(adrv9001_device, adrv9002_init);
 	if (ret)
 		return adrv9002_dev_err(phy);
 
@@ -2164,8 +2159,8 @@ static int adrv9002_tx_dac_full_scale_get(void *arg, u64 *val)
 		return -ENODEV;
 
 	mutex_lock(&phy->lock);
-	ret = adi_adrv9001_Tx_DacFullScaleBoost_Get(phy->adrv9001,
-						    tx->channel.number, &enable);
+	ret = adi_adrv9001_Tx_OutputPowerBoost_Get(phy->adrv9001,
+						   tx->channel.number, &enable);
 	mutex_unlock(&phy->lock);
 	if (ret)
 		return adrv9002_dev_err(phy);
@@ -2208,21 +2203,44 @@ static int adrv9002_pll_status_show(struct seq_file *s, void *ignored)
 {
 	struct adrv9002_rf_phy *phy = s->private;
 	int ret;
-	u32 pll_status;
+	bool lo1, lo2, aux, clk, clk_lp;
 
 	mutex_lock(&phy->lock);
-	ret = adi_adrv9001_Radio_PllStatus_Get(phy->adrv9001, &pll_status);
-	mutex_unlock(&phy->lock);
-	if (ret)
-		return adrv9002_dev_err(phy);
+	ret = adi_adrv9001_Radio_PllStatus_Get(phy->adrv9001,
+					       ADI_ADRV9001_PLL_LO1, &lo1);
 
-	seq_printf(s, "Clock: %s\n", pll_status & 0x1 ? "Locked" : "Unlocked");
-	seq_printf(s, "Clock LP: %s\n", pll_status & 0x2 ? "Locked" : "Unlocked");
-	seq_printf(s, "LO1: %s\n", pll_status & 0x4 ? "Locked" : "Unlocked");
-	seq_printf(s, "LO2: %s\n", pll_status & 0x8 ? "Locked" : "Unlocked");
-	seq_printf(s, "AUX: %s\n", pll_status & 0x10 ? "Locked" : "Unlocked");
+	ret = adi_adrv9001_Radio_PllStatus_Get(phy->adrv9001,
+	                                       ADI_ADRV9001_PLL_LO2, &lo2);
+	if (ret)
+	        goto error;
+
+	ret = adi_adrv9001_Radio_PllStatus_Get(phy->adrv9001,
+	                                       ADI_ADRV9001_PLL_AUX, &aux);
+	if (ret)
+	        goto error;
+
+	ret = adi_adrv9001_Radio_PllStatus_Get(phy->adrv9001,
+	                                       ADI_ADRV9001_PLL_CLK, &clk);
+	if (ret)
+	        goto error;
+
+	ret = adi_adrv9001_Radio_PllStatus_Get(phy->adrv9001,
+	                                       ADI_ADRV9001_PLL_CLK_LP,
+	                                       &clk_lp);
+	if (ret)
+	        goto error;
+	mutex_unlock(&phy->lock);
+
+	seq_printf(s, "Clock: %s\n", clk ? "Locked" : "Unlocked");
+	seq_printf(s, "Clock LP: %s\n", clk_lp ? "Locked" : "Unlocked");
+	seq_printf(s, "LO1: %s\n", lo1 ? "Locked" : "Unlocked");
+	seq_printf(s, "LO2: %s\n", lo2 ? "Locked" : "Unlocked");
+	seq_printf(s, "AUX: %s\n", aux ? "Locked" : "Unlocked");
 
 	return 0;
+error:
+	mutex_unlock(&phy->lock);
+	return adrv9002_dev_err(phy);
 }
 DEFINE_SHOW_ATTRIBUTE(adrv9002_pll_status);
 
@@ -3002,11 +3020,11 @@ static int adrv9002_probe(struct spi_device *spi)
 	adi_adrv9001_SiliconVersion_Get(phy->adrv9001, &silicon_version);
 
 	dev_info(&spi->dev,
-		 "%s Rev %d.%d, Firmware %u.%u.%u.%u API version: %u.%u.%u.%u successfully initialized",
+		 "%s Rev %d.%d, Firmware %u.%u.%u.%u API version: %u.%u.%u successfully initialized",
 		 indio_dev->name, silicon_version.major, silicon_version.minor,
 		 arm_version.majorVer, arm_version.minorVer,
 		 arm_version.maintVer, arm_version.rcVer, api_version.major,
-		 api_version.minor, api_version.patch, api_version.build);
+		 api_version.minor, api_version.patch);
 
 	adrv9002_debugfs_create(phy);
 
