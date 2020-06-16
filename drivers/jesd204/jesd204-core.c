@@ -519,6 +519,7 @@ static int jesd204_dev_init_link_lane_ids(struct jesd204_dev_top *jdev_top,
 	struct device *dev = jdev->dev.parent;
 	u8 id;
 
+	jlink->num_lanes = 1;
 	if (!jlink->num_lanes) {
 		dev_err(dev, "JESD204 link [%d] number of lanes is 0\n",
 			link_idx);
@@ -734,8 +735,8 @@ static struct jesd204_dev *jesd204_dev_register(struct device *dev,
 		goto err_free_id;
 #endif
 
-	jdev->state_ops = init->state_ops;
-	//jdev->state_ops = test_state_ops;
+	//jdev->state_ops = init->state_ops;
+	jdev->state_ops = test_state_ops;
 
 	jdev->dev.parent = dev;
 	jdev->dev.groups = jdev->groups;
