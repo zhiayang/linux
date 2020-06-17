@@ -5869,8 +5869,7 @@ static int adrv9009_jesd204_sysref(struct jesd204_dev *jdev,
 	return JESD204_STATE_CHANGE_DONE;
 }
 
-static int adrv9009_jesd204_setup_stage1(struct jesd204_dev *jdev,
-		unsigned int link_num)
+static int adrv9009_jesd204_setup_stage1(struct jesd204_dev *jdev)
 {
 	struct device *dev = jesd204_dev_to_device(jdev);
 	struct adrv9009_jesd204_priv *priv = jesd204_dev_priv(jdev);
@@ -5878,7 +5877,8 @@ static int adrv9009_jesd204_setup_stage1(struct jesd204_dev *jdev,
 	int ret;
 	u8 mcsStatus;
 
-	dev_dbg(dev, "%s:%d link_num %u\n", __func__, __LINE__, link_num);
+	//dev_dbg(dev, "%s:%d link_num %u\n", __func__, __LINE__, link_num);
+	dev_dbg(dev, "%s:%d\n", __func__, __LINE__);
 
 
 	ret = TALISE_enableMultichipSync(phy->talDevice, 0, &mcsStatus);
@@ -6011,7 +6011,8 @@ static const struct jesd204_dev_data jesd204_adrv9009_init = {
 			.per_link = adrv9009_jesd204_link_running,
 		},
 		[JESD204_OP_OPT_SETUP_STAGE1] = {
-			.pre_transition = adrv9009_jesd204_setup_stage1,
+			.per_device = adrv9009_jesd204_setup_stage1,
+			.mode = JESD204_STATE_OP_MODE_PER_DEVICE,
 			//.per_link = adrv9009_jesd204_setup_stage1,
 		},
 		[JESD204_OP_OPT_SETUP_STAGE2] = {

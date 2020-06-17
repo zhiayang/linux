@@ -16,6 +16,8 @@
 
 #include "jesd204-priv.h"
 
+#define HACK_TEST_STATE_OPS	0
+
 /* IDA to assign each registered device a unique id */
 static DEFINE_IDA(jesd204_ida);
 
@@ -519,7 +521,9 @@ static int jesd204_dev_init_link_lane_ids(struct jesd204_dev_top *jdev_top,
 	struct device *dev = jdev->dev.parent;
 	u8 id;
 
+#if HACK_TEST_STATE_OPS
 	jlink->num_lanes = 1;
+#endif
 	if (!jlink->num_lanes) {
 		dev_err(dev, "JESD204 link [%d] number of lanes is 0\n",
 			link_idx);
@@ -637,15 +641,9 @@ static int jesd204_dev_init_links_data(struct device *parent,
 }
 
 #define state_op(op) \
-static int op ## jesd204_dev_pre(struct jesd204_dev *jdev, unsigned int link_idx) \
+static int op ## jesd204_dev_cb_call(struct jesd204_dev *jdev) \
 {	\
-	pr_err("%pOF %s pre link %d\n", jdev ? jdev->np : NULL, __stringify(op), link_idx);\
-	return JESD204_STATE_CHANGE_DONE; \
-}\
-\
-static int op ## jesd204_dev_post(struct jesd204_dev *jdev, unsigned int link_idx) \
-{	\
-	pr_err("%pOF %s post link %d\n", jdev ? jdev->np : NULL, __stringify(op),link_idx);\
+	pr_err("%pOF %s PER DVICE\n", jdev ? jdev->np : NULL, __stringify(op));\
 	return JESD204_STATE_CHANGE_DONE; \
 }\
 \
@@ -678,12 +676,12 @@ state_op(SYSREF)
 #define state_op_entry(op)	\
 [JESD204_OP_ ## op] = \
 {\
-	.pre_transition = op ## jesd204_dev_pre, \
-	.post_transition = op ## jesd204_dev_post, \
+	.mode = JESD204_STATE_OP_MODE_PER_DEVICE,\
+	.per_device = op ## jesd204_dev_cb_call, \
 	.per_link = op ## jesd204_link, \
 },
 
-static const struct jesd204_state_ops test_state_ops[] = {
+static const struct jesd204_state_op test_state_ops[] = {
 	state_op_entry(LINK_INIT)
 	state_op_entry(LINK_UNINIT)
 	state_op_entry(LINK_SUPPORTED)
@@ -735,8 +733,11 @@ static struct jesd204_dev *jesd204_dev_register(struct device *dev,
 		goto err_free_id;
 #endif
 
-	//jdev->state_ops = init->state_ops;
+#if HACK_TEST_STATE_OPS
 	jdev->state_ops = test_state_ops;
+#else
+	jdev->state_ops = init->state_ops;
+#endif
 
 	jdev->dev.parent = dev;
 	jdev->dev.groups = jdev->groups;

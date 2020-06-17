@@ -119,7 +119,7 @@ struct jesd204_dev {
 	bool				is_sysref_provider;
 
 	int				error;
-	const struct jesd204_state_ops	*state_ops;
+	const struct jesd204_state_op	*state_ops;
 	struct device_node		*np;
 
 	struct jesd204_dev_con_out	**inputs;
