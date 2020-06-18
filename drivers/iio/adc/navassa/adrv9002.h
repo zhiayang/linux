@@ -160,6 +160,11 @@ struct adrv9002_tx_chan {
 	u8 dac_boost_en;
 };
 
+struct adrv9002_gpio {
+	struct adi_adrv9001_GpioCfg gpio;
+	u32 signal;
+};
+
 #define to_clk_priv(_hw) container_of(_hw, struct adrv9002_clock, hw)
 
 struct adrv9002_rf_phy {
@@ -177,7 +182,7 @@ struct adrv9002_rf_phy {
 	char			*bin_attr_buf;
 	struct adrv9002_rx_chan	rx_channels[ADRV9002_CHANN_MAX];
 	struct adrv9002_tx_chan	tx_channels[ADRV9002_CHANN_MAX];
-	struct adi_adrv9001_GpioCfg *adrv9002_gpios;
+	struct adrv9002_gpio 		*adrv9002_gpios;
 	struct adi_adrv9001_Device	adrv9001_device;
 	struct adi_adrv9001_Device	*adrv9001;
 	struct adi_hal_Cfg		hal;

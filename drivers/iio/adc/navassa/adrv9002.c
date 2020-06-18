@@ -1665,6 +1665,25 @@ static irqreturn_t adrv9002_irq_handler(int irq, void *p)
 	return IRQ_HANDLED;
 }
 
+static int adrv9002_dgpio_config(struct adrv9002_rf_phy *phy)
+{
+	struct adrv9002_gpio *dgpio = phy->adrv9002_gpios;
+	int i, ret;
+
+	for (i = 0; i < phy->ngpios; i++) {
+		dev_dbg(&phy->spi->dev, "Set dpgio: %d, signal: %d\n",
+			dgpio[i].gpio.pin, dgpio[i].signal);
+
+		ret = adi_adrv9001_gpio_Configure(phy->adrv9001,
+						  dgpio[i].signal,
+						  &dgpio[i].gpio);
+		if (ret)
+			return adrv9002_dev_err(phy);
+	}
+
+	return 0;
+}
+
 #define ADRV9001_BF_EQUAL(mask, value) ((value) == ((value) & (mask)))
 
 static int adrv9001_rx_path_config(struct adrv9002_rf_phy *phy)
@@ -1929,26 +1948,26 @@ static int adrv9002_setup(struct adrv9002_rf_phy *phy,
 	clk_set_rate(phy->clks[TX2_SAMPL_CLK],
 		     phy->curr_profile->tx.txProfile[1].txInputRate_Hz);
 
-	return 0;
+	return adrv9002_dgpio_config(phy);
 }
 
 static void adrv9002_cleanup(struct adrv9002_rf_phy *phy)
 {
 	int i;
 
-	memset(&phy->adrv9001->devStateInfo, 0,
-	       sizeof(phy->adrv9001->devStateInfo));
-
 	for (i = 0; i < ARRAY_SIZE(phy->rx_channels); i++) {
 		memset(&phy->rx_channels[i].channel, 0,
-		       sizeof(struct adrv9002_rx_chan));
+		       sizeof(struct adrv9002_chan));
 		phy->rx_channels[i].nco_freq = 0;
 	}
 
 	for (i = 0; i < ARRAY_SIZE(phy->tx_channels); i++) {
 		memset(&phy->tx_channels[i].channel, 0,
-		       sizeof(struct adrv9002_rx_chan));
+		       sizeof(struct adrv9002_chan));
 	}
+
+	memset(&phy->adrv9001->devStateInfo, 0,
+	       sizeof(phy->adrv9001->devStateInfo));
 }
 
 #define rx_to_phy(rx, nr)	\
@@ -2212,23 +2231,23 @@ static int adrv9002_pll_status_show(struct seq_file *s, void *ignored)
 	ret = adi_adrv9001_Radio_PllStatus_Get(phy->adrv9001,
 	                                       ADI_ADRV9001_PLL_LO2, &lo2);
 	if (ret)
-	        goto error;
+		goto error;
 
 	ret = adi_adrv9001_Radio_PllStatus_Get(phy->adrv9001,
 	                                       ADI_ADRV9001_PLL_AUX, &aux);
 	if (ret)
-	        goto error;
+		goto error;
 
 	ret = adi_adrv9001_Radio_PllStatus_Get(phy->adrv9001,
 	                                       ADI_ADRV9001_PLL_CLK, &clk);
 	if (ret)
-	        goto error;
+		goto error;
 
 	ret = adi_adrv9001_Radio_PllStatus_Get(phy->adrv9001,
 	                                       ADI_ADRV9001_PLL_CLK_LP,
 	                                       &clk_lp);
 	if (ret)
-	        goto error;
+		goto error;
 	mutex_unlock(&phy->lock);
 
 	seq_printf(s, "Clock: %s\n", clk ? "Locked" : "Unlocked");
@@ -2704,15 +2723,7 @@ static int adrv9002_parse_dt(struct adrv9002_rf_phy *phy)
 	/* handle channels */
 	of_channels = of_get_child_by_name(parent, "adi,channels");
 	if (!of_channels)
-		/*
-		 * FIXME: For now we are just returning if no special
-		 * configurations are given to the existing channels because
-		 * the gpios will only be configured when setting up the
-		 * channels. It might make sense to still look for gpios since
-		 * user's might just want to configure some gpios completely
-		 * controlled by the part (i.e. adrv9002 is the gpio master)
-		 */
-		return 0;
+		goto of_gpio;
 
 	for_each_available_child_of_node(of_channels, child) {
 		u32 chann, port;
@@ -2753,6 +2764,7 @@ static int adrv9002_parse_dt(struct adrv9002_rf_phy *phy)
 			goto of_channels_put;
 	}
 
+of_gpio:
 	/* handle gpios */
 	of_gpios = of_get_child_by_name(parent, "adi,gpios");
 	if (!of_gpios)
@@ -2771,7 +2783,7 @@ static int adrv9002_parse_dt(struct adrv9002_rf_phy *phy)
 	}
 
 	for_each_available_child_of_node(of_gpios, child) {
-		u32 gpio, polarity, master;
+		u32 gpio, polarity, master, signal;
 
 		ret = of_property_read_u32(child, "reg", &gpio);
 		if (ret) {
@@ -2784,9 +2796,23 @@ static int adrv9002_parse_dt(struct adrv9002_rf_phy *phy)
 			ret = -EINVAL;
 			goto of_gpio_put;
 		}
-
 		/* index 0 is not valid */
-		phy->adrv9002_gpios[idx].pin = gpio + 1;
+		phy->adrv9002_gpios[idx].gpio.pin = gpio + 1;
+
+		ret = of_property_read_u32(child, "adi,signal", &signal);
+		if (ret) {
+			dev_err(&phy->spi->dev,
+				"No adi,signal property defined for gpio%d\n",
+				gpio);
+			goto of_gpio_put;
+		} else if (signal > ADI_ADRV9001_GPIO_SIGNAL_ADC_SWITCHING_CHANNEL2) {
+			dev_err(&phy->spi->dev,
+				"Invalid gpio signal: %d\n", signal);
+			ret = -EINVAL;
+			goto of_gpio_put;
+		}
+		phy->adrv9002_gpios[idx].signal = signal;
+
 		ret = of_property_read_u32(child, "adi,polarity", &polarity);
 		if (!ret) {
 			if (polarity > ADI_ADRV9001_GPIO_POLARITY_INVERTED) {
@@ -2797,7 +2823,7 @@ static int adrv9002_parse_dt(struct adrv9002_rf_phy *phy)
 				ret = -EINVAL;
 				goto of_gpio_put;
 			}
-			phy->adrv9002_gpios[idx].polarity = polarity;
+			phy->adrv9002_gpios[idx].gpio.polarity = polarity;
 		}
 
 		ret = of_property_read_u32(child, "adi,master", &master);
@@ -2811,7 +2837,7 @@ static int adrv9002_parse_dt(struct adrv9002_rf_phy *phy)
 				ret = -EINVAL;
 				goto of_gpio_put;
 			}
-			phy->adrv9002_gpios[idx].master = master;
+			phy->adrv9002_gpios[idx].gpio.master = master;
 		} else {
 			ret = 0;
 		}
