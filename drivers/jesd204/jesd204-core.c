@@ -188,7 +188,8 @@ static struct jesd204_dev *jesd204_dev_sysref_provider(struct jesd204_dev *tp_jd
 }
 
 int jesd204_sysref_async(struct jesd204_dev *tp_jdev,
-	enum jesd204_sysref_mode mode, u32 num)
+	unsigned int link_num,
+	struct jesd204_link *lnk)
 {
 	jesd204_link_cb link_op;
 	struct jesd204_dev *jdev = jesd204_dev_sysref_provider(tp_jdev);
@@ -199,7 +200,7 @@ int jesd204_sysref_async(struct jesd204_dev *tp_jdev,
 	link_op = jdev->state_ops[JESD204_OP_SYSREF].per_link;
 
 	if (link_op)
-		return link_op(jdev, mode, NULL);
+		return link_op(jdev, link_num, lnk);
 
 	return -ENODEV;
 }
@@ -699,7 +700,7 @@ static const struct jesd204_state_op test_state_ops[] = {
 	state_op_entry(LINK_DISABLE)
 	state_op_entry(SYSREF)
 };
-	
+
 static struct jesd204_dev *jesd204_dev_register(struct device *dev,
 						const struct jesd204_dev_data *init)
 {

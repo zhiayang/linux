@@ -209,8 +209,8 @@ int jesd204_link_get_rate(struct jesd204_link *lnk, u64 *lane_rate_hz);
 int jesd204_link_get_device_clock(struct jesd204_link *lnk,
 				  unsigned long *device_clock);
 
-int jesd204_sysref_async(struct jesd204_dev *jdev,
-				enum jesd204_sysref_mode mode, u32 num);
+int jesd204_sysref_async(struct jesd204_dev *tp_jdev,
+				unsigned int link_num, struct jesd204_link *lnk);
 
 bool jesd204_dev_is_top(struct jesd204_dev *jdev);
 
