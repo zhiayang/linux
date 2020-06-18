@@ -66,7 +66,7 @@ struct jesd204_fsm_table_entry {
 /**
  * struct jesd204_fsm_table_entry_iter - JESD204 table state iterator
  * @table		current entry in a state table
- * @per_device_ran	list of JESD204 device IDs to mark when a device's 
+ * @per_device_ran	list of JESD204 device IDs to mark when a device's
  *			callback was ran, when running ops per_device
  */
 struct jesd204_fsm_table_entry_iter {
@@ -247,10 +247,35 @@ done:
 	return ret;
 }
 
+static int jesd204_fsm_propagate_cb_top_level(struct jesd204_dev *jdev,
+					      struct jesd204_fsm_data *fsm_data)
+{
+	unsigned int i;
+	int ret;
+
+	if (fsm_data->link_idx != JESD204_LINKS_ALL)
+		return jesd204_fsm_handle_con_cb(jdev, NULL,
+						 fsm_data->link_idx,
+						 fsm_data);
+
+	/*
+	 * FIXME: think of a better way to iterate the top-level device callback here.
+	 * for now this works; and is slightly cleaner than before
+	 */
+	jdev = &fsm_data->jdev_top->jdev;
+	for (i = 0; i < fsm_data->jdev_top->num_links; i++) {
+		ret = jesd204_fsm_handle_con_cb(jdev, NULL, i, fsm_data);
+		if (ret)
+			break;
+	}
+	/* FIXME: error message here? */
+
+	return ret;
+}
+
 static int jesd204_fsm_propagate_cb(struct jesd204_dev *jdev,
 				    struct jesd204_fsm_data *data)
 {
-	unsigned int i;
 	int ret;
 
 	data->inputs = true;
@@ -263,17 +288,7 @@ static int jesd204_fsm_propagate_cb(struct jesd204_dev *jdev,
 	if (ret)
 		goto out;
 
-	/*
-	 * FIXME: think of a better way to iterate the top-level device callback here.
-	 * for now this works; and is slightly cleaner than before
-	 */
-	jdev = &data->jdev_top->jdev;
-	for (i = 0; i < data->jdev_top->num_links; i++) {
-		ret = jesd204_fsm_handle_con_cb(jdev, NULL, i, data);
-		if (ret)
-			break;
-	}
-	/* FIXME: error message here? */
+	ret = jesd204_fsm_propagate_cb_top_level(jdev, data);
 out:
 	return ret;
 }
@@ -410,10 +425,10 @@ static int jesd204_con_validate_cur_state(struct jesd204_dev *jdev,
 	if (fsm_data->cur_state == JESD204_STATE_DONT_CARE)
 		return 0;
 
-	if (c && c->state == fsm_data->nxt_state)
+	if (c->state == fsm_data->nxt_state)
 		return 0;
 
-	if (c && fsm_data->cur_state != c->state) {
+	if (fsm_data->cur_state != c->state) {
 		ol = &fsm_data->jdev_top->active_links[c->link_idx];
 		dev_warn(&jdev->dev,
 			 "JESD204 link[%d] invalid connection state: %s, exp: %s, nxt: %s\n",
