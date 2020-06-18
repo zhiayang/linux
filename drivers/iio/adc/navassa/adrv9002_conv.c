@@ -7,6 +7,8 @@
  * Licensed under the GPL-2.
  */
 
+#include <linux/bitfield.h>
+#include <linux/bits.h>
 #include <linux/module.h>
 #include <linux/device.h>
 #include <linux/kernel.h>
@@ -30,9 +32,18 @@
 #if IS_ENABLED(CONFIG_CF_AXI_ADC)
 #include "../cf_axi_adc.h"
 
+#define ADI_RX2_REG_OFF			0x1000
 #define ADI_TX1_REG_OFF			0x2000
+#define ADI_TX2_REG_OFF			0x4000
 #define ADI_TX_REG_RATE			0x4c
+#define ADI_TX_REG_CTRL_2		0x48
 #define AIM_AXI_REG(off, addr)		((off) + (addr))
+#define	NUM_LANES_MASK			GENMASK(12, 8)
+#define NUM_LANES(x)			FIELD_PREP(NUM_LANES_MASK, x)
+#define SDR_DDR_MASK			BIT(16)
+#define SDR_DDR(x)			FIELD_PREP(SDR_DDR_MASK, x)
+
+#define IS_CMOS(cfg)			((cfg) & (ADI_CMOS_OR_LVDS_N))
 
 #define AIM_CHAN(_chan, _mod, _si, _bits, _sign)			\
 	{ .type = IIO_VOLTAGE,						\
@@ -113,6 +124,74 @@ static int adrv9002_reg_access(struct iio_dev *indio_dev, u32 reg, u32 writeval,
 		axiadc_write(st, reg & 0xFFFF, writeval);
 	else
 		*readval = axiadc_read(st, reg & 0xFFFF);
+
+	return 0;
+}
+
+static int adrv9002_interface_validate(const struct adrv9002_rf_phy *phy,
+				       struct axiadc_state *st,
+				       const u8 ssi_intf)
+{
+	u32 axi_config = 0;
+
+	axi_config = axiadc_read(st, ADI_REG_CONFIG);
+	dev_info(&phy->spi->dev, "Get core active interface:%08X\n",
+		 axi_config);
+	if (IS_CMOS(axi_config) && ssi_intf == ADI_ADRV9001_SSI_TYPE_LVDS) {
+		dev_err(&phy->spi->dev,
+			 "AXI interface is CMOS and device profile is LVDS...\n");
+		return -EINVAL;
+	} else if (!IS_CMOS(axi_config) &&
+		   ssi_intf == ADI_ADRV9001_SSI_TYPE_CMOS) {
+		dev_err(&phy->spi->dev,
+			 "AXI interface is LVDS and device profile is CMOS...\n");
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+static int adrv9002_interface_config(struct axiadc_state *st, const u8 n_lanes,
+				     const u8 ssi_intf, const bool cmos_ddr,
+				     const int channel)
+{
+	u32 reg_ctrl = 0;
+	u8 rate;
+	const int rx_off = channel ? ADI_RX2_REG_OFF : 0;
+	const int tx_off = channel ? ADI_TX2_REG_OFF : ADI_TX1_REG_OFF;
+
+	switch (n_lanes) {
+	case ADI_ADRV9001_SSI_1_LANE:
+		reg_ctrl = NUM_LANES(1);
+		if (ssi_intf == ADI_ADRV9001_SSI_TYPE_CMOS) {
+			rate = cmos_ddr ? 3 : 7;
+			reg_ctrl |= SDR_DDR(!cmos_ddr);
+		} else {
+			rate = 3;
+		}
+		break;
+	case ADI_ADRV9001_SSI_2_LANE:
+		if (ssi_intf == ADI_ADRV9001_SSI_TYPE_CMOS)
+			return -EINVAL;
+
+		reg_ctrl = NUM_LANES(2);
+		rate = 1;
+		break;
+	case ADI_ADRV9001_SSI_4_LANE:
+		if (ssi_intf == ADI_ADRV9001_SSI_TYPE_LVDS)
+			return -EINVAL;
+
+		reg_ctrl = NUM_LANES(4);
+		rate = cmos_ddr ? 0 : 1;
+		reg_ctrl |= SDR_DDR(!cmos_ddr);
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	axiadc_write(st, AIM_AXI_REG(rx_off, ADI_REG_CNTRL), reg_ctrl);
+	axiadc_write(st, AIM_AXI_REG(tx_off, ADI_TX_REG_RATE), rate);
+	axiadc_write(st, AIM_AXI_REG(tx_off, ADI_TX_REG_CTRL_2), reg_ctrl);
 
 	return 0;
 }

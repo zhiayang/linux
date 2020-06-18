@@ -197,9 +197,14 @@ struct adrv9002_rf_phy {
 
 int adrv9002_hdl_loopback(struct adrv9002_rf_phy *phy, bool enable);
 int adrv9002_register_axi_converter(struct adrv9002_rf_phy *phy);
+int adrv9002_axi_interface_set(struct adrv9002_rf_phy *phy, const u8 n_lanes,
+			       const u8 ssi_intf, const bool cmos_ddr,
+			       const int channel);
 struct adrv9002_rf_phy *adrv9002_spi_to_phy(struct spi_device *spi);
 int adrv9002_spi_read(struct spi_device *spi, u32 reg);
 int adrv9002_spi_write(struct spi_device *spi, u32 reg, u32 val);
+void adrv9002_get_ssi_interface(struct adrv9002_rf_phy *phy, const int channel,
+				u8 *ssi_intf, u8 *n_lanes, bool *cmos_ddr_en);
 /* get init structs */
 struct adi_adrv9001_SpiSettings *adrv9002_spi_settings_get(void);
 struct adi_adrv9001_Init *adrv9002_init_get(void);

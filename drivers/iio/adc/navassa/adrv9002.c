@@ -147,6 +147,25 @@ int adrv9002_spi_write(struct spi_device *spi, u32 reg, u32 val)
 	return 0;
 }
 
+void adrv9002_get_ssi_interface(struct adrv9002_rf_phy *phy, const int chann,
+				u8 *ssi_intf, u8 *n_lanes, bool *cmos_ddr_en)
+{
+	adi_adrv9001_TxProfile_t *tx_cfg;
+
+	if (chann >= ADRV9002_CHANN_MAX)
+		return;
+	/*
+	 * We only look for one port. Although theoretical possible, we are
+	 * assuming that ports on the same channel have the same number of lanes
+	 * and, obviously, the same interface type
+	 */
+	tx_cfg = &phy->curr_profile->tx.txProfile[chann];
+	*ssi_intf = tx_cfg->txSsiConfig.ssiType;
+	*n_lanes = tx_cfg->txSsiConfig.numLaneSel;
+	*cmos_ddr_en = tx_cfg->txSsiConfig.cmosDdrEn;
+}
+EXPORT_SYMBOL(adrv9002_get_ssi_interface);
+
 static int adrv9002_phy_reg_access(struct iio_dev *indio_dev,
 				   u32 reg, u32 writeval,
 				   u32 *readval)
@@ -2853,6 +2872,34 @@ of_channels_put:
 }
 
 #ifdef ADI_DYNAMIC_PROFILE_LOAD
+static int adrv9002_profile_update(struct adrv9002_rf_phy *phy)
+{
+	int ret;
+	bool cmos_ddr;
+	u8 n_lanes, ssi_intf;
+
+	adrv9002_cleanup(phy);
+	ret = adrv9002_setup(phy, &phy->profile);
+	if (ret) {
+		/* try one more time */
+		ret = adrv9002_setup(phy, &phy->profile);
+		if (ret)
+			return ret;
+	}
+	/*
+	 * For now we are just defaulting to rx2tx2 mode. Hence we just get/set
+	 * channel 1 ssi info.
+	 */
+	adrv9002_get_ssi_interface(phy, ADRV9002_CHANN_1, &ssi_intf, &n_lanes,
+				   &cmos_ddr);
+	ret = adrv9002_axi_interface_set(phy, n_lanes, ssi_intf, cmos_ddr,
+					 ADRV9002_CHANN_1);
+	if (ret)
+		return ret;
+
+	return 0;
+}
+
 static ssize_t
 adrv9002_profile_bin_write(struct file *filp, struct kobject *kobj,
 			   struct bin_attribute *bin_attr,
@@ -2884,6 +2931,7 @@ adrv9002_profile_bin_write(struct file *filp, struct kobject *kobj,
 
 	mutex_lock(&phy->lock);
 
+	memset(&phy->profile, 0, sizeof(phy->profile));
 	ret = adi_adrv9001_Utilities_DeviceProfile_Parse(phy->adrv9001,
 							 &phy->profile,
 							 phy->bin_attr_buf,
@@ -2891,9 +2939,7 @@ adrv9002_profile_bin_write(struct file *filp, struct kobject *kobj,
 	if (ret)
 		goto out;
 
-	adrv9002_cleanup(phy);
-	ret = adrv9002_setup(phy, &phy->profile);
-
+	ret = adrv9002_profile_update(phy);
 out:
 	mutex_unlock(&phy->lock);
 
