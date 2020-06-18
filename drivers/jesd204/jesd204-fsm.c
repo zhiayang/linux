@@ -891,11 +891,11 @@ int jesd204_fsm_start(struct jesd204_dev *jdev, unsigned int link_idx)
 }
 EXPORT_SYMBOL_GPL(jesd204_fsm_start);
 
-
 static int jesd204_fsm_table_dev_op_cb(struct jesd204_dev *jdev,
 				       const struct jesd204_state_op *state_op,
 				       unsigned int link_idx,
-				       struct jesd204_fsm_data *fsm_data)
+				       struct jesd204_fsm_data *fsm_data,
+				       bool sysref)
 {
 	struct jesd204_fsm_table_entry_iter *it = fsm_data->cb_data;
 	jesd204_dev_cb dev_op;
@@ -911,6 +911,13 @@ static int jesd204_fsm_table_dev_op_cb(struct jesd204_dev *jdev,
 	ret = dev_op(jdev);
 
 	it->per_device_ran[jdev->id] = true;
+
+	if (sysref && jesd204_dev_is_top(jdev)) {
+		struct jesd204_link_opaque *ol =
+			&fsm_data->jdev_top->active_links[link_idx];
+
+		jesd204_sysref_async(jdev, link_idx, &ol->link);
+	}
 
 	return ret;
 }
@@ -948,10 +955,13 @@ static int jesd204_fsm_table_entry_cb(struct jesd204_dev *jdev,
 	switch (state_op->mode) {
 	case JESD204_STATE_OP_MODE_PER_DEVICE:
 		return jesd204_fsm_table_dev_op_cb(jdev, state_op, link_idx,
-						   fsm_data);
+						   fsm_data, false);
 	case JESD204_STATE_OP_MODE_PER_LINK:
 		return jesd204_fsm_table_link_op_cb(jdev, state_op, link_idx,
 						    fsm_data);
+	case JESD204_STATE_OP_MODE_PER_DEVICE_POST_TOP_SYSREF:
+		return jesd204_fsm_table_dev_op_cb(jdev, state_op, link_idx,
+						   fsm_data, true);
 	default:
 		dev_err(&jdev->dev, "Invalid state_op mode %d\n",
 			state_op->mode);

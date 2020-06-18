@@ -138,6 +138,7 @@ typedef int (*jesd204_link_cb)(struct jesd204_dev *jdev,
 enum jesd204_state_op_mode {
 	JESD204_STATE_OP_MODE_PER_LINK,
 	JESD204_STATE_OP_MODE_PER_DEVICE,
+	JESD204_STATE_OP_MODE_PER_DEVICE_POST_TOP_SYSREF,
 };
 
 /**
