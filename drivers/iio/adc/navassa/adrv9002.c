@@ -2282,6 +2282,212 @@ error:
 }
 DEFINE_SHOW_ATTRIBUTE(adrv9002_pll_status);
 
+static const char *const adrv9002_ssi_test_mode_data_avail[] = {
+	"TESTMODE_DATA_NORMAL",
+	"TESTMODE_DATA_FIXED_PATTERN",
+	"TESTMODE_DATA_RAMP_NIBBLE",
+	"TESTMODE_DATA_RAMP_16_BIT",
+	"TESTMODE_DATA_PRBS15",
+	"TESTMODE_DATA_PRBS7",
+};
+
+#define ADRV9002_RX_SSI_TEST_DATA_MASK_SIZE	6
+#define ADRV9002_RX_SSI_TEST_DATA_LVDS_MASK	0x3b
+#define ADRV9002_RX_SSI_TEST_DATA_CMOS_MASK	GENMASK(2, 0)
+#define ADRV9002_TX_SSI_TEST_DATA_LVDS_MASK	0x33
+#define ADRV9002_TX_SSI_TEST_DATA_CMOS_MASK	GENMASK(1, 0)
+
+static unsigned long rx_ssi_avail_mask;
+static unsigned long tx_ssi_avail_mask;
+
+static ssize_t adrv9002_ssi_test_mode_data_show(char __user *userbuf,
+						size_t count, loff_t *ppos,
+						const char *item)
+{
+	char buf[32];
+	int len;
+
+	len = scnprintf(buf, sizeof(buf), "%s\n", item);
+
+	return simple_read_from_buffer(userbuf, count, ppos, buf, len);
+}
+
+static int adrv9002_ssi_test_mode_data_set(const char __user *userbuf,
+					   size_t count, loff_t *ppos,
+					   const unsigned long mask)
+{
+	char buf[32] = {0};
+	int bit = 0, ret;
+
+	ret = simple_write_to_buffer(buf, sizeof(buf) - 1, ppos, userbuf,
+				     count);
+	if (ret < 0)
+		return ret;
+
+	for_each_set_bit(bit, &mask, ADRV9002_RX_SSI_TEST_DATA_MASK_SIZE) {
+		if (sysfs_streq(buf, adrv9002_ssi_test_mode_data_avail[bit]))
+			break;
+	}
+
+	if (bit == ADRV9002_RX_SSI_TEST_DATA_MASK_SIZE)
+		return -EINVAL;
+
+	return bit;
+}
+
+static int adrv9002_ssi_mode_avail_show(struct seq_file *s, void *ignored)
+{
+	int bit = 0;
+	const unsigned long *mask = s->private;
+
+	for_each_set_bit(bit, mask, ADRV9002_RX_SSI_TEST_DATA_MASK_SIZE) {
+		seq_printf(s, "%s\n", adrv9002_ssi_test_mode_data_avail[bit]);
+	}
+
+	return 0;
+}
+DEFINE_SHOW_ATTRIBUTE(adrv9002_ssi_mode_avail);
+
+static ssize_t adrv9002_rx_ssi_test_mode_data_show(struct file *file,
+						   char __user *userbuf,
+						   size_t count, loff_t *ppos)
+{
+	struct adrv9002_rx_chan	*rx = file->private_data;
+	int idx = rx->ssi_test.testData;
+	const char *data = adrv9002_ssi_test_mode_data_avail[idx];
+
+	return adrv9002_ssi_test_mode_data_show(userbuf, count, ppos, data);
+}
+
+static ssize_t adrv9002_rx_ssi_test_mode_data_set(struct file *file,
+						  const char __user *userbuf,
+						  size_t count, loff_t *ppos)
+{
+	struct adrv9002_rx_chan	*rx = file->private_data;
+	int ret;
+
+	ret = adrv9002_ssi_test_mode_data_set(userbuf, count, ppos, rx_ssi_avail_mask);
+	if (ret < 0)
+		return ret;
+
+	rx->ssi_test.testData = ret;
+
+	return count;
+}
+
+static const struct file_operations adrv9002_rx_ssi_test_mode_data_fops = {
+	.open = simple_open,
+	.read = adrv9002_rx_ssi_test_mode_data_show,
+	.write = adrv9002_rx_ssi_test_mode_data_set,
+	.llseek = default_llseek,
+};
+
+static int adrv9002_rx_ssi_test_mode_fixed_pattern_get(void *arg, u64 *val)
+{
+	struct adrv9002_rx_chan	*rx = arg;
+
+	*val = rx->ssi_test.fixedDataPatternToTransmit;
+
+	return 0;
+};
+
+static int adrv9002_rx_ssi_test_mode_fixed_pattern_set(void *arg, const u64 val)
+{
+	struct adrv9002_rx_chan	*rx = arg;
+	struct adrv9002_rf_phy *phy = rx_to_phy(rx, rx->channel.number - 1);
+	adi_adrv9001_SsiType_e ssi_type = adrv9002_axi_ssi_type_get(phy);
+	int val_max = ssi_type == ADI_ADRV9001_SSI_TYPE_CMOS ? 0xf : U16_MAX;
+	int __val;
+
+	__val = clamp_val(val, 0, val_max);
+	rx->ssi_test.fixedDataPatternToTransmit = __val;
+
+	return 0;
+};
+
+DEFINE_DEBUGFS_ATTRIBUTE(adrv9002_rx_ssi_test_mode_fixed_pattern_fops,
+			 adrv9002_rx_ssi_test_mode_fixed_pattern_get,
+			 adrv9002_rx_ssi_test_mode_fixed_pattern_set,
+			 "%llu\n");
+
+static int adrv9002_ssi_rx_test_mode_set(void *arg, const u64 val)
+{
+	struct adrv9002_rx_chan	*rx = arg;
+	struct adrv9002_rf_phy *phy = rx_to_phy(rx, rx->channel.number - 1);
+	adi_adrv9001_SsiType_e ssi_type = adrv9002_axi_ssi_type_get(phy);
+	int ret;
+
+	mutex_lock(&phy->lock);
+	ret = adi_adrv9001_Ssi_Rx_TestMode_Configure(phy->adrv9001, rx->channel.number,
+						     ssi_type,
+						     ADI_ADRV9001_SSI_FORMAT_16_BIT_I_Q_DATA,
+						     &rx->ssi_test);
+	mutex_unlock(&phy->lock);
+	if (ret)
+		adrv9002_dev_err(phy);
+
+	return 0;
+};
+DEFINE_DEBUGFS_ATTRIBUTE(adrv9002_ssi_rx_test_mode_config_fops,
+			 NULL, adrv9002_ssi_rx_test_mode_set, "%llu");
+
+static ssize_t adrv9002_tx_ssi_test_mode_data_show(struct file *file,
+						   char __user *userbuf,
+						   size_t count, loff_t *ppos)
+{
+	struct adrv9002_tx_chan	*tx = file->private_data;
+	int idx = tx->ssi_test.testData;
+	const char *data = adrv9002_ssi_test_mode_data_avail[idx];
+
+	return adrv9002_ssi_test_mode_data_show(userbuf, count, ppos, data);
+}
+
+static ssize_t adrv9002_tx_ssi_test_mode_data_set(struct file *file,
+						  const char __user *userbuf,
+						  size_t count, loff_t *ppos)
+{
+	struct adrv9002_tx_chan	*tx = file->private_data;
+	int ret;
+
+	ret = adrv9002_ssi_test_mode_data_set(userbuf, count, ppos, tx_ssi_avail_mask);
+	if (ret < 0)
+		return ret;
+
+	tx->ssi_test.testData = ret;
+
+	return count;
+}
+
+static const struct file_operations adrv9002_tx_ssi_test_mode_data_fops = {
+	.open = simple_open,
+	.read = adrv9002_tx_ssi_test_mode_data_show,
+	.write = adrv9002_tx_ssi_test_mode_data_set,
+	.llseek = default_llseek,
+};
+
+static int adrv9002_tx_ssi_test_mode_fixed_pattern_get(void *arg, u64 *val)
+{
+	struct adrv9002_tx_chan	*tx = arg;
+
+	*val = tx->ssi_test.fixedDataPatternToCheck;
+
+	return 0;
+};
+
+static int adrv9002_tx_ssi_test_mode_fixed_pattern_set(void *arg, const u64 val)
+{
+	struct adrv9002_tx_chan	*tx = arg;
+
+	clamp_val(val, 0, U16_MAX);
+	tx->ssi_test.fixedDataPatternToCheck = val;
+
+	return 0;
+};
+DEFINE_DEBUGFS_ATTRIBUTE(adrv9002_tx_ssi_test_mode_fixed_pattern_fops,
+			 adrv9002_tx_ssi_test_mode_fixed_pattern_get,
+			 adrv9002_tx_ssi_test_mode_fixed_pattern_set,
+			 "%llu\n");
+
 static int adrv9002_init_set(void *arg, const u64 val)
 {
 	struct adrv9002_rf_phy *phy = arg;
@@ -2300,21 +2506,86 @@ static int adrv9002_init_set(void *arg, const u64 val)
 DEFINE_DEBUGFS_ATTRIBUTE(adrv9002_init_fops,
 			 NULL, adrv9002_init_set, "%llu");
 
+static int adrv9002_ssi_tx_test_mode_set(void *arg, const u64 val)
+{
+	struct adrv9002_tx_chan	*tx = arg;
+	struct adrv9002_rf_phy *phy = tx_to_phy(tx, tx->channel.number - 1);
+	adi_adrv9001_SsiType_e ssi_type = adrv9002_axi_ssi_type_get(phy);
+	int ret;
+
+	mutex_lock(&phy->lock);
+	ret = adi_adrv9001_Ssi_Tx_TestMode_Configure(phy->adrv9001, tx->channel.number,
+						     ssi_type,
+						     ADI_ADRV9001_SSI_FORMAT_16_BIT_I_Q_DATA,
+						     &tx->ssi_test);
+	mutex_unlock(&phy->lock);
+	if (ret)
+		adrv9002_dev_err(phy);
+
+	return 0;
+};
+DEFINE_DEBUGFS_ATTRIBUTE(adrv9002_ssi_tx_test_mode_config_fops,
+			 NULL, adrv9002_ssi_tx_test_mode_set, "%llu");
+
+static int adrv9002_ssi_tx_test_mode_status_show(struct seq_file *s,
+						 void *ignored)
+{
+	struct adrv9002_tx_chan	*tx = s->private;
+	struct adrv9002_rf_phy *phy = tx_to_phy(tx, tx->channel.number - 1);
+	adi_adrv9001_SsiType_e ssi_type = adrv9002_axi_ssi_type_get(phy);
+	adi_adrv9001_TxSsiTestModeStatus_t ssi_status = {0};
+	int ret;
+
+	mutex_lock(&phy->lock);
+	ret = adi_adrv9001_Ssi_Tx_TestMode_Status_Inspect(phy->adrv9001,
+							  tx->channel.number,
+							  ssi_type,
+							  ADI_ADRV9001_SSI_FORMAT_16_BIT_I_Q_DATA,
+							  &tx->ssi_test,
+							  &ssi_status);
+	mutex_unlock(&phy->lock);
+	if (ret)
+		adrv9002_dev_err(phy);
+
+	seq_printf(s, "dataError: %u\n", ssi_status.dataError);
+	seq_printf(s, "fifoFull: %u\n", ssi_status.fifoFull);
+	seq_printf(s, "fifoEmpty: %u\n", ssi_status.fifoEmpty);
+	seq_printf(s, "strobeAlignError: %u\n", ssi_status.strobeAlignError);
+
+	return 0;
+}
+DEFINE_SHOW_ATTRIBUTE(adrv9002_ssi_tx_test_mode_status);
+
 static void adrv9002_debugfs_create(struct adrv9002_rf_phy *phy)
 {
 	int chan;
-	char attr[32];
+	char attr[64];
 	struct iio_dev *indio_dev = iio_priv_to_dev(phy);
 	struct dentry *d = iio_get_debugfs_dentry(indio_dev);
+	adi_adrv9001_SsiType_e ssi_type = adrv9002_axi_ssi_type_get(phy);
 
 	if (!d)
 		return;
+
+	if (ssi_type == ADI_ADRV9001_SSI_TYPE_CMOS) {
+		rx_ssi_avail_mask = ADRV9002_RX_SSI_TEST_DATA_CMOS_MASK;
+		tx_ssi_avail_mask = ADRV9002_TX_SSI_TEST_DATA_CMOS_MASK;
+	} else {
+		rx_ssi_avail_mask = ADRV9002_RX_SSI_TEST_DATA_LVDS_MASK;
+		tx_ssi_avail_mask = ADRV9002_TX_SSI_TEST_DATA_LVDS_MASK;
+	}
 
 	debugfs_create_file_unsafe("initialize", 0600, d, phy,
 				   &adrv9002_init_fops);
 
 	debugfs_create_file("pll_status", 0400, d, phy,
 			    &adrv9002_pll_status_fops);
+
+	debugfs_create_file("rx_ssi_test_mode_data_available", 0400, d,
+			    &rx_ssi_avail_mask, &adrv9002_ssi_mode_avail_fops);
+
+	debugfs_create_file("tx_ssi_test_mode_data_available", 0400, d,
+			    &tx_ssi_avail_mask, &adrv9002_ssi_mode_avail_fops);
 
 	for (chan = 0; chan < ARRAY_SIZE(phy->tx_channels); chan++) {
 		sprintf(attr, "tx%d_nco_frequency_hz", chan);
@@ -2328,6 +2599,21 @@ static void adrv9002_debugfs_create(struct adrv9002_rf_phy *phy)
 		debugfs_create_file_unsafe(attr, 0400, d,
 					   &phy->tx_channels[chan],
 					   &adrv9002_tx_dac_full_scale_fops);
+		sprintf(attr, "tx%d_ssi_test_mode_data", chan);
+		debugfs_create_file(attr, 0600, d, &phy->tx_channels[chan],
+				    &adrv9002_tx_ssi_test_mode_data_fops);
+		sprintf(attr, "tx%d_ssi_test_mode_fixed_pattern", chan);
+		debugfs_create_file_unsafe(attr, 0600, d,
+					   &phy->tx_channels[chan],
+					   &adrv9002_tx_ssi_test_mode_fixed_pattern_fops);
+		sprintf(attr, "tx%d_ssi_test_mode_configure", chan);
+		debugfs_create_file(attr, 0200, d,
+				    &phy->tx_channels[chan],
+				    &adrv9002_ssi_tx_test_mode_config_fops);
+		sprintf(attr, "tx%d_ssi_test_mode_status", chan);
+		debugfs_create_file(attr, 0400, d,
+				    &phy->tx_channels[chan],
+				    &adrv9002_ssi_tx_test_mode_status_fops);
 	}
 
 	for (chan = 0; chan < ARRAY_SIZE(phy->rx_channels); chan++) {
@@ -2340,6 +2626,17 @@ static void adrv9002_debugfs_create(struct adrv9002_rf_phy *phy)
 		sprintf(attr, "rx%d_agc_config", chan);
 		debugfs_create_file(attr, 0400, d, &phy->rx_channels[chan],
 				    &adrv9002_rx_agc_config_fops);
+		sprintf(attr, "rx%d_ssi_test_mode_data", chan);
+		debugfs_create_file(attr, 0600, d, &phy->rx_channels[chan],
+				    &adrv9002_rx_ssi_test_mode_data_fops);
+		sprintf(attr, "rx%d_ssi_test_mode_fixed_pattern", chan);
+		debugfs_create_file_unsafe(attr, 0600, d,
+					   &phy->rx_channels[chan],
+					   &adrv9002_rx_ssi_test_mode_fixed_pattern_fops);
+		sprintf(attr, "rx%d_ssi_test_mode_configure", chan);
+		debugfs_create_file(attr, 0200, d,
+				    &phy->rx_channels[chan],
+				    &adrv9002_ssi_rx_test_mode_config_fops);
 	}
 }
 #else

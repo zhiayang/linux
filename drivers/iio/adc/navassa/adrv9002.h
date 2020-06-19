@@ -23,6 +23,9 @@
 #include <linux/uaccess.h>
 #include <linux/firmware.h>
 #include <linux/interrupt.h>
+#ifdef CONFIG_DEBUG_FS
+#include "adi_adrv9001_ssi.h"
+#endif
 
 #include <linux/of.h>
 #include <linux/of_gpio.h>
@@ -152,12 +155,18 @@ struct adrv9002_rx_chan {
 	struct adi_adrv9001_GainControlCfg *agc;
 	struct adi_adrv9001_RxGainControlPinCfg *pin_cfg;
 	int nco_freq;
+#ifdef CONFIG_DEBUG_FS
+	struct adi_adrv9001_RxSsiTestModeCfg ssi_test;
+#endif
 };
 
 struct adrv9002_tx_chan {
 	struct adrv9002_chan channel;
 	struct adi_adrv9001_TxAttenuationPinControlCfg *pin_cfg;
 	u8 dac_boost_en;
+#ifdef CONFIG_DEBUG_FS
+	struct adi_adrv9001_TxSsiTestModeCfg ssi_test;
+#endif
 };
 
 struct adrv9002_gpio {
@@ -205,6 +214,9 @@ int adrv9002_spi_read(struct spi_device *spi, u32 reg);
 int adrv9002_spi_write(struct spi_device *spi, u32 reg, u32 val);
 void adrv9002_get_ssi_interface(struct adrv9002_rf_phy *phy, const int channel,
 				u8 *ssi_intf, u8 *n_lanes, bool *cmos_ddr_en);
+#ifdef CONFIG_DEBUG_FS
+adi_adrv9001_SsiType_e adrv9002_axi_ssi_type_get(struct adrv9002_rf_phy *phy);
+#endif
 /* get init structs */
 struct adi_adrv9001_SpiSettings *adrv9002_spi_settings_get(void);
 struct adi_adrv9001_Init *adrv9002_init_get(void);

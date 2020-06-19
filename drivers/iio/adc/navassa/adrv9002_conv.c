@@ -321,6 +321,21 @@ struct adrv9002_rf_phy *adrv9002_spi_to_phy(struct spi_device *spi)
 }
 EXPORT_SYMBOL(adrv9002_spi_to_phy);
 
+#ifdef CONFIG_DEBUG_FS
+adi_adrv9001_SsiType_e adrv9002_axi_ssi_type_get(struct adrv9002_rf_phy *phy)
+{
+	struct axiadc_converter *conv = spi_get_drvdata(phy->spi);
+	struct axiadc_state *st = iio_priv(conv->indio_dev);
+	u32 axi_config = 0;
+
+	axi_config = axiadc_read(st, ADI_REG_CONFIG);
+	if (IS_CMOS(axi_config))
+		return ADI_ADRV9001_SSI_TYPE_CMOS;
+	else
+		return ADI_ADRV9001_SSI_TYPE_LVDS;
+}
+EXPORT_SYMBOL(adrv9002_axi_ssi_type_get);
+#endif
 #else  /* CONFIG_CF_AXI_ADC */
 
 int adrv9002_hdl_loopback(struct adrv9002_rf_phy *phy, bool enable)
