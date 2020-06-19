@@ -6,8 +6,6 @@
  *
  * Licensed under the GPL-2.
  */
-//#define DEBUG
-//#define _DEBUG
 
 #include <linux/module.h>
 #include <linux/device.h>
@@ -1374,6 +1372,9 @@ static int adrv9002_channel_power_set(struct adrv9002_rf_phy *phy,
 				      const int val)
 {
 	int ret;
+
+	dev_dbg(&phy->spi->dev, "Set power: %d, chan: %d, port: %d\n",
+		val, channel->number, port);
 
 	if (!val && channel->power) {
 		ret = adrv9002_channel_to_state(phy, channel, port,
@@ -3218,58 +3219,16 @@ static void adrv9002_of_clk_del_provider(void *data)
 	of_clk_del_provider(dev->of_node);
 }
 
-static int adrv9002_probe(struct spi_device *spi)
+int adrv9002_post_init(struct adrv9002_rf_phy *phy)
 {
-	struct iio_dev *indio_dev;
-	struct adrv9002_rf_phy *phy;
-	struct clk *clk = NULL;
 	struct adi_common_ApiVersion api_version;
 	struct adi_adrv9001_ArmVersion arm_version;
 	struct adi_adrv9001_SiliconVersion silicon_version;
-	struct adi_adrv9001_Init *adrv9002_init = adrv9002_init_get();
 	int ret;
-	const int *id;
+	struct spi_device *spi = phy->spi;
+	struct iio_dev *indio_dev = phy->indio_dev;
 
-	id = of_device_get_match_data(&spi->dev);
-	if (!id)
-		return -EINVAL;
-
-	clk = devm_clk_get(&spi->dev, "adrv9002_ext_refclk");
-	if (IS_ERR(clk))
-		return PTR_ERR(clk);
-
-	indio_dev = devm_iio_device_alloc(&spi->dev, sizeof(*phy));
-	if (!indio_dev)
-		return -ENOMEM;
-
-	phy = iio_priv(indio_dev);
-	phy->indio_dev = indio_dev;
-	phy->spi = spi;
-	phy->hal.phy = phy;
-	phy->spi_device_id = *id;
-	mutex_init(&phy->lock);
-
-	phy->adrv9001 = &phy->adrv9001_device;
-	phy->hal.spi = spi;
-	phy->adrv9001->common.devHalInfo = &phy->hal;
-
-	phy->hal.reset_gpio = devm_gpiod_get(&spi->dev, "reset", GPIOD_OUT_LOW);
-	if (IS_ERR(phy->hal.reset_gpio))
-		return PTR_ERR(phy->hal.reset_gpio);
-
-	ret = clk_prepare_enable(clk);
-	if (ret)
-		return ret;
-
-	ret = devm_add_action_or_reset(&spi->dev, adrv9002_clk_disable, clk);
-	if (ret)
-		return ret;
-
-	ret = adrv9002_parse_dt(phy);
-	if (ret)
-		return ret;
-
-	ret = adrv9002_setup(phy, adrv9002_init);
+	ret = adrv9002_setup(phy, adrv9002_init_get());
 	if (ret < 0)
 		return ret;
 
@@ -3323,10 +3282,6 @@ static int adrv9002_probe(struct spi_device *spi)
 	if (ret < 0)
 		return ret;
 
-	ret = adrv9002_register_axi_converter(phy);
-	if (ret < 0)
-		return ret;
-
 	sysfs_bin_attr_init(&phy->bin);
 	phy->bin.attr.name = "profile_config";
 	phy->bin.attr.mode = 0200;
@@ -3350,6 +3305,57 @@ static int adrv9002_probe(struct spi_device *spi)
 	adrv9002_debugfs_create(phy);
 
 	return 0;
+}
+EXPORT_SYMBOL(adrv9002_post_init);
+
+static int adrv9002_probe(struct spi_device *spi)
+{
+	struct iio_dev *indio_dev;
+	struct adrv9002_rf_phy *phy;
+	struct clk *clk = NULL;
+	int ret;
+	const int *id;
+
+	id = of_device_get_match_data(&spi->dev);
+	if (!id)
+		return -EINVAL;
+
+	clk = devm_clk_get(&spi->dev, "adrv9002_ext_refclk");
+	if (IS_ERR(clk))
+		return PTR_ERR(clk);
+
+	indio_dev = devm_iio_device_alloc(&spi->dev, sizeof(*phy));
+	if (!indio_dev)
+		return -ENOMEM;
+
+	phy = iio_priv(indio_dev);
+	phy->indio_dev = indio_dev;
+	phy->spi = spi;
+	phy->hal.phy = phy;
+	phy->spi_device_id = *id;
+	mutex_init(&phy->lock);
+
+	phy->adrv9001 = &phy->adrv9001_device;
+	phy->hal.spi = spi;
+	phy->adrv9001->common.devHalInfo = &phy->hal;
+
+	phy->hal.reset_gpio = devm_gpiod_get(&spi->dev, "reset", GPIOD_OUT_LOW);
+	if (IS_ERR(phy->hal.reset_gpio))
+		return PTR_ERR(phy->hal.reset_gpio);
+
+	ret = clk_prepare_enable(clk);
+	if (ret)
+		return ret;
+
+	ret = devm_add_action_or_reset(&spi->dev, adrv9002_clk_disable, clk);
+	if (ret)
+		return ret;
+
+	ret = adrv9002_parse_dt(phy);
+	if (ret)
+		return ret;
+
+	return adrv9002_register_axi_converter(phy);
 }
 
 static const int adrv9002_id = ID_ADRV9002;

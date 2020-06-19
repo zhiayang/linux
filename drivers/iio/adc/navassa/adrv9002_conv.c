@@ -238,12 +238,32 @@ int adrv9002_hdl_loopback(struct adrv9002_rf_phy *phy, bool enable)
 }
 EXPORT_SYMBOL(adrv9002_hdl_loopback);
 
+int adrv9002_axi_interface_set(struct adrv9002_rf_phy *phy, const u8 n_lanes,
+			       const u8 ssi_intf, const bool cmos_ddr,
+			       const int channel)
+{
+	struct axiadc_converter *conv = spi_get_drvdata(phy->spi);
+	struct axiadc_state *st = iio_priv(conv->indio_dev);
+	int ret;
+
+	ret = adrv9002_interface_validate(phy, st, ssi_intf);
+	if (ret)
+		return ret;
+
+	return adrv9002_interface_config(st, n_lanes, ssi_intf, cmos_ddr,
+					 channel);
+}
+EXPORT_SYMBOL(adrv9002_axi_interface_set);
+
 static int adrv9002_post_setup(struct iio_dev *indio_dev)
 {
 	struct axiadc_state *st = iio_priv(indio_dev);
 	struct axiadc_converter *conv = iio_device_get_drvdata(indio_dev);
-	u32 num_chan;
-	int i;
+	struct adrv9002_rf_phy *phy = conv->phy;
+	u32 num_chan, axi_config = 0;
+	int i, ret;
+	u8 ssi_intf, n_lanes;
+	bool cmos_ddr;
 
 	num_chan = conv->chip_info->num_channels;
 
@@ -262,28 +282,23 @@ static int adrv9002_post_setup(struct iio_dev *indio_dev)
 			     ADI_ENABLE | ADI_IQCOR_ENB);
 	}
 
-	/* FIXME: Defaut DAC interface to LVDS 2 Lane for now */
-	axiadc_write(st, AIM_AXI_REG(ADI_TX1_REG_OFF, ADI_TX_REG_RATE), 1);
+	axi_config = axiadc_read(st, ADI_REG_CONFIG);
+	if (IS_CMOS(axi_config))
+		adrv9002_cmos_default_set();
 
-	return 0;
-}
+	ret = adrv9002_post_init(phy);
+	if (ret)
+		return ret;
 
-static int adrv9002_post_iio(struct iio_dev *indio_dev)
-{
-	struct axiadc_state *st = iio_priv(indio_dev);
+	/* get adc rate now */
+	conv->clk = phy->clks[RX1_SAMPL_CLK];
+	conv->adc_clk = clk_get_rate(conv->clk);
 
-	/*
-	 * FIXME: This is a workaround. Apparently, there is an issue with
-	 * the hdl core in the rx1 port on the Q data. Doing a reset on the core
-	 * (in the final step of probing - this __only__ worked on the
-	 * post_iio_register cb) fixes the problem. However, the real issue
-	 * needs to be found and this should be removed...
-	 */
-	axiadc_write(st, ADI_REG_RSTN, 0);
-	msleep(20);
-	axiadc_write(st, ADI_REG_RSTN, 0x3);
+	adrv9002_get_ssi_interface(phy, ADRV9002_CHANN_1, &ssi_intf, &n_lanes,
+				   &cmos_ddr);
 
-	return 0;
+	return adrv9002_interface_config(st, n_lanes, ssi_intf, cmos_ddr,
+					 ADRV9002_CHANN_1);
 }
 
 int adrv9002_register_axi_converter(struct adrv9002_rf_phy *phy)
@@ -300,12 +315,8 @@ int adrv9002_register_axi_converter(struct adrv9002_rf_phy *phy)
 	conv->read_raw = adrv9002_read_raw;
 	conv->post_setup = adrv9002_post_setup;
 	conv->reg_access = adrv9002_reg_access;
-	conv->post_iio_register = adrv9002_post_iio;
 	conv->spi = spi;
 	conv->phy = phy;
-
-	conv->clk = phy->clks[RX1_SAMPL_CLK];
-	conv->adc_clk = clk_get_rate(conv->clk);
 
 	spi_set_drvdata(spi, conv); /* Take care here */
 
