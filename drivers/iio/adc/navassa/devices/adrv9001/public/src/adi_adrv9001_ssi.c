@@ -66,7 +66,7 @@ int32_t adi_adrv9001_Ssi_Rx_TestMode_Configure(adi_adrv9001_Device_t *device,
     uint8_t channelIdx = 0;
 
     ADI_PERFORM_VALIDATION(adi_adrv9001_Ssi_Rx_TestMode_Configure_Validate, device, channel, ssiType, dataFormat, ssiTestModeConfig);
-    
+
     adi_common_channel_to_index(channel, &channelIdx);
     instance = nvsRegmapRxInstances[channelIdx];
 
@@ -84,51 +84,65 @@ int32_t adi_adrv9001_Ssi_Rx_TestMode_Configure(adi_adrv9001_Device_t *device,
 
     if (ADI_ADRV9001_SSI_TYPE_CMOS == ssiType)
     {
-        ADI_EXPECT(adrv9001_NvsRegmapRx_CssiRxDebugMode_Set, device, instance, 0x1);
-        if (ADI_ADRV9001_SSI_TESTMODE_DATA_RAMP_NIBBLE == ssiTestModeConfig->testData)
-        {
-            ADI_EXPECT(adrv9001_NvsRegmapRx_CssiRxDebugStartRamp_Set, device, instance, 0x1);
-        }
-        else
-        {
-            ADI_EXPECT(adrv9001_NvsRegmapRx_CssiRxDebugStartRamp_Set, device, instance, 0x0);
-
-            for (i = 0; i < 2; i++)
+	if (ADI_ADRV9001_SSI_TESTMODE_DATA_NORMAL == ssiTestModeConfig->testData)
+	{
+	    ADI_EXPECT(adrv9001_NvsRegmapRx_CssiRxDebugMode_Set, device, instance, 0x0);
+	}
+	else
+	{
+	    ADI_EXPECT(adrv9001_NvsRegmapRx_CssiRxDebugMode_Set, device, instance, 0x1);
+            if (ADI_ADRV9001_SSI_TESTMODE_DATA_RAMP_NIBBLE == ssiTestModeConfig->testData)
             {
-                ADI_EXPECT(adrv9001_NvsRegmapRx_CssiRxDebugQSel_Set, device, instance, i);   // 0: I_data; 1: Q_data
-                ADI_EXPECT(adrv9001_NvsRegmapRx_CssiRxDebugNibbleSel_Set, device, instance, 0x3);
-                ADI_EXPECT(adrv9001_NvsRegmapRx_CssiRxDebugLoadValue_Set, device, instance, (uint8_t)(ssiTestModeConfig->fixedDataPatternToTransmit & 0xF));
-                ADI_EXPECT(adrv9001_NvsRegmapRx_CssiRxDebugLoad_Set, device, instance, 0x1);
-                ADI_EXPECT(adrv9001_NvsRegmapRx_CssiRxDebugLoad_Set, device, instance, 0x0);
+                ADI_EXPECT(adrv9001_NvsRegmapRx_CssiRxDebugStartRamp_Set, device, instance, 0x1);
             }
-        }
+            else
+            {
+                ADI_EXPECT(adrv9001_NvsRegmapRx_CssiRxDebugStartRamp_Set, device, instance, 0x0);
+
+                for (i = 0; i < 2; i++)
+                {
+                    ADI_EXPECT(adrv9001_NvsRegmapRx_CssiRxDebugQSel_Set, device, instance, i);   // 0: I_data; 1: Q_data
+                    ADI_EXPECT(adrv9001_NvsRegmapRx_CssiRxDebugNibbleSel_Set, device, instance, 0x3);
+                    ADI_EXPECT(adrv9001_NvsRegmapRx_CssiRxDebugLoadValue_Set, device, instance, (uint8_t)(ssiTestModeConfig->fixedDataPatternToTransmit & 0xF));
+                    ADI_EXPECT(adrv9001_NvsRegmapRx_CssiRxDebugLoad_Set, device, instance, 0x1);
+                    ADI_EXPECT(adrv9001_NvsRegmapRx_CssiRxDebugLoad_Set, device, instance, 0x0);
+                }
+            }
+	}
     }
     else /* LVDS */
     {
-        ADI_EXPECT(adrv9001_NvsRegmapRx_LssiRxDebugMode_Set, device, instance, 0x1);
-        if (ADI_ADRV9001_SSI_TESTMODE_DATA_RAMP_16_BIT == ssiTestModeConfig->testData)
-        {
-            ADI_EXPECT(adrv9001_NvsRegmapRx_LssiRxDebugStartRamp_Set, device, instance, 0x1);
-        }
-        else if (ADI_ADRV9001_SSI_TESTMODE_DATA_PRBS7 == ssiTestModeConfig->testData)
-        {
-
-            ADI_EXPECT(adrv9001_NvsRegmapRx_LssiRxDebugPrbs7Restart_Set, device, instance, 0x1);
-            ADI_EXPECT(adrv9001_NvsRegmapRx_LssiRxDebugPrbs7Enable_Set, device, instance, 0x1);
-        }
-        else if (ADI_ADRV9001_SSI_TESTMODE_DATA_PRBS15 == ssiTestModeConfig->testData)
-        {
-            ADI_EXPECT(adrv9001_NvsRegmapRx_LssiRxDebugPrbs15Restart_Set, device, instance, 0x1);
-            ADI_EXPECT(adrv9001_NvsRegmapRx_LssiRxDebugPrbs15Enable_Set, device, instance, 0x1);
-
-        }
-        else /* Fixed Pattern */
-        {
-            ADI_EXPECT(adrv9001_NvsRegmapRx_LssiRxDebugStartRamp_Set, device, instance, 0x0);
-            ADI_EXPECT(adrv9001_NvsRegmapRx_LssiRxDebugLoadValue_Set, device, instance, (uint16_t)(ssiTestModeConfig->fixedDataPatternToTransmit & 0xFFFF));
-            ADI_EXPECT(adrv9001_NvsRegmapRx_LssiRxDebugLoad_Set, device, instance, 0x1);
-            ADI_EXPECT(adrv9001_NvsRegmapRx_LssiRxDebugLoad_Set, device, instance, 0x0);
-        }
+	ADI_EXPECT(adrv9001_NvsRegmapRx_LssiRxDebugPrbs7Enable_Set, device, instance, 0x0);
+	ADI_EXPECT(adrv9001_NvsRegmapRx_LssiRxDebugPrbs15Enable_Set, device, instance, 0x0);
+	ADI_EXPECT(adrv9001_NvsRegmapRx_LssiRxDebugStartRamp_Set, device, instance, 0x0);
+	if (ADI_ADRV9001_SSI_TESTMODE_DATA_NORMAL == ssiTestModeConfig->testData)
+	{
+	    ADI_EXPECT(adrv9001_NvsRegmapRx_LssiRxDebugMode_Set, device, instance, 0x0);
+	}
+	else
+	{
+	    ADI_EXPECT(adrv9001_NvsRegmapRx_LssiRxDebugMode_Set, device, instance, 0x1);
+            if (ADI_ADRV9001_SSI_TESTMODE_DATA_RAMP_16_BIT == ssiTestModeConfig->testData)
+            {
+                ADI_EXPECT(adrv9001_NvsRegmapRx_LssiRxDebugStartRamp_Set, device, instance, 0x1);
+            }
+            else if (ADI_ADRV9001_SSI_TESTMODE_DATA_PRBS7 == ssiTestModeConfig->testData)
+            {
+                ADI_EXPECT(adrv9001_NvsRegmapRx_LssiRxDebugPrbs7Restart_Set, device, instance, 0x1);
+                ADI_EXPECT(adrv9001_NvsRegmapRx_LssiRxDebugPrbs7Enable_Set, device, instance, 0x1);
+            }
+            else if (ADI_ADRV9001_SSI_TESTMODE_DATA_PRBS15 == ssiTestModeConfig->testData)
+            {
+                ADI_EXPECT(adrv9001_NvsRegmapRx_LssiRxDebugPrbs15Restart_Set, device, instance, 0x1);
+                ADI_EXPECT(adrv9001_NvsRegmapRx_LssiRxDebugPrbs15Enable_Set, device, instance, 0x1);
+            }
+            else /* Fixed Pattern */
+            {
+                ADI_EXPECT(adrv9001_NvsRegmapRx_LssiRxDebugLoadValue_Set, device, instance, (uint16_t)(ssiTestModeConfig->fixedDataPatternToTransmit & 0xFFFF));
+                ADI_EXPECT(adrv9001_NvsRegmapRx_LssiRxDebugLoad_Set, device, instance, 0x1);
+                ADI_EXPECT(adrv9001_NvsRegmapRx_LssiRxDebugLoad_Set, device, instance, 0x0);
+            }
+	}
     }
 
     ADI_API_RETURN(device);
