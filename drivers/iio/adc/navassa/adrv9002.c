@@ -2142,50 +2142,6 @@ static int adrv9002_rx_agc_config_show(struct seq_file *s, void *ignored)
 }
 DEFINE_SHOW_ATTRIBUTE(adrv9002_rx_agc_config);
 
-static int adrv9002_tx_nco_frequency_get(void *arg, u64 *val)
-{
-	struct adrv9002_tx_chan	*tx = arg;
-	struct adrv9002_rf_phy *phy = tx_to_phy(tx, tx->channel.number - 1);
-	int ret;
-	int tmp;
-
-	if (!tx->channel.enabled)
-		return -ENODEV;
-
-	mutex_lock(&phy->lock);
-	ret = adi_adrv9001_Tx_NcoFrequency_Get(phy->adrv9001,
-					       tx->channel.number, &tmp);
-	mutex_unlock(&phy->lock);
-	if (ret)
-		return adrv9002_dev_err(phy);
-
-	*val = tmp;
-
-	return 0;
-}
-
-static int adrv9002_tx_nco_frequency_set(void *arg, const u64 val)
-{
-	struct adrv9002_tx_chan	*tx = arg;
-	struct adrv9002_rf_phy *phy = tx_to_phy(tx, tx->channel.number - 1);
-	int ret;
-
-	if (!tx->channel.enabled)
-		return -ENODEV;
-
-	mutex_lock(&phy->lock);
-	ret = adi_adrv9001_Tx_NcoFrequency_Set(phy->adrv9001,
-					       tx->channel.number, val);
-	mutex_unlock(&phy->lock);
-	if (ret)
-		return adrv9002_dev_err(phy);
-
-	return 0;
-}
-DEFINE_DEBUGFS_ATTRIBUTE(adrv9002_tx_nco_frequency_fops,
-			 adrv9002_tx_nco_frequency_get,
-			 adrv9002_tx_nco_frequency_set, "%lld\n");
-
 static int adrv9002_tx_dac_full_scale_get(void *arg, u64 *val)
 {
 	struct adrv9002_tx_chan	*tx = arg;
@@ -2588,10 +2544,6 @@ static void adrv9002_debugfs_create(struct adrv9002_rf_phy *phy)
 			    &tx_ssi_avail_mask, &adrv9002_ssi_mode_avail_fops);
 
 	for (chan = 0; chan < ARRAY_SIZE(phy->tx_channels); chan++) {
-		sprintf(attr, "tx%d_nco_frequency_hz", chan);
-		debugfs_create_file_unsafe(attr, 0600, d,
-					   &phy->tx_channels[chan],
-					   &adrv9002_tx_nco_frequency_fops);
 		sprintf(attr, "tx%d_attenuation_pin_control", chan);
 		debugfs_create_file(attr, 0400, d, &phy->tx_channels[chan],
 				    &adrv9002_tx_pin_atten_control_fops);
