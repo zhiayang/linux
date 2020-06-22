@@ -2374,6 +2374,9 @@ static int adrv9002_ssi_rx_test_mode_set(void *arg, const u64 val)
 	adi_adrv9001_SsiType_e ssi_type = adrv9002_axi_ssi_type_get(phy);
 	int ret;
 
+	if (!rx->channel.enabled)
+		return -ENODEV;
+
 	mutex_lock(&phy->lock);
 	ret = adi_adrv9001_Ssi_Rx_TestMode_Configure(phy->adrv9001, rx->channel.number,
 						     ssi_type,
@@ -2470,6 +2473,9 @@ static int adrv9002_ssi_tx_test_mode_set(void *arg, const u64 val)
 	adi_adrv9001_SsiType_e ssi_type = adrv9002_axi_ssi_type_get(phy);
 	int ret;
 
+	if (!tx->channel.enabled)
+		return -ENODEV;
+
 	mutex_lock(&phy->lock);
 	ret = adi_adrv9001_Ssi_Tx_TestMode_Configure(phy->adrv9001, tx->channel.number,
 						     ssi_type,
@@ -2492,6 +2498,9 @@ static int adrv9002_ssi_tx_test_mode_status_show(struct seq_file *s,
 	adi_adrv9001_SsiType_e ssi_type = adrv9002_axi_ssi_type_get(phy);
 	adi_adrv9001_TxSsiTestModeStatus_t ssi_status = {0};
 	int ret;
+
+	if (!tx->channel.enabled)
+		return -ENODEV;
 
 	mutex_lock(&phy->lock);
 	ret = adi_adrv9001_Ssi_Tx_TestMode_Status_Inspect(phy->adrv9001,
