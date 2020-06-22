@@ -2513,6 +2513,65 @@ static int adrv9002_ssi_tx_test_mode_status_show(struct seq_file *s,
 }
 DEFINE_SHOW_ATTRIBUTE(adrv9002_ssi_tx_test_mode_status);
 
+static int adrv9002_ssi_delays_show(struct seq_file *s, void *ignored)
+{
+	struct adrv9002_rf_phy *phy = s->private;
+	int ret, i;
+	struct adi_adrv9001_SsiCalibrationCfg delays = {0};
+	adi_adrv9001_SsiType_e ssi_type = adrv9002_axi_ssi_type_get(phy);
+
+	mutex_lock(&phy->lock);
+	ret = adi_adrv9001_Ssi_Delay_Inspect(phy->adrv9001, ssi_type, &delays);
+	mutex_unlock(&phy->lock);
+	if (ret)
+		return adrv9002_dev_err(phy);
+
+	for (i = 0; i < ADRV9002_CHANN_MAX; i++) {
+		seq_printf(s, "rx%d_ClkDelay: %u\n", i, delays.rxClkDelay[i]);
+		seq_printf(s, "rx%d_StrobeDelay: %u\n", i, delays.rxStrobeDelay[i]);
+		seq_printf(s, "rx%d_rxIDataDelay: %u\n", i, delays.rxIDataDelay[i]);
+		seq_printf(s, "rx%d_rxQDataDelay: %u\n", i, delays.rxQDataDelay[i]);
+		seq_printf(s, "tx%d_ClkDelay: %u\n", i, delays.txClkDelay[i]);
+		seq_printf(s, "tx%d_RefClkDelay: %u\n", i, delays.txRefClkDelay[i]);
+		seq_printf(s, "tx%d_StrobeDelay: %u\n", i, delays.txStrobeDelay[i]);
+		seq_printf(s, "tx%d_rxIDataDelay: %u\n", i, delays.txIDataDelay[i]);
+		seq_printf(s, "tx%d_rxQDataDelay: %u\n", i, delays.txQDataDelay[i]);
+	}
+
+	return 0;
+}
+
+static ssize_t adrv9002_ssi_delays_write(struct file *file, const char __user *userbuf,
+					 size_t count, loff_t *ppos)
+{
+	struct seq_file *s = file->private_data;
+	struct adrv9002_rf_phy *phy = s->private;
+	int ret;
+	adi_adrv9001_SsiType_e ssi_type = adrv9002_axi_ssi_type_get(phy);
+
+	mutex_lock(&phy->lock);
+	ret = adi_adrv9001_Ssi_Delay_Configure(phy->adrv9001, ssi_type, &phy->ssi_delays);
+	mutex_unlock(&phy->lock);
+	if (ret)
+		return adrv9002_dev_err(phy);
+
+	return count;
+}
+
+static int adrv9002_ssi_delays_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, adrv9002_ssi_delays_show, inode->i_private);
+}
+
+static const struct file_operations adrv9002_ssi_delays_fops = {
+	.owner		= THIS_MODULE,
+	.open		= adrv9002_ssi_delays_open,
+	.read		= seq_read,
+	.write		= adrv9002_ssi_delays_write,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
+
 static void adrv9002_debugfs_create(struct adrv9002_rf_phy *phy)
 {
 	int chan;
@@ -2544,6 +2603,8 @@ static void adrv9002_debugfs_create(struct adrv9002_rf_phy *phy)
 	debugfs_create_file("tx_ssi_test_mode_data_available", 0400, d,
 			    &tx_ssi_avail_mask, &adrv9002_ssi_mode_avail_fops);
 
+	debugfs_create_file("ssi_delays", 0600, d, phy, &adrv9002_ssi_delays_fops);
+
 	for (chan = 0; chan < ARRAY_SIZE(phy->tx_channels); chan++) {
 		sprintf(attr, "tx%d_attenuation_pin_control", chan);
 		debugfs_create_file(attr, 0400, d, &phy->tx_channels[chan],
@@ -2567,6 +2628,17 @@ static void adrv9002_debugfs_create(struct adrv9002_rf_phy *phy)
 		debugfs_create_file(attr, 0400, d,
 				    &phy->tx_channels[chan],
 				    &adrv9002_ssi_tx_test_mode_status_fops);
+
+		sprintf(attr, "tx%d_ssi_clk_delay", chan);
+		debugfs_create_u8(attr, 0600, d, &phy->ssi_delays.txClkDelay[chan]);
+		sprintf(attr, "tx%d_ssi_refclk_delay", chan);
+		debugfs_create_u8(attr, 0600, d, &phy->ssi_delays.txRefClkDelay[chan]);
+		sprintf(attr, "tx%d_ssi_strobe_delay_delay", chan);
+		debugfs_create_u8(attr, 0600, d, &phy->ssi_delays.txStrobeDelay[chan]);
+		sprintf(attr, "tx%d_ssi_i_data_delay", chan);
+		debugfs_create_u8(attr, 0600, d, &phy->ssi_delays.txIDataDelay[chan]);
+		sprintf(attr, "tx%d_ssi_q_data_delay", chan);
+		debugfs_create_u8(attr, 0600, d, &phy->ssi_delays.txQDataDelay[chan]);
 	}
 
 	for (chan = 0; chan < ARRAY_SIZE(phy->rx_channels); chan++) {
@@ -2590,6 +2662,15 @@ static void adrv9002_debugfs_create(struct adrv9002_rf_phy *phy)
 		debugfs_create_file(attr, 0200, d,
 				    &phy->rx_channels[chan],
 				    &adrv9002_ssi_rx_test_mode_config_fops);
+
+		sprintf(attr, "rx%d_ssi_clk_delay", chan);
+		debugfs_create_u8(attr, 0600, d, &phy->ssi_delays.rxClkDelay[chan]);
+		sprintf(attr, "rx%d_ssi_strobe_delay", chan);
+		debugfs_create_u8(attr, 0600, d, &phy->ssi_delays.rxStrobeDelay[chan]);
+		sprintf(attr, "rx%d_ssi_i_data_delay", chan);
+		debugfs_create_u8(attr, 0600, d, &phy->ssi_delays.rxIDataDelay[chan]);
+		sprintf(attr, "rx%d_ssi_q_data_delay", chan);
+		debugfs_create_u8(attr, 0600, d, &phy->ssi_delays.rxQDataDelay[chan]);
 	}
 }
 #else

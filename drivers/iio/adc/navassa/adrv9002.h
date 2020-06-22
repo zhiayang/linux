@@ -201,7 +201,9 @@ struct adrv9002_rf_phy {
 
 	int			spi_device_id;
 	int			ngpios;
-
+#ifdef CONFIG_DEBUG_FS
+	struct adi_adrv9001_SsiCalibrationCfg ssi_delays;
+#endif
 };
 
 int adrv9002_hdl_loopback(struct adrv9002_rf_phy *phy, bool enable);
