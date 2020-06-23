@@ -2141,7 +2141,121 @@ static int adrv9002_rx_agc_config_show(struct seq_file *s, void *ignored)
 
 	return 0;
 }
-DEFINE_SHOW_ATTRIBUTE(adrv9002_rx_agc_config);
+
+static ssize_t adrv9002_rx_agc_config_write(struct file *file, const char __user *userbuf,
+					    size_t count, loff_t *ppos)
+{
+	struct seq_file *s = file->private_data;
+	struct adrv9002_rx_chan	*rx = s->private;
+	struct adrv9002_rf_phy *phy = rx_to_phy(rx, rx->channel.number - 1);
+	int ret;
+
+	mutex_lock(&phy->lock);
+	ret = adi_adrv9001_Rx_GainControl_Configure(phy->adrv9001, rx->channel.number,
+						    &rx->debug_agc);
+	mutex_unlock(&phy->lock);
+	if (ret)
+		return adrv9002_dev_err(phy);
+
+	return count;
+}
+
+static int adrv9002_rx_agc_config_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, adrv9002_rx_agc_config_show, inode->i_private);
+}
+
+static const struct file_operations adrv9002_rx_agc_config_fops = {
+	.owner		= THIS_MODULE,
+	.open		= adrv9002_rx_agc_config_open,
+	.read		= seq_read,
+	.write		= adrv9002_rx_agc_config_write,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
+
+void adrv9002_debugfs_agc_config_create(struct adrv9002_rx_chan *rx, struct dentry *d)
+{
+#define adrv9002_agc_get_attr(nr, member) ((nr) == ADI_CHANNEL_1 ? \
+					"rx0_agc_" #member : "rx1_agc_" #member)
+
+#define adrv9002_agc_add_file_u8(member) { \
+	const char *attr = adrv9002_agc_get_attr(rx->channel.number, member); \
+	debugfs_create_u8(attr, 0600, d, (u8 *)&rx->debug_agc.member); \
+}
+
+#define adrv9002_agc_add_file_u16(member) { \
+	const char *attr = adrv9002_agc_get_attr(rx->channel.number, member); \
+	debugfs_create_u16(attr, 0600, d, &rx->debug_agc.member); \
+}
+
+#define adrv9002_agc_add_file_u32(member) { \
+	const char *attr = adrv9002_agc_get_attr(rx->channel.number, member); \
+	debugfs_create_u32(attr, 0600, d, &rx->debug_agc.member); \
+}
+
+#define adrv9002_agc_add_file_bool(member) { \
+	const char *attr = adrv9002_agc_get_attr(rx->channel.number, member); \
+	debugfs_create_bool(attr, 0600, d, &rx->debug_agc.member); \
+}
+	adrv9002_agc_add_file_u8(peakWaitTime);
+	adrv9002_agc_add_file_u8(maxGainIndex);
+	adrv9002_agc_add_file_u8(minGainIndex);
+	adrv9002_agc_add_file_u32(gainUpdateCounter);
+	adrv9002_agc_add_file_u8(attackDelay_us);
+	adrv9002_agc_add_file_u8(slowLoopSettlingDelay);
+	adrv9002_agc_add_file_bool(lowThreshPreventGainInc);
+	adrv9002_agc_add_file_u8(changeGainIfThreshHigh);
+	adrv9002_agc_add_file_u8(agcMode);
+	adrv9002_agc_add_file_bool(resetOnRxon);
+	adrv9002_agc_add_file_u8(resetOnRxonGainIndex);
+	adrv9002_agc_add_file_bool(enableSyncPulseForGainCounter);
+	adrv9002_agc_add_file_bool(enableFastRecoveryLoop);
+	/* power parameters */
+	adrv9002_agc_add_file_bool(power.powerEnableMeasurement);
+	adrv9002_agc_add_file_u8(power.underRangeHighPowerThresh);
+	adrv9002_agc_add_file_u8(power.underRangeLowPowerThresh);
+	adrv9002_agc_add_file_u8(power.underRangeHighPowerGainStepRecovery);
+	adrv9002_agc_add_file_u8(power.underRangeLowPowerGainStepRecovery);
+	adrv9002_agc_add_file_u8(power.powerMeasurementDuration);
+	adrv9002_agc_add_file_u8(power.powerMeasurementDelay);
+	adrv9002_agc_add_file_u16(power.rxTddPowerMeasDuration);
+	adrv9002_agc_add_file_u16(power.rxTddPowerMeasDelay);
+	adrv9002_agc_add_file_u8(power.overRangeHighPowerThresh);
+	adrv9002_agc_add_file_u8(power.overRangeLowPowerThresh);
+	adrv9002_agc_add_file_u8(power.overRangeHighPowerGainStepAttack);
+	adrv9002_agc_add_file_u8(power.overRangeLowPowerGainStepAttack);
+	adrv9002_agc_add_file_u8(power.feedback_lowThreshold_gainChange);
+	adrv9002_agc_add_file_u8(power.feedback_high_threshold_exceeded);
+	/* peak parameters */
+	adrv9002_agc_add_file_u16(peak.agcUnderRangeLowInterval);
+	adrv9002_agc_add_file_u8(peak.agcUnderRangeMidInterval);
+	adrv9002_agc_add_file_u8(peak.agcUnderRangeHighInterval);
+	adrv9002_agc_add_file_u8(peak.apdHighThresh);
+	adrv9002_agc_add_file_u8(peak.apdLowThresh);
+	adrv9002_agc_add_file_u8(peak.apdUpperThreshPeakExceededCount);
+	adrv9002_agc_add_file_u8(peak.apdLowerThreshPeakExceededCount);
+	adrv9002_agc_add_file_u8(peak.apdGainStepAttack);
+	adrv9002_agc_add_file_u8(peak.apdGainStepRecovery);
+	adrv9002_agc_add_file_bool(peak.enableHbOverload);
+	adrv9002_agc_add_file_u8(peak.hbOverloadDurationCount);
+	adrv9002_agc_add_file_u8(peak.hbOverloadThreshCount);
+	adrv9002_agc_add_file_u16(peak.hbHighThresh);
+	adrv9002_agc_add_file_u16(peak.hbUnderRangeLowThresh);
+	adrv9002_agc_add_file_u16(peak.hbUnderRangeMidThresh);
+	adrv9002_agc_add_file_u16(peak.hbUnderRangeHighThresh);
+	adrv9002_agc_add_file_u8(peak.hbUpperThreshPeakExceededCount);
+	adrv9002_agc_add_file_u8(peak.hbUnderRangeHighThreshExceededCount);
+	adrv9002_agc_add_file_u8(peak.hbGainStepHighRecovery);
+	adrv9002_agc_add_file_u8(peak.hbGainStepLowRecovery);
+	adrv9002_agc_add_file_u8(peak.hbGainStepMidRecovery);
+	adrv9002_agc_add_file_u8(peak.hbGainStepMidRecovery);
+	adrv9002_agc_add_file_u8(peak.hbOverloadPowerMode);
+	adrv9002_agc_add_file_u8(peak.hbUnderRangeMidThreshExceededCount);
+	adrv9002_agc_add_file_u8(peak.hbUnderRangeLowThreshExceededCount);
+	adrv9002_agc_add_file_u8(peak.feedback_low_threshold_counter_exceeded);
+	adrv9002_agc_add_file_u8(peak.feedback_high_threshold_counter_exceeded);
+}
 
 static int adrv9002_tx_dac_full_scale_get(void *arg, u64 *val)
 {
@@ -2658,7 +2772,7 @@ static void adrv9002_debugfs_create(struct adrv9002_rf_phy *phy)
 		debugfs_create_file(attr, 0400, d, &phy->rx_channels[chan],
 				    &adrv9002_rx_gain_control_pin_mode_fops);
 		sprintf(attr, "rx%d_agc_config", chan);
-		debugfs_create_file(attr, 0400, d, &phy->rx_channels[chan],
+		debugfs_create_file(attr, 0600, d, &phy->rx_channels[chan],
 				    &adrv9002_rx_agc_config_fops);
 		sprintf(attr, "rx%d_ssi_test_mode_data", chan);
 		debugfs_create_file(attr, 0600, d, &phy->rx_channels[chan],
@@ -2680,6 +2794,7 @@ static void adrv9002_debugfs_create(struct adrv9002_rf_phy *phy)
 		debugfs_create_u8(attr, 0600, d, &phy->ssi_delays.rxIDataDelay[chan]);
 		sprintf(attr, "rx%d_ssi_q_data_delay", chan);
 		debugfs_create_u8(attr, 0600, d, &phy->ssi_delays.rxQDataDelay[chan]);
+		adrv9002_debugfs_agc_config_create(&phy->rx_channels[chan], d);
 	}
 }
 #else
