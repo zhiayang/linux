@@ -53,7 +53,14 @@
 	adi,control-bits-per-sample = <0>;
 };
 
+&hmc7044 {
+	adi,pll2-autocal-bypass-manual-cap-bank-sel = <0xe>;
+};
+
 &hmc7044_fmc_car {
+
+	adi,pll2-autocal-bypass-manual-cap-bank-sel = <0xf>;
+
 	hmc7044_fmc_car_c6: channel@6 {
 		reg = <6>;
 		adi,extended-name = "SYNC_OUT2";
@@ -889,6 +896,8 @@
 
 		adi,high-performance-mode-clock-dist-enable;
 		adi,high-performance-mode-pll-vco-enable;
+
+		adi,pll2-autocal-bypass-manual-cap-bank-sel = <0xf>;
 
 		clock-output-names =
 			"hmc7044_out0_DEV_REFCLK_C", "hmc7044_out1_DEV_SYSREF_C",
