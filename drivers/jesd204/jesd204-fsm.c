@@ -113,7 +113,7 @@ static const struct jesd204_fsm_table_entry jesd204_start_links_states[] = {
 static const struct jesd204_fsm_table_entry jesd204_uninit_dev_states[] = {
 	JESD204_STATE_OP(LINK_DISABLE),
 	JESD204_STATE_OP(CLOCKS_DISABLE),
-	JESD204_STATE_OP_LAST(LINK_UNINIT),
+	JESD204_STATE_OP_LAST(LINK_DOWN),
 };
 
 const char *jesd204_state_str(enum jesd204_dev_state state)
@@ -129,6 +129,8 @@ const char *jesd204_state_str(enum jesd204_dev_state state)
 		return "probed";
 	case JESD204_STATE_LINK_INIT:
 		return "link_init";
+	case JESD204_STATE_LINK_DOWN:
+		return "link_down";
 	case JESD204_STATE_LINK_SUPPORTED:
 		return "link_supported";
 	case JESD204_STATE_LINK_PRE_SETUP:
@@ -145,8 +147,6 @@ const char *jesd204_state_str(enum jesd204_dev_state state)
 		return "link_disable";
 	case JESD204_STATE_LINK_RUNNING:
 		return "link_running";
-	case JESD204_STATE_LINK_UNINIT:
-		return "link_uninit";
 	case JESD204_STATE_OPT_SETUP_STAGE1:
 		return "opt_setup_stage1";
 	case JESD204_STATE_OPT_SETUP_STAGE2:
@@ -882,15 +882,10 @@ static int jesd204_fsm_probe_done(struct jesd204_dev *jdev,
 				      JESD204_STATE_LINK_INIT);
 }
 
-int jesd204_fsm_start(struct jesd204_dev *jdev, unsigned int link_idx)
+static int jesd204_fsm_start_from_probe(struct jesd204_dev *jdev,
+					unsigned int link_idx)
 {
 	int ret;
-
-	if (!jdev)
-		return 0;
-
-	if (IS_ERR(jdev))
-		return PTR_ERR(jdev);
 
 	jdev->fsm_started = true;
 
@@ -903,6 +898,20 @@ int jesd204_fsm_start(struct jesd204_dev *jdev, unsigned int link_idx)
 		jdev->fsm_started = false;
 
 	return ret;
+}
+
+int jesd204_fsm_start(struct jesd204_dev *jdev, unsigned int link_idx)
+{
+	if (!jdev)
+		return 0;
+
+	if (IS_ERR(jdev))
+		return PTR_ERR(jdev);
+
+	if (!jdev->fsm_started)
+		return jesd204_fsm_start_from_probe(jdev, link_idx);
+
+	return jesd204_fsm_start_link(jdev, link_idx, JESD204_STATE_LINK_DOWN);
 }
 EXPORT_SYMBOL_GPL(jesd204_fsm_start);
 

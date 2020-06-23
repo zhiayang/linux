@@ -658,7 +658,7 @@ static int op ## jesd204_link(struct jesd204_dev *jdev, \
 
 
 state_op(LINK_INIT)
-state_op(LINK_UNINIT)
+state_op(LINK_DOWN)
 state_op(LINK_SUPPORTED)
 state_op(LINK_PRE_SETUP)
 state_op(LINK_SETUP)
@@ -684,7 +684,7 @@ state_op(SYSREF)
 
 static const struct jesd204_state_op test_state_ops[] = {
 	state_op_entry(LINK_INIT)
-	state_op_entry(LINK_UNINIT)
+	state_op_entry(LINK_DOWN)
 	state_op_entry(LINK_SUPPORTED)
 	state_op_entry(LINK_PRE_SETUP)
 	state_op_entry(LINK_SETUP)

@@ -5854,7 +5854,7 @@ static const struct jesd204_dev_data jesd204_adrv9009_init = {
 		[JESD204_OP_LINK_RUNNING] = {
 			.per_link = adrv9009_jesd204_link_running,
 		},
-		[JESD204_OP_LINK_UNINIT] = {
+		[JESD204_OP_LINK_DOWN] = {
 			.per_device = adrv9009_jesd204_uninit,
 			.mode = JESD204_STATE_OP_MODE_PER_DEVICE,
 		},
