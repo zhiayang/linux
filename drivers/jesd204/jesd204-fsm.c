@@ -845,15 +845,26 @@ static int jesd204_fsm_init_link(struct jesd204_dev *jdev,
 	if (ret)
 		return ret;
 
+	if (!jdev_top)
+		return 0;
+
 	return jesd204_dev_init_link_data(jdev_top, link_idx);
 }
 
 static int jesd204_fsm_start_link(struct jesd204_dev *jdev,
+				  struct jesd204_dev_top *jdev_top,
 				  unsigned int link_idx,
 				  enum jesd204_dev_state init_state)
 {
+	int ret;
+
+	ret = jesd204_fsm_init_link(jdev, jdev_top, link_idx, init_state);
+	if (ret)
+		return ret;
+
 	return jesd204_fsm_table(jdev, link_idx,
-				 init_state, jesd204_start_links_states,
+				 JESD204_STATE_LINK_INIT,
+				 jesd204_start_links_states,
 				 false);
 }
 
@@ -870,16 +881,9 @@ static int jesd204_fsm_probed_cb(struct jesd204_dev *jdev,
 static int jesd204_fsm_probe_done(struct jesd204_dev *jdev,
 				  struct jesd204_fsm_data *fsm_data)
 {
-	int ret;
-
-	ret = jesd204_fsm_init_link(jdev, fsm_data->jdev_top,
-				    fsm_data->link_idx,
-				    JESD204_STATE_PROBED);
-	if (ret)
-		return ret;
-
-	return jesd204_fsm_start_link(jdev, fsm_data->link_idx,
-				      JESD204_STATE_LINK_INIT);
+	return jesd204_fsm_start_link(jdev, fsm_data->jdev_top,
+				      fsm_data->link_idx,
+				      JESD204_STATE_PROBED);
 }
 
 static int jesd204_fsm_start_from_probe(struct jesd204_dev *jdev,
@@ -911,7 +915,8 @@ int jesd204_fsm_start(struct jesd204_dev *jdev, unsigned int link_idx)
 	if (!jdev->fsm_started)
 		return jesd204_fsm_start_from_probe(jdev, link_idx);
 
-	return jesd204_fsm_start_link(jdev, link_idx, JESD204_STATE_LINK_DOWN);
+	return jesd204_fsm_start_link(jdev, jesd204_dev_top_dev(jdev),
+				      link_idx, JESD204_STATE_LINK_DOWN);
 }
 EXPORT_SYMBOL_GPL(jesd204_fsm_start);
 
