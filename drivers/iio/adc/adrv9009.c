@@ -5798,7 +5798,7 @@ static int adrv9009_jesd204_post_running_stage(struct jesd204_dev *jdev)
 	}
 
 	phy->is_initialized = 1;
-	enable_irq(phy->spi->irq);
+	//enable_irq(phy->spi->irq);
 	adrv9009_info(phy);
 
 	return JESD204_STATE_CHANGE_DONE;
@@ -6021,6 +6021,7 @@ static int adrv9009_probe(struct spi_device *spi)
 	switch (phy->spi_device_id) {
 	case ID_ADRV9009:
 	case ID_ADRV9009_X2:
+	case ID_ADRV9009_X4:
 		phy->initCalMask = TAL_TX_BB_FILTER | TAL_ADC_TUNER |  TAL_TIA_3DB_CORNER |
 			TAL_DC_OFFSET | TAL_RX_GAIN_DELAY | TAL_FLASH_CAL |
 			TAL_PATH_DELAY | TAL_TX_LO_LEAKAGE_INTERNAL |
