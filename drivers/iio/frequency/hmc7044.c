@@ -310,6 +310,7 @@ struct hmc7044 {
 	struct jesd204_dev 		*jdev;
 	u32				jdev_lmfc_lemc_rate;
 	u32				jdev_lmfc_lemc_gcd;
+	bool				is_sysref_provider;
 };
 
 static const char * const hmc7044_input_clk_names[] = {
@@ -1264,6 +1265,8 @@ static int hmc7044_parse_dt(struct device *dev,
 			return ret;
 	}
 
+	hmc->is_sysref_provider = of_property_read_bool(np, "jesd204-sysref-provider");
+
 	hmc->rf_reseeder_en =
 		!of_property_read_bool(np, "adi,rf-reseeder-disable");
 
@@ -1474,24 +1477,63 @@ static int hmc7044_jesd204_link_supported(struct jesd204_dev *jdev,
 	return JESD204_STATE_CHANGE_DONE;
 }
 
-static int hmc7044_jesd204_clks_enable(struct jesd204_dev *jdev,
-		unsigned int link_num,
-		struct jesd204_link *lnk)
+static int hmc7044_jesd204_clks_sync1(struct jesd204_dev *jdev)
 {
 	struct device *dev = jesd204_dev_to_device(jdev);
+	struct iio_dev *indio_dev = dev_get_drvdata(dev);
+	struct hmc7044 *hmc = iio_priv(indio_dev);
+	int ret;
+	unsigned mask, val;
 
-	dev_dbg(dev, "%s:%d link_num %u\n", __func__, __LINE__, link_num);
+	dev_dbg(dev, "%s:%d\n", __func__, __LINE__);
+
+	if (hmc->is_sysref_provider)
+		mask = HMC7044_RESEED_REQ;
+	else
+		mask = HMC7044_RESTART_DIV_FSM;
+
+	ret = hmc7044_read(indio_dev, HMC7044_REG_REQ_MODE_0, &val);
+	if (ret < 0) {
+		mutex_unlock(&hmc->lock);
+		return ret;
+	}
+
+	hmc7044_write(indio_dev, HMC7044_REG_REQ_MODE_0,
+		val | mask);
+
+	ret = hmc7044_write(indio_dev, HMC7044_REG_REQ_MODE_0, val);
+	if (ret)
+		return ret;
+
+	msleep(1);
 
 	return JESD204_STATE_CHANGE_DONE;
 }
 
-static int hmc7044_jesd204_clks_disable(struct jesd204_dev *jdev,
-		unsigned int link_num,
-		struct jesd204_link *lnk)
+static int hmc7044_jesd204_clks_sync2(struct jesd204_dev *jdev)
+{
+	return JESD204_STATE_CHANGE_DONE;
+}
+
+static int hmc7044_jesd204_clks_sync3(struct jesd204_dev *jdev)
 {
 	struct device *dev = jesd204_dev_to_device(jdev);
+	struct iio_dev *indio_dev = dev_get_drvdata(dev);
+	struct hmc7044 *hmc = iio_priv(indio_dev);
+	unsigned val;
+	int ret;
 
-	dev_dbg(dev, "%s:%d link_num %u\n", __func__, __LINE__, link_num);
+	if (hmc->is_sysref_provider)
+		return JESD204_STATE_CHANGE_DONE;
+
+	msleep(1);
+
+	ret = hmc7044_read(indio_dev, HMC7044_REG_ALARM_READBACK, &val);
+	if (ret < 0)
+		return ret;
+
+	if (HMC7044_CLK_OUT_PH_STATUS(val))
+		dev_err(dev, "%s: SYSREF of the HMC7044 is not valid; that is, its phase output is not stable\n",__func__);
 
 	return JESD204_STATE_CHANGE_DONE;
 }
@@ -1577,11 +1619,17 @@ static const struct jesd204_dev_data jesd204_hmc7044_init = {
 		[JESD204_OP_LINK_SUPPORTED] = {
 			.per_link = hmc7044_jesd204_link_supported,
 		},
-		[JESD204_OP_CLOCKS_ENABLE] = {
-			.per_link = hmc7044_jesd204_clks_enable,
+		[JESD204_OP_CLK_SYNC_STAGE1] = {
+			.per_device = hmc7044_jesd204_clks_sync1,
+			.mode = JESD204_STATE_OP_MODE_PER_DEVICE,
 		},
-		[JESD204_OP_CLOCKS_DISABLE] = {
-			.per_link = hmc7044_jesd204_clks_disable,
+		[JESD204_OP_CLK_SYNC_STAGE2] = {
+			.per_device = hmc7044_jesd204_clks_sync2,
+			.mode = JESD204_STATE_OP_MODE_PER_DEVICE_POST_TOP_SYSREF,
+		},
+		[JESD204_OP_CLK_SYNC_STAGE3] = {
+			.per_device = hmc7044_jesd204_clks_sync3,
+			.mode = JESD204_STATE_OP_MODE_PER_DEVICE,
 		},
 		[JESD204_OP_LINK_PRE_SETUP] = {
 			.per_link = hmc7044_jesd204_link_pre_setup,
